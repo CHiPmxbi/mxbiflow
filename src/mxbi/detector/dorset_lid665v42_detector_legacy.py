@@ -2,10 +2,11 @@ from threading import Thread
 from typing import Callable
 
 from mxbi.detector.detector import DetectionResult, Detector
+from mxbi.models.rfid_animal import animal_db
 from mxbi.peripheral.rfid.dorset_lid665v42 import DorsetLID665v42, Result
 
 
-class DorsetLID665v42Detector(Detector):
+class DorsetLID665v42DetectorLegacy(Detector):
     def __init__(self, theater, port: str, baudrate: int) -> None:
         super().__init__(theater, port, baudrate)
         self._scanner = DorsetLID665v42(self._port, self._baudrate)
@@ -37,5 +38,7 @@ class DorsetLID665v42Detector(Detector):
             self._reader_thread = None
 
     def _handle_result(self, result: Result) -> None:
-        detect_result = DetectionResult(result.animal_id, False)
-        self.process_detection(detect_result)
+        animal = animal_db.root.get(result.animal_id)
+        if animal is not None:
+            detect_result = DetectionResult(animal.name, False)
+            self.process_detection(detect_result)
