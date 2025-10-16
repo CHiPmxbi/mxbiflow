@@ -108,7 +108,7 @@ class InitialHabituationTraining:
             name=self._animal_state.name,
             id=self._animal_state.trial_id,
             dur=f"{int(self._data.stay_duration)} s",
-            rewards=self._reward_times
+            rewards=self._reward_times,
         )
         self._show_data_widget.update_data(data.model_dump())
         self._background.after(1000, self._start_tracking_data)
