@@ -247,7 +247,11 @@ class Scheduler:
         self._evaluate_and_adjust_difficulty(animal_state)
 
     def _get_animal_state(self, animal_name: str) -> AnimalState:
-        return self._animal_states[animal_name]
+        try:
+            return self._animal_states[animal_name]
+        except KeyError as e:
+            logger.error("Unknown animal name from detector: %s", animal_name)
+            raise KeyError(animal_name) from e
 
     def _select_task(self, task_enum: TaskEnum) -> type[Task]:
         return task_table[task_enum]
