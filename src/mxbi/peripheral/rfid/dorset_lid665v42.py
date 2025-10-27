@@ -5,7 +5,7 @@ from enum import StrEnum, auto
 from threading import Lock
 from typing import Callable, Deque
 
-from serial import EIGHTBITS, PARITY_NONE, STOPBITS_ONE, Serial
+from serial import EIGHTBITS, PARITY_NONE, Serial, SerialException, STOPBITS_ONE
 
 
 class ProtocolState(StrEnum):
@@ -59,6 +59,9 @@ class _LID665v42FrameParser:
     @property
     def last_error(self) -> str:
         return self._last_error
+
+    def record_error(self, message: str) -> None:
+        self._last_error = message
 
     def feed(self, byte: bytes) -> Result | None:
         """Consume a single byte and return a complete frame when available"""
@@ -216,7 +219,13 @@ class DorsetLID665v42:
     def read(self) -> None:
         """Continuously read from the serial port and store parsed frames."""
         while self._serial.is_open:
-            byte = self._serial.read(1)
+            try:
+                byte = self._serial.read(1)
+            except (SerialException, OSError, TypeError) as exc:
+                # Closing the serial port from another thread can interrupt reads.
+                self._protocol.record_error(f"Serial read aborted: {exc}")
+                self._protocol.reset()
+                break
             if not byte:
                 continue
 
