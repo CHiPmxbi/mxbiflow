@@ -3,12 +3,11 @@ name = "mxbi"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-authors = [
-    { name = "HuYang", email = "huyangcommit@gmail.com" }
-]
+authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = [
     "gpiozero>=2.0.1",
+    "keyring>=25.6.0",
     "loguru>=0.7.3",
     "matplotlib>=3.10.6",
     "mss>=10.1.0",
@@ -19,6 +18,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "pyserial>=3.5",
     "rich>=14.1.0",
+    "typer>=0.20.0",
     "varname>=0.15.0",
 ]
 
