@@ -5,7 +5,7 @@ from enum import StrEnum, auto
 from threading import Lock
 from typing import Callable, Deque
 
-from serial import EIGHTBITS, PARITY_NONE, Serial, SerialException, STOPBITS_ONE
+from serial import EIGHTBITS, PARITY_NONE, STOPBITS_ONE, Serial, SerialException
 
 
 class ProtocolState(StrEnum):

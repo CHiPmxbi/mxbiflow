@@ -1,0 +1,13 @@
+from pathlib import Path
+
+ROOT_DIR_PATH = Path(__file__).parents[2]
+
+CONFIG_DIR_PATH = ROOT_DIR_PATH / "config"
+SAMBA_CONFIG = "samba.json"
+
+DATA_DIR_PATH = ROOT_DIR_PATH / "data"
+SAMBA_MOUNT_PATH = ROOT_DIR_PATH / "samba_mount"
+SAMBA_BACKUP_DIR_NAME = "backup"
+SAMBA_BACKUP_DIR_PATH = SAMBA_MOUNT_PATH / SAMBA_BACKUP_DIR_NAME
+
+KEYRING_SERVICE_NAME = "mxbi"
