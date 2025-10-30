@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 import subprocess
 from getpass import getpass
+from pathlib import Path
 
 import typer
-from mxbi.path import MOUNT_SERVICE_NAME, MOUNT_SERVICE_PATH, SAMBA_MOUNT_PATH
+from mxbi.path import (
+    MOUNT_SERVICE_NAME,
+    MOUNT_SERVICE_PATH,
+    SAMBA_MOUNT_PATH,
+    SYNC_SERVICE_NAME,
+    SYNC_SERVICE_PATH,
+)
 from rich import print
 
 
@@ -19,14 +26,23 @@ def link() -> None:
     """
     print("[cyan]🔗 Linking service file to /etc/systemd/system/...[/cyan]")
 
-    target_path = f"/etc/systemd/system/{MOUNT_SERVICE_NAME}"
+    mount_target_path = Path("/etc/systemd/system") / MOUNT_SERVICE_NAME
+    sync_target_path = Path.home() / ".config" / "systemd" / "user" / SYNC_SERVICE_NAME
+    sync_target_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         subprocess.run(
-            ["sudo", "ln", "-sf", str(MOUNT_SERVICE_PATH), target_path],
+            ["sudo", "ln", "-sf", str(MOUNT_SERVICE_PATH), mount_target_path],
             check=True,
         )
-        print(f"[green]✅ Linked:[/green] {target_path}")
+        print(f"[green]✅ Linked:[/green] {mount_target_path}")
+
+        subprocess.run(
+            ["ln", "-sf", str(SYNC_SERVICE_PATH), sync_target_path],
+            check=True,
+        )
+        print(f"[green]✅ Linked:[/green] {sync_target_path}")
+
     except subprocess.CalledProcessError:
         print(
             "[red]❌ Failed to create symlink. Try running with sudo privileges.[/red]"
@@ -43,22 +59,38 @@ def enable() -> None:
     try:
         # Reload systemd units
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
 
         # Try to start the service first (without enabling)
         print(f"[cyan]▶️ Testing start for:[/cyan] {MOUNT_SERVICE_NAME}")
-        start_proc = subprocess.run(
+        start_mount_proc = subprocess.run(
             ["sudo", "systemctl", "start", f"{MOUNT_SERVICE_NAME}"],
             capture_output=True,
             text=True,
         )
 
-        if start_proc.returncode != 0:
+        if start_mount_proc.returncode != 0:
             print("[red]❌ Failed to start the service. Not enabling it.[/red]")
-            print(f"[yellow]STDOUT:[/yellow]\n{start_proc.stdout.strip()}")
-            print(f"[yellow]STDERR:[/yellow]\n{start_proc.stderr.strip()}")
+            print(f"[yellow]STDOUT:[/yellow]\n{start_mount_proc.stdout.strip()}")
+            print(f"[yellow]STDERR:[/yellow]\n{start_mount_proc.stderr.strip()}")
             raise typer.Exit(code=1)
 
-        print("[green]✅ Service started successfully.[/green]")
+        print(f"[green]✅ Service {MOUNT_SERVICE_NAME} started successfully.[/green]")
+
+        print(f"[cyan]▶️ Testing start for:[/cyan] {SYNC_SERVICE_NAME}")
+        start_sync_proc = subprocess.run(
+            ["systemctl", "--user", "start", f"{SYNC_SERVICE_NAME}"],
+            capture_output=True,
+            text=True,
+        )
+
+        if start_sync_proc.returncode != 0:
+            print("[red]❌ Failed to start the service. Not enabling it.[/red]")
+            print(f"[yellow]STDOUT:[/yellow]\n{start_sync_proc.stdout.strip()}")
+            print(f"[yellow]STDERR:[/yellow]\n{start_sync_proc.stderr.strip()}")
+            raise typer.Exit(code=1)
+
+        print(f"[green]✅ Service {SYNC_SERVICE_NAME} started successfully.[/green]")
 
         # Enable the service to start automatically on boot
         print("[cyan]🔁 Enabling service to start on boot...[/cyan]")
@@ -68,6 +100,13 @@ def enable() -> None:
         )
 
         print(f"[green]✅ Service enabled on boot:[/green] {MOUNT_SERVICE_NAME}")
+
+        subprocess.run(
+            ["systemctl", "--user", "enable", f"{SYNC_SERVICE_NAME}"],
+            check=True,
+        )
+
+        print(f"[green]✅ Service enabled on boot:[/green] {SYNC_SERVICE_NAME}")
 
     except subprocess.CalledProcessError as e:
         print(f"[red]❌ Command failed:[/red] {e}")
@@ -143,7 +182,7 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 
-ExecStartPre=/bin/sleep 60
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/mount -t cifs {smb_server} {SAMBA_MOUNT_PATH} -o credentials=%d/dpz-smb-cred,uid=1000,gid=1000,nobrl,_netdev
 ExecStop=/usr/bin/umount {SAMBA_MOUNT_PATH}
 

@@ -14,5 +14,6 @@ def sync() -> None:
 def setup() -> None:
     setup_samba()
 
+
 if __name__ == "__main__":
     app()
