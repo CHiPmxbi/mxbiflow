@@ -6,13 +6,13 @@
 
 [Unit]
 Description=sync data to samba server
-After=network-online.target mount.service
+After=network-online.target
 Wants=network-online.target
-Requires=mount.service
 
 [Service]
 Type=oneshot
 WorkingDirectory=%h/mxbi/src/mxbi/tools/sync_data
+ExecStartPre=/bin/sleep 20
 ExecStart=%h/.local/bin/uv run main.py sync
 
 [Install]
