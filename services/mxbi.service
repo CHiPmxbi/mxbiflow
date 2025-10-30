@@ -1,0 +1,19 @@
+# User service file for mxbi main process
+# Place this file in ~/.config/systemd/user/
+# systemctl --user daemon-reload
+# systemctl --user enable mxbi.service
+# systemctl --user start mediamtx.service
+
+[Unit]
+Description=mxbi main task
+After=graphical.target
+
+[Service]
+Type=exec
+WorkingDirectory=%h/mxbi
+ExecStart=%h/.local/bin/uv run mxbi
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

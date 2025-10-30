@@ -1,0 +1,19 @@
+# User service file for mxbi main process
+# Place this file in ~/.config/systemd/user/
+# systemctl --user daemon-reload
+# systemctl --user enable sync.service
+# systemctl --user start sync.service
+
+[Unit]
+Description=sync data to samba server
+After=network-online.target mount.service
+Wants=network-online.target
+Requires=mount.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/mxbi/src/mxbi/tools/sync_data
+ExecStart=%h/.local/bin/uv run main.py sync
+
+[Install]
+WantedBy=default.target
