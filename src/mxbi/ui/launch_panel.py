@@ -149,6 +149,7 @@ class LaunchPanel:
         self.text_detector_interval = create_textbox(
             frame_detector, "Interval: ", height=1
         )
+        self.text_detector_interval.insert(str(session_config.value.detector_interval))
         self.text_detector_interval.pack(fill="x")
 
     def _init_animals_ui(self) -> None:
@@ -264,9 +265,10 @@ class LaunchPanel:
         value = self.combo_detector_baudrate.get().strip()
         return int(value) if value else None
 
-    def _selected_detector_interval(self) -> int | None:
+    def _selected_detector_interval(self) -> float | None:
         value = self.text_detector_interval.get().strip()
-        return int(value) if value else None
+        if value != "None":
+            return float(value) if value else None
 
     def _selected_screen_type(self):
         screen_key = ScreenTypeEnum(self.combo_screen.get())

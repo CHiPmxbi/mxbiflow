@@ -9,12 +9,12 @@ from mxbi.peripheral.rfid.dorset_lid665v42 import DorsetLID665v42, Result
 
 class DorsetLID665v42Detector(Detector):
     def __init__(
-        self, theater, port: str, baudrate: int, detection_interval: int
+        self, theater, port: str, baudrate: int, detection_interval: float
     ) -> None:
         super().__init__(theater)
-        self._scanner = DorsetLID665v42(self._port, self._baudrate)
         self._port = port
         self._baudrate = baudrate
+        self._scanner = DorsetLID665v42(self._port, self._baudrate)
 
         self._reader_thread: Thread | None = None
         self._stop_event = Event()

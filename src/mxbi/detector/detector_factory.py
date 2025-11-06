@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class DorsetLID665v42Config:
     baudrate: int
     port: str
-    interval: int
+    interval: float
 
 
 DetectorConfig = Union[DorsetLID665v42Config, None]

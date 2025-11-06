@@ -63,7 +63,9 @@ class Theater:
         self._root.geometry(f"{screen_type.width}x{screen_type.height}")
 
         self._root.config(cursor="none")
+        self._root.configure(bg="black")
         self._root.after(1000, lambda: self._root.attributes("-fullscreen", True))
+
 
     def _bind_event(self) -> None:
         self._root.bind("<Escape>", self._quit)
