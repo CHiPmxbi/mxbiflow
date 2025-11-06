@@ -55,20 +55,21 @@ Outcome goal:
 
 **📊 Current Level Table**
 
-| level | evaluation_interval | reward_interval / s | reward_duration / ms | stimulus_duration / ms | stimulus_density |
-| ----- | ------------------- | ------------------- | -------------------- | ---------------------- | ---------------- |
-| 0     | 20                  | 5                   | 1000                 | 1000                   | 5                |
-| 1     | 30                  | 10                  | 1200                 | 1500                   | 7                |
-| 2     | 40                  | 15                  | 1400                 | 2000                   | 9                |
-| 3     | 50                  | 20                  | 1600                 | 2500                   | 11               |
-| 4     | 50                  | 25                  | 1800                 | 3000                   | 13               |
-| 5     | 100                 | 30                  | 2000                 | 3000                   | 15               |
-| 6     | 100                 | 35                  | 2200                 | 3000                   | 17               |
-| 7     | 100                 | 40                  | 2400                 | 3000                   | 19               |
-| 8     | 100                 | 45                  | 2600                 | 3000                   | 21               |
-| 9     | 100                 | 50                  | 2800                 | 3000                   | 23               |
-| 10    | 100                 | 55                  | 3000                 | 3000                   | 25               |
-| 11    | 100                 | 60                  | 3000                 | 3000                   | 25               |
+| level | evaluation_interval | reward_interval_s | reward_duration_ms | stimulus_duration_ms | stimulus_density |
+| :---: | :-----------------: | :---------------: | :----------------: | :------------------: | :--------------: |
+|   0   |         20          |         2         |        1000        |         1000         |        5         |
+|   1   |         20          |         5         |        1200        |         1500         |        7         |
+|   2   |         40          |        10         |        1400        |         2000         |        9         |
+|   3   |         50          |        15         |        1600        |         2500         |        11        |
+|   4   |         50          |        20         |        1800        |         3000         |        13        |
+|   5   |         100         |        25         |        2000        |         3000         |        15        |
+|   6   |         100         |        30         |        2200        |         3000         |        17        |
+|   7   |         100         |        35         |        2400        |         3000         |        19        |
+|   8   |         100         |        40         |        2600        |         3000         |        21        |
+|   9   |         100         |        45         |        2800        |         3000         |        23        |
+|  10   |         100         |        50         |        3000        |         3000         |        25        |
+|  11   |         100         |        55         |        3000        |         3000         |        25        |
+|  12   |         100         |        60         |        3000        |         3000         |        25        |
 
 **🧪 Next Step**
 Currently, the time the animal must stay in MXBI to get a reward is controlled by `reward_interval`. As shown above, it is a fixed value. Consider changing it to a range and randomly choosing the actual `reward_interval` within that range.
