@@ -4,7 +4,6 @@ from tkinter import Tk
 from tkinter.ttk import Button, Frame, Label
 
 from mxbi.config import session_config, session_options
-from mxbi.detector.detector_factory import DetectorEnum
 from mxbi.models.animal import AnimalConfig
 from mxbi.models.reward import RewardEnum
 from mxbi.models.session import ScreenTypeEnum, SessionConfig
@@ -16,6 +15,7 @@ from mxbi.ui.components.fileds.labeled_combobox import (
 )
 from mxbi.ui.components.fileds.labeled_textbox import create_textbox
 from mxbi.utils.detect_platform import PlatformEnum
+from mxbi.models.detector import DetectorEnum
 
 
 class LaunchPanel:
@@ -91,7 +91,7 @@ class LaunchPanel:
             default_screen,
         )
 
-        self.entry_comments = create_textbox(frame_general, "Comments: ", height=8)
+        self.entry_comments = create_textbox(frame_general, "Comments: ", height=4)
         self.entry_comments.pack(fill="x")
 
     def _init_detector_ui(self) -> None:
@@ -145,6 +145,11 @@ class LaunchPanel:
             baudrate_options,
             default_baudrate,
         )
+
+        self.text_detector_interval = create_textbox(
+            frame_detector, "Interval: ", height=1
+        )
+        self.text_detector_interval.pack(fill="x")
 
     def _init_animals_ui(self) -> None:
         self.frame_animals = Frame(self._frame)
@@ -239,6 +244,7 @@ class LaunchPanel:
             detector=DetectorEnum(self.combo_detector.get()),
             detector_port=self._selected_detector_port(),
             detector_baudrate=self._selected_detector_baudrate(),
+            detector_interval=self._selected_detector_interval(),
             screen_type=self._selected_screen_type(),
             comments=comments,
             animals=self._collect_animals(),
@@ -256,6 +262,10 @@ class LaunchPanel:
 
     def _selected_detector_baudrate(self) -> int | None:
         value = self.combo_detector_baudrate.get().strip()
+        return int(value) if value else None
+
+    def _selected_detector_interval(self) -> int | None:
+        value = self.text_detector_interval.get().strip()
         return int(value) if value else None
 
     def _selected_screen_type(self):

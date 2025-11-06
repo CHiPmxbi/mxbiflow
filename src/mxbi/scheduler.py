@@ -13,6 +13,7 @@ from mxbi.models.task import TaskEnum
 from mxbi.tasks.task_protocol import Task
 from mxbi.tasks.task_table import task_table
 from mxbi.utils.logger import logger
+from mxbi.detector.detector_factory import DorsetLID665v42Config
 
 if TYPE_CHECKING:
     from mxbi.models.task import Feedback
@@ -70,9 +71,16 @@ class Scheduler:
 
     def _init_detector(self) -> Detector:
         config = self._theater.session_config
-        baudrate = config.detector_baudrate or 0
-        port = config.detector_port or ""
-        return DetectorFactory.create(config.detector, self._theater, baudrate, port)
+        if config.detector_port and config.detector_baudrate is not None:
+            detector_config = DorsetLID665v42Config(
+                port=config.detector_port,
+                baudrate=config.detector_baudrate,
+                interval=5,
+            )
+
+            return DetectorFactory.create(detector_config, self._theater)
+
+        return DetectorFactory.create(None, self._theater)
 
     def start(self) -> None:
         self._detector.start()
@@ -260,12 +268,17 @@ class Scheduler:
         if state.condition is None:
             return
 
-        if state.current_level_trial_id < state.condition.config.evaluation_interval:
+        config = state.condition.config
+
+        if state.current_level_trial_id < config.evaluation_interval:
             return
 
-        if state.correct_rate >= state.condition.config.difficulty_increase_threshold:
+        if state.correct_rate >= config.difficulty_increase_threshold:
             self._increase_difficulty(state)
-        elif state.correct_rate <= state.condition.config.difficulty_decrease_threshold:
+        elif (
+            state.correct_rate <= config.difficulty_decrease_threshold
+            and config.allow_decrease
+        ):
             self._decrease_difficulty(state)
 
     def _increase_difficulty(self, state: AnimalState) -> None:

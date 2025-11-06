@@ -1,8 +1,0 @@
-{
-    "default": {
-        "params": {
-            "stay_duration": 10000,
-            "reward_duration": 1000
-        }
-    }
-}
