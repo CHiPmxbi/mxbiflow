@@ -16,6 +16,7 @@ from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_t
     DefaultStayToRewardScene,
 )
 from mxbi.utils.logger import logger
+from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState
@@ -25,12 +26,25 @@ if TYPE_CHECKING:
 
 
 contexts = StageContexts()
+background: CanvasWithInnerBorder | None = None
 
 
 def _initialize_contexts(session_config: "SessionConfig") -> None:
+    global contexts
     for monkey in session_config.animals.keys():
         if contexts.root.get(monkey) is None:
             contexts.root[monkey] = StageContext()
+
+
+def _initialize_background(theater: "Theater", session_config: "SessionConfig") -> None:
+    global background
+    background = CanvasWithInnerBorder(
+        master=theater.root,
+        bg="black",
+        width=session_config.screen_type.width,
+        height=session_config.screen_type.height,
+        border_width=40,
+    )
 
 
 class InitialHabituationTrainingStage:
@@ -48,6 +62,9 @@ class InitialHabituationTrainingStage:
 
         if not contexts.root:
             _initialize_contexts(session_state.session_config)
+
+        if background is None:
+            _initialize_background(theater, session_state.session_config)
 
         context = contexts.root[animal_state.name]
 
@@ -70,12 +87,15 @@ class InitialHabituationTrainingStage:
             self._session_state, self._animal_state.name, self.STAGE_NAME
         )
 
+        assert background is not None
+
         self._task = DefaultStayToRewardScene(
             theater=theater,
             animal_state=animal_state,
             screen_type=session_state.session_config.screen_type,
             trial_config=_config,
             context=context,
+            background=background,
         )
 
     def start(self) -> "Feedback":

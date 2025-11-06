@@ -71,11 +71,15 @@ class Scheduler:
 
     def _init_detector(self) -> Detector:
         config = self._theater.session_config
-        if config.detector_port and config.detector_baudrate is not None:
+        if (
+            config.detector_port
+            and config.detector_baudrate is not None
+            and config.detector_interval is not None
+        ):
             detector_config = DorsetLID665v42Config(
                 port=config.detector_port,
                 baudrate=config.detector_baudrate,
-                interval=5,
+                interval=config.detector_interval,
             )
 
             return DetectorFactory.create(detector_config, self._theater)

@@ -1,6 +1,7 @@
 from datetime import datetime
 from math import ceil
 from typing import TYPE_CHECKING, Final
+from tkinter import Frame
 
 from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_to_reward_models import (
     DataToShow,
@@ -36,12 +37,14 @@ class DefaultStayToRewardScene:
         screen_type: "ScreenConfig",
         trial_config: "TrialConfig",
         context: "StageContext",
+        background: "CanvasWithInnerBorder",
     ):
         self._theater: "Final[Theater]" = theater
         self._animal_state: "Final[AnimalState]" = animal_state
         self._screen_type: "Final[ScreenConfig]" = screen_type
         self._trial_config: "Final[TrialConfig]" = trial_config
         self._context: "Final[StageContext]" = context
+        self._background = background
 
         self._tone = self._prepare_stimulus()
 
@@ -73,7 +76,8 @@ class DefaultStayToRewardScene:
             self._data.trial_end_time - self._data.trial_start_time
         )
 
-        self._background.destroy()
+        self._trigger.destroy()
+        self._show_data_widget.destroy()
         self._theater.root.quit()
 
     # endregion
@@ -82,18 +86,15 @@ class DefaultStayToRewardScene:
 
     def _create_view(self) -> None:
         self._create_background()
+        self._create_trigger()
         self._create_show_data_widget()
 
     def _create_background(self) -> None:
-        self._background = CanvasWithInnerBorder(
-            master=self._theater.root,
-            bg="black",
-            width=self._screen_type.width,
-            height=self._screen_type.height,
-            border_width=40,
-        )
-
         self._background.place(relx=0.5, rely=0.5, anchor="center")
+
+    def _create_trigger(self) -> None:
+        self._trigger = Frame()
+        self._trigger.pack_forget()
 
     def _create_show_data_widget(self) -> None:
         self._show_data_widget = ShowDataWidget(self._background)
@@ -112,11 +113,11 @@ class DefaultStayToRewardScene:
 
     # region event binding
     def _bind_events(self) -> None:
-        self._background.focus_set()
-        self._background.bind("<r>", lambda e: self._give_reward())
+        self._trigger.focus_set()
+        self._trigger.bind("<r>", lambda e: self._give_reward())
 
     def _start_timing(self) -> None:
-        self._background.after(
+        self._trigger.after(
             self._trial_config.reward_interval * 1000, self._give_stimulus
         )
 
@@ -137,7 +138,7 @@ class DefaultStayToRewardScene:
         self._context.duration += 1
 
         self._show_data_widget.update_data(data.model_dump())
-        self._background.after(1000, self._start_tracking_data)
+        self._trigger.after(1000, self._start_tracking_data)
 
     def _init_data(self) -> None:
         self._data = TrialData(
@@ -180,9 +181,9 @@ class DefaultStayToRewardScene:
 
     def _on_stimulus_complete(self, future: "Future[bool]") -> None:
         if future.result():
-            self._background.after(0, self._give_reward)
+            self._trigger.after(0, self._give_reward)
 
-            self._background.after(self._trial_config.reward_duration, self._on_correct)
+            self._trigger.after(self._trial_config.reward_duration, self._on_correct)
 
     def _on_correct(self) -> None:
         self._data.result = Result.CORRECT
