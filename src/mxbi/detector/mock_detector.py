@@ -3,8 +3,8 @@ from mxbi.utils.logger import logger
 
 
 class MockDetector(Detector):
-    def __init__(self, theater, port: str, baudrate: int) -> None:
-        super().__init__(theater, port, baudrate)
+    def __init__(self, theater) -> None:
+        super().__init__(theater)
 
         self.__result = DetectionResult("mock_001", False)
         self._theater.root.bind("<p>", self.__on_mock_001_animal_entered)

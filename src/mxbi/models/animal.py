@@ -17,7 +17,8 @@ class AnimalConfig(BaseModel):
 class ScheduleConditionConfig(BaseModel):
     evaluation_interval: int = 20
     difficulty_increase_threshold: float = 0.8
-    difficulty_decrease_threshold: float = 0.45
+    difficulty_decrease_threshold: float = 0
+    allow_decrease: bool = True
     next_task: TaskEnum | None = None
 
 

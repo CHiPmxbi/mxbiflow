@@ -33,6 +33,7 @@ class SessionConfig(BaseModel):
     detector: DetectorEnum = DetectorEnum.MOCK
     detector_port: str | None = None
     detector_baudrate: int | None = None
+    detector_interval: float | None = None
     screen_type: ScreenConfig = Field(default_factory=ScreenConfig)
     animals: dict[str, AnimalConfig] = Field(default_factory=dict)
 
