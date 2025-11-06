@@ -2,7 +2,7 @@
     "default": {
         "condition": {
             "config": {
-                "difficulty_increase_threshold": 0.8,
+                "difficulty_increase_threshold": 0,
                 "allow_decrease": false
             }
         },
