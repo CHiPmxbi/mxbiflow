@@ -38,8 +38,7 @@ class IDLEScene:
         self._bind_events()
 
     def _on_trial_end(self) -> None:
-        self._background.destroy()
-        self._theater.root.quit()
+        self._theater.root.after(0, self._destory)
 
     def _create_view(self) -> None:
         self._background = CanvasWithInnerBorder(
@@ -69,12 +68,17 @@ class IDLEScene:
         self._theater.reward.give_reward(duration)
 
     def quit(self) -> None:
+        self._on_trial_end()
+    
+    def _destory(self) -> None:
         self._background.destroy()
         self._theater.root.quit()
 
-    def on_idle(self) -> None: ...
+    def on_idle(self) -> None:
+        self._on_trial_end()
 
-    def on_return(self) -> None: ...
+    def on_return(self) -> None:
+        self._on_trial_end()
 
     @property
     def condition(self) -> "ScheduleCondition | None":

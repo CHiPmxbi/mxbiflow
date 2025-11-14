@@ -56,12 +56,12 @@ class Scheduler:
             for animal in session_config.value.animals.values()
         }
 
-        self._state = SchedulerState(
+        self._scheduler_state = SchedulerState(
             running=False,
             state=ScheduleRunningStateEnum.SCHEDULE,
             animal_state=None,
         )
-        self._state.current_task = None
+        self._scheduler_state.current_task = None
 
         self._scheduler_logger = DataLogger(
             self._theater._session_state, "scheduler", "scheduler"
@@ -88,8 +88,8 @@ class Scheduler:
 
     def start(self) -> None:
         self._detector.start()
-        self._state.running = True
-        self._run_scheduler_loop()
+        self._scheduler_state.running = True
+        self._scheduler_loop()
 
     def quit(self) -> None:
         for animal_state in self._animal_states.values():
@@ -98,10 +98,10 @@ class Scheduler:
 
         session_config.save()
 
-        self._state.running = False
+        self._scheduler_state.running = False
         self._detector.quit()
-        if self._state.current_task is not None:
-            self._state.current_task.quit()
+        if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.quit()
 
     def _bind_events(self) -> None:
         self._theater.register_event_quit(self.quit)
@@ -123,48 +123,50 @@ class Scheduler:
         )
 
     def _on_manual_next_task(self, _) -> None:
-        if not self._state.running:
+        if not self._scheduler_state.running:
             return
 
-        if self._state.animal_state is None:
+        if self._scheduler_state.animal_state is None:
             logger.warning(
                 "No animal selected, unable to start the next task manually."
             )
             return
 
-        if self._state.current_task is not None:
+        if self._scheduler_state.current_task is not None:
             try:
-                self._state.current_task.quit()
+                self._scheduler_state.current_task.quit()
             except Exception:
                 logger.exception("Error quitting current task during manual advance")
 
-        self._state.current_task = None
+        self._scheduler_state.current_task = None
 
-        condition = self._state.animal_state.condition
+        condition = self._scheduler_state.animal_state.condition
         if condition is None or condition.config.next_task is None:
             logger.warning("Manual advance requested but no next task is defined.")
         else:
-            previous_task = self._state.animal_state.task
-            previous_level = self._state.animal_state.level
+            previous_task = self._scheduler_state.animal_state.task
+            previous_level = self._scheduler_state.animal_state.level
 
-            self._state.animal_state.task = condition.config.next_task
-            self._state.animal_state.level = 0
-            self._state.animal_state.reset()
+            self._scheduler_state.animal_state.task = condition.config.next_task
+            self._scheduler_state.animal_state.level = 0
+            self._scheduler_state.animal_state.reset()
 
             session_config.value.animals[
-                self._state.animal_state.name
-            ].task = self._state.animal_state.task
+                self._scheduler_state.animal_state.name
+            ].task = self._scheduler_state.animal_state.task
 
             session_config.save()
-            self._log_task_switch(self._state.animal_state, previous_task)
-            if previous_level != self._state.animal_state.level:
-                self._log_level_change(self._state.animal_state, previous_level)
+            self._log_task_switch(self._scheduler_state.animal_state, previous_task)
+            if previous_level != self._scheduler_state.animal_state.level:
+                self._log_level_change(
+                    self._scheduler_state.animal_state, previous_level
+                )
 
     def _on_manual_next_level(self, _) -> None:
-        if not self._state.running:
+        if not self._scheduler_state.running:
             return
 
-        animal_state = self._state.animal_state
+        animal_state = self._scheduler_state.animal_state
         if animal_state is None:
             logger.warning("No animal selected, unable to advance the level manually.")
             return
@@ -175,14 +177,14 @@ class Scheduler:
             )
             return
 
-        if self._state.current_task is not None:
+        if self._scheduler_state.current_task is not None:
             try:
-                self._state.current_task.quit()
+                self._scheduler_state.current_task.quit()
             except Exception:
                 logger.exception(
                     "Error quitting current task during manual level advance"
                 )
-            self._state.current_task = None
+            self._scheduler_state.current_task = None
 
         previous_level = animal_state.level
         previous_task = animal_state.task
@@ -195,64 +197,65 @@ class Scheduler:
             )
             return
 
-    def _run_scheduler_loop(self) -> None:
-        state_handlers = {
-            ScheduleRunningStateEnum.IDLE: self._run_idle_state,
-            ScheduleRunningStateEnum.SCHEDULE: self._run_schedule_state,
-            ScheduleRunningStateEnum.ERROR: self._run_error_state,
-        }
+    def _scheduler_loop(self) -> None:
+        while self._scheduler_state.running:
+            match self._scheduler_state.state:
+                case ScheduleRunningStateEnum.IDLE:
+                    self._run_idle_state()
 
-        while self._state.running:
-            handler = state_handlers.get(self._state.state)
-            if handler is None:
-                logger.error(f"Unknown scheduler state: {self._state.state}")
-                self._state.running = False
-                continue
+                case ScheduleRunningStateEnum.SCHEDULE:
+                    self._run_schedule_state()
 
-            handler()
+                case ScheduleRunningStateEnum.ERROR:
+                    self._run_error_state()
+
+                case _:
+                    logger.error(f"Unknown scheduler state: {self._state.state}")
+                    self._state.running = False
 
     def _run_idle_state(self) -> None:
         self._start_system_task(TaskEnum.IDEL)
+        self._scheduler_state.current_task = None
 
     def _run_schedule_state(self) -> None:
-        animal_state = self._state.animal_state
+        animal_state = self._scheduler_state.animal_state
         if animal_state is None:
             self._transition_to_state(
                 ScheduleRunningStateEnum.IDLE, reason="no_animal_selected"
             )
             return
 
-        self._state.current_task = self._create_task(animal_state)
-        try:
-            feedback = self._state.current_task.start()
-            self._handle_task_feedback(animal_state, feedback)
-        finally:
-            self._state.current_task = None
+        self._scheduler_state.current_task = self._create_task(animal_state)
+        feedback = self._scheduler_state.current_task.start()
+        self._scheduler_state.current_task = None
+
+        self._handle_task_feedback(animal_state, feedback)
 
     def _run_error_state(self) -> None:
         self._start_system_task(TaskEnum.ERROR)
+        self._scheduler_state.current_task = None
 
     def _start_system_task(self, task_enum: TaskEnum) -> None:
-        self._state.current_task = task_table[task_enum](
+        self._scheduler_state.current_task = task_table[task_enum](
             self._theater,
             self._theater._session_state,
             AnimalState(),
         )
-        self._state.current_task.start()
+        self._scheduler_state.current_task.start()
 
     def _create_task(self, animal_state: AnimalState) -> Task:
-        task_class = self._select_task(animal_state.task)
-        task = task_class(self._theater, self._theater._session_state, animal_state)
+        task = task_table[animal_state.task](
+            self._theater, self._theater._session_state, animal_state
+        )
 
         animal_state.condition = task.condition
-        logger.info(f"condition: {task.condition}")
 
         return task
 
     def _handle_task_feedback(
         self, animal_state: AnimalState, feedback: "Feedback"
     ) -> None:
-        if self._state.current_task is None:
+        if self._scheduler_state.current_task is None:
             return
 
         animal_state.update(feedback)
@@ -264,9 +267,6 @@ class Scheduler:
         except KeyError as e:
             logger.error("Unknown animal name from detector: %s", animal_name)
             raise KeyError(animal_name) from e
-
-    def _select_task(self, task_enum: TaskEnum) -> type[Task]:
-        return task_table[task_enum]
 
     def _evaluate_and_adjust_difficulty(self, state: AnimalState) -> None:
         if state.condition is None:
@@ -337,45 +337,40 @@ class Scheduler:
             self._log_level_change(state, previous_level)
 
     def _on_animal_entered(self, animal_name: str) -> None:
-        self._state.animal_state = self._get_animal_state(animal_name)
+        self._scheduler_state.animal_state = self._get_animal_state(animal_name)
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_entered"
         )
-        if self._state.current_task is not None:
-            self._state.current_task.quit()
+
+        if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.quit()
 
     def _on_animal_returned(self, _: str) -> None:
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_returned"
         )
-        if self._state.current_task is not None:
-            self._state.current_task.on_return()
+        if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.on_return()
 
     def _on_animal_left(self, _: str) -> None:
         self._transition_to_state(ScheduleRunningStateEnum.IDLE, reason="animal_left")
-        if self._state.current_task is None:
-            return
-
-        try:
-            self._state.current_task.on_idle()
-        except Exception as error:
-            logger.error(error)
-            self._state.current_task.quit()
+        if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.quit()
 
     def _on_animal_changed(self, animal_name: str) -> None:
-        self._state.animal_state = self._get_animal_state(animal_name)
+        self._scheduler_state.animal_state = self._get_animal_state(animal_name)
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_changed"
         )
-        if self._state.current_task is not None:
-            self._state.current_task.quit()
+        if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.quit()
 
     def _on_detect_error(self, _: str) -> None:
         self._transition_to_state(
             ScheduleRunningStateEnum.ERROR, reason="error_detected"
         )
-        if self._state.current_task is not None:
-            self._state.current_task.quit()
+        if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.quit()
 
     def _log_task_switch(
         self, animal_state: AnimalState, previous_task: TaskEnum
@@ -400,11 +395,11 @@ class Scheduler:
     def _transition_to_state(
         self, new_state: ScheduleRunningStateEnum, *, reason: str | None = None
     ) -> None:
-        previous_state = self._state.state
+        previous_state = self._scheduler_state.state
         if previous_state == new_state:
             return
 
-        self._state.state = new_state
+        self._scheduler_state.state = new_state
         self._log_state_change(previous_state, new_state, reason)
 
     def _log_state_change(
@@ -414,7 +409,7 @@ class Scheduler:
         reason: str | None,
     ) -> None:
         record = self._build_history_record(
-            SchedulerEvent.STATE_CHANGE, self._state.animal_state
+            SchedulerEvent.STATE_CHANGE, self._scheduler_state.animal_state
         )
         record.previous_state = previous_state.name
         record.new_state = new_state.name
@@ -428,8 +423,8 @@ class Scheduler:
     ) -> SchedulerHistoryRecord:
         return SchedulerHistoryRecord(
             event=event.value,
-            scheduler_state=self._state.state.name,
-            running=self._state.running,
+            scheduler_state=self._scheduler_state.state.name,
+            running=self._scheduler_state.running,
             animal_name=animal_state.name if animal_state else None,
             task=animal_state.task.name if animal_state and animal_state.task else None,
             level=animal_state.level if animal_state else None,
