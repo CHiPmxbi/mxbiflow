@@ -34,6 +34,7 @@ class AnimalDetectorStateMachine:
 
         self.current_state: DetectorState = DetectorState.NO_ANIMAL
         self.current_animal: str | None = None
+        self.last_animal: str | None = None
 
     def transition(self, detection_result: DetectionResult) -> None:
         match (self.current_state, detection_result):
@@ -44,7 +45,7 @@ class AnimalDetectorStateMachine:
             case (DetectorState.NO_ANIMAL, DetectionResult(animal_name=animal)) if (
                 animal is not None
             ):
-                if animal != self.current_animal:
+                if animal != self.last_animal:
                     self._handle_animal_entered(animal)
                 else:
                     self._handle_animal_returned(animal)
@@ -87,11 +88,13 @@ class AnimalDetectorStateMachine:
 
     def _handle_animal_entered(self, animal: str) -> None:
         self.current_state = DetectorState.ANIMAL_PRESENT
+        self.last_animal = animal
         self.current_animal = animal
         self.detector._emit_event(DetectorEvent.ANIMAL_ENTERED, animal)
 
     def _handle_animal_returned(self, animal: str) -> None:
         self.current_state = DetectorState.ANIMAL_PRESENT
+        self.last_animal = animal
         self.current_animal = animal
         self.detector._emit_event(DetectorEvent.ANIMAL_RETUREND, animal)
 
