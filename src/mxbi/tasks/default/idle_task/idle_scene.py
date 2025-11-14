@@ -1,8 +1,9 @@
 from pathlib import Path
-# from tkinter.ttk import Label
+
+from tkinter.ttk import Label
 from typing import TYPE_CHECKING
 
-# from PIL import Image, ImageTk
+from PIL import Image, ImageTk
 
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 
@@ -38,7 +39,8 @@ class IDLEScene:
         self._bind_events()
 
     def _on_trial_end(self) -> None:
-        self._theater.root.after(0, self._destory)
+        self._background.destroy()
+        self._theater.root.quit()
 
     def _create_view(self) -> None:
         self._background = CanvasWithInnerBorder(
@@ -50,15 +52,15 @@ class IDLEScene:
         )
         self._background.place(relx=0.5, rely=0.5, anchor="center")
 
-        # xshift = 240
-        # xcenter = self._screen_type.width / 2 + xshift
-        # ycenter = self._screen_type.height / 2
+        xshift = 240
+        xcenter = self._screen_type.width / 2 + xshift
+        ycenter = self._screen_type.height / 2
 
-        # self._img = Image.open(ASSETS_PATH / "apple_v1.png")
-        # self._img = self._img.resize((400, 400)).rotate(-90, expand=True)
-        # self._img = ImageTk.PhotoImage(self._img)
-        # self.label_apple = Label(self._background, image=self._img)
-        # self.label_apple.place(x=xcenter, y=ycenter, anchor="center")
+        self._img = Image.open(ASSETS_PATH / "apple_v1.png")
+        self._img = self._img.resize((400, 400)).rotate(-90, expand=True)
+        self._img = ImageTk.PhotoImage(self._img)
+        self.label_apple = Label(self._background, image=self._img)
+        self.label_apple.place(x=xcenter, y=ycenter, anchor="center")
 
     def _bind_events(self) -> None:
         self._background.focus_set()
@@ -69,10 +71,6 @@ class IDLEScene:
 
     def quit(self) -> None:
         self._on_trial_end()
-    
-    def _destory(self) -> None:
-        self._background.destroy()
-        self._theater.root.quit()
 
     def on_idle(self) -> None:
         self._on_trial_end()
