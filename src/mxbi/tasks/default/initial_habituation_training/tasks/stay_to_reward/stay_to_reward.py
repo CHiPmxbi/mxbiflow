@@ -76,9 +76,7 @@ class DefaultStayToRewardScene:
             self._data.trial_end_time - self._data.trial_start_time
         )
 
-        self._theater.root.after(0, self._destory)
-
-    def _destory(self):
+        self._theater.aplayer.stop()
         self._trigger.destroy()
         self._show_data_widget.destroy()
         self._theater.root.quit()
