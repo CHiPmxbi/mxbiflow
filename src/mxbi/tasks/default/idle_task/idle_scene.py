@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from PIL import Image, ImageTk
 
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
+from mxbi.utils.stimulus.standard_reward_stimulus import StandardRewardStimulus
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState, ScheduleCondition
@@ -26,6 +27,7 @@ class IDLEScene:
         self._theater = theater
         self._session_config = session_state
         self._screen_type = self._session_config.session_config.screen_type
+        self._standard_reward_stimulus = StandardRewardStimulus(1000, theater)
 
         self._on_trial_start()
 
@@ -39,6 +41,7 @@ class IDLEScene:
         self._bind_events()
 
     def _on_trial_end(self) -> None:
+        self._theater.aplayer.stop()
         self._background.destroy()
         self._theater.root.quit()
 
@@ -64,10 +67,10 @@ class IDLEScene:
 
     def _bind_events(self) -> None:
         self._background.focus_set()
-        self._background.bind("<r>", lambda e: self._give_reward(1000))
+        self._background.bind("<r>", lambda e: self._give_stimulus(1000))
 
-    def _give_reward(self, duration: int) -> None:
-        self._theater.reward.give_reward(duration)
+    def _give_stimulus(self, duration: int) -> None:
+        self._standard_reward_stimulus.play(1000)
 
     def quit(self) -> None:
         self._on_trial_end()
