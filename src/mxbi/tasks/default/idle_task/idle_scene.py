@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from tkinter.ttk import Label
 from typing import TYPE_CHECKING
 
@@ -26,7 +25,9 @@ class IDLEScene:
         self._theater = theater
         self._session_config = session_state
         self._screen_type = self._session_config.session_config.screen_type
-        self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(1000)
+        self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(
+            1000
+        )
 
         self._on_trial_start()
 

@@ -1,8 +1,7 @@
 def main() -> None:
     from mxbi.theater import Theater
-    from mxbi.ui.launch_panel import LaunchPanel
-
     from mxbi.tools.sync_data.sync_data import sync_data
+    from mxbi.ui.launch_panel import LaunchPanel
 
     LaunchPanel()
 

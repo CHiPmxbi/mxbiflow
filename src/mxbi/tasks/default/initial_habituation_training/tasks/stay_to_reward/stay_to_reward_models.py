@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from enum import StrEnum, auto
+
+from pydantic import BaseModel
 
 
 class Result(StrEnum):

@@ -6,14 +6,13 @@ from pydantic import BaseModel
 from mxbi.config import session_config
 from mxbi.data_logger import DataLogger
 from mxbi.detector.detector import Detector, DetectorEvent
-from mxbi.detector.detector_factory import DetectorFactory
+from mxbi.detector.detector_factory import DetectorFactory, DorsetLID665v42Config
 from mxbi.models.animal import AnimalState
 from mxbi.models.scheduler import SchedulerState, ScheduleRunningStateEnum
 from mxbi.models.task import TaskEnum
 from mxbi.tasks.task_protocol import Task
 from mxbi.tasks.task_table import task_table
 from mxbi.utils.logger import logger
-from mxbi.detector.detector_factory import DorsetLID665v42Config
 
 if TYPE_CHECKING:
     from mxbi.models.task import Feedback

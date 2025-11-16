@@ -1,12 +1,16 @@
-from numpy import int16
-from typing import TYPE_CHECKING
 from math import ceil
+from typing import TYPE_CHECKING
+
+from numpy import int16
+
 from mxbi.utils.aplayer import ToneConfig
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
-    from mxbi.theater import Theater
     from concurrent.futures import Future
+
+    from numpy.typing import NDArray
+
+    from mxbi.theater import Theater
 
 STIMULUS_FREQUENCY = 2000
 STIMULUS_FREQUENCY_DURATION = 100

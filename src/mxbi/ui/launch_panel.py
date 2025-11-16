@@ -5,6 +5,7 @@ from tkinter.ttk import Button, Frame, Label
 
 from mxbi.config import session_config, session_options
 from mxbi.models.animal import AnimalConfig
+from mxbi.models.detector import DetectorEnum
 from mxbi.models.reward import RewardEnum
 from mxbi.models.session import ScreenTypeEnum, SessionConfig
 from mxbi.peripheral.pumps.pump_factory import PumpEnum
@@ -15,7 +16,6 @@ from mxbi.ui.components.fileds.labeled_combobox import (
 )
 from mxbi.ui.components.fileds.labeled_textbox import create_textbox
 from mxbi.utils.detect_platform import PlatformEnum
-from mxbi.models.detector import DetectorEnum
 
 
 class LaunchPanel:

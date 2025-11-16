@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, RootModel, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from mxbi.config import Configure
-from mxbi.tasks.GNGSiD.models import MonkeyName
 from mxbi.models.animal import ScheduleCondition
+from mxbi.tasks.GNGSiD.models import MonkeyName
 
 CONFIG_PATH = Path(__file__).parent / "config.json"
 
