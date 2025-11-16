@@ -39,6 +39,9 @@ class GNGSiDDetectScene:
         self._persistent_data: Final["PersistentData"] = persistent_data
 
         self._tone: Final[NDArray[int16]] = self._prepare_stimulus()
+        self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(
+            self._trial_config.stimulus_duration
+        )
 
         self._set_stimulus_intensity()
 
@@ -129,7 +132,7 @@ class GNGSiDDetectScene:
     # region event binding
     def _bind_first_stage(self) -> None:
         self._background.focus_set()
-        self._background.bind("<r>", self._give_reward)
+        self._background.bind("<r>", lambda e: self._give_standard_stimulus())
         self._trigger_canvas.bind("<ButtonPress>", self._on_first_touched)
         self._trigger_canvas.after(self._trial_config.time_out, self._on_timeout)
 
@@ -246,6 +249,9 @@ class GNGSiDDetectScene:
         self._theater.acontroller.set_digital_volume(
             self._trial_config.stimulus_freq_digital_amp
         )
+
+    def _give_standard_stimulus(self) -> None:
+        self._standard_reward_stimulus.play(self._trial_config.reward_duration)
 
     # endregion
 

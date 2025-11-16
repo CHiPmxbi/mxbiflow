@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from PIL import Image, ImageTk
 
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
-from mxbi.utils.stimulus.standard_reward_stimulus import StandardRewardStimulus
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState, ScheduleCondition
@@ -27,7 +26,7 @@ class IDLEScene:
         self._theater = theater
         self._session_config = session_state
         self._screen_type = self._session_config.session_config.screen_type
-        self._standard_reward_stimulus = StandardRewardStimulus(1000, theater)
+        self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(1000)
 
         self._on_trial_start()
 

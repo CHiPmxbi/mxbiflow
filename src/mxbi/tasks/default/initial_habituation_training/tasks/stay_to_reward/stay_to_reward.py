@@ -47,6 +47,9 @@ class DefaultStayToRewardScene:
         self._background = background
 
         self._tone = self._prepare_stimulus()
+        self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(
+            self._trial_config.stimulus_duration
+        )
 
         self._set_stimulus_intensity()
         self._on_trial_start()
@@ -94,8 +97,9 @@ class DefaultStayToRewardScene:
         self._background.place(relx=0.5, rely=0.5, anchor="center")
 
     def _create_trigger(self) -> None:
-        self._trigger = Frame()
-        self._trigger.pack_forget()
+        self._trigger = Frame(bg="red", width=0, height=0)
+        self._trigger.place(relx=0.5, rely=0.5, anchor="center")
+        self._trigger.lower()
 
     def _create_show_data_widget(self) -> None:
         self._show_data_widget = ShowDataWidget(self._background)
@@ -115,7 +119,7 @@ class DefaultStayToRewardScene:
     # region event binding
     def _bind_events(self) -> None:
         self._trigger.focus_set()
-        self._trigger.bind("<r>", lambda e: self._give_reward())
+        self._trigger.bind("<r>", lambda e: self._give_standard_stimulus())
 
     def _start_timing(self) -> None:
         self._trigger.after(
@@ -193,5 +197,9 @@ class DefaultStayToRewardScene:
     def _give_reward(self) -> None:
         self._context.rewards += 1
         self._theater.reward.give_reward(self._trial_config.reward_duration)
+
+    def _give_standard_stimulus(self) -> None:
+        self._context.rewards += 1
+        self._standard_reward_stimulus.play(self._trial_config.reward_duration)
 
     # endregion

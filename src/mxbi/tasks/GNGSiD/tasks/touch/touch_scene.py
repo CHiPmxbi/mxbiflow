@@ -40,6 +40,9 @@ class GNGSiDTouchScene:
         self._persistent_data: "Final[PersistentData]" = persistent_data
 
         self._tone = self._prepare_stimulus()
+        self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(
+            self._trial_config.stimulus_duration
+        )
 
         self._set_stimulus_intensity()
 
@@ -132,7 +135,7 @@ class GNGSiDTouchScene:
     def _bind_events(self) -> None:
         # Manual reward
         self._background.focus_set()
-        self._background.bind("<r>", lambda e: self._give_reward())
+        self._background.bind("<r>", lambda e: self._give_standard_stimulus())
 
         # Trigger event
         self._background.bind("<ButtonPress>", self._on_background_touched)
@@ -223,6 +226,9 @@ class GNGSiDTouchScene:
     def _give_reward(self) -> None:
         self._persistent_data.rewards += 1
         self._theater.reward.give_reward(self._trial_config.reward_duration)
+
+    def _give_standard_stimulus(self) -> None:
+        self._standard_reward_stimulus.play(self._trial_config.reward_duration)
 
     def _set_stimulus_intensity(self) -> None:
         self._theater.acontroller.set_master_volume(
