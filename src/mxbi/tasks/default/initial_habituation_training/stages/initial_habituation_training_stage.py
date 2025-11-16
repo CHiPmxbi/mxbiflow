@@ -1,26 +1,26 @@
 from typing import TYPE_CHECKING, Final
 
+from mxbi.data_logger import DataLogger
+from mxbi.models.animal import ScheduleCondition
 from mxbi.tasks.default.initial_habituation_training.stages.models import (
-    StageContexts,
-    StageContext,
     InitialHabituationTrainingStageConfig,
+    StageContext,
+    StageContexts,
     config,
+)
+from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_to_reward import (
+    DefaultStayToRewardScene,
 )
 from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_to_reward_models import (
     Result,
     TrialConfig,
-)
-from mxbi.models.animal import ScheduleCondition
-from mxbi.data_logger import DataLogger
-from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_to_reward import (
-    DefaultStayToRewardScene,
 )
 from mxbi.utils.logger import logger
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState
-    from mxbi.models.session import SessionState, SessionConfig
+    from mxbi.models.session import SessionConfig, SessionState
     from mxbi.models.task import Feedback
     from mxbi.theater import Theater
 

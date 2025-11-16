@@ -1,5 +1,4 @@
-from __future__ import annotations
-from threading import Thread, Event, Lock, Timer
+from threading import Event, Lock, Thread, Timer
 from typing import Callable
 
 from mxbi.detector.detector import DetectionResult, Detector

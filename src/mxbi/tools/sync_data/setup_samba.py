@@ -4,6 +4,8 @@ from getpass import getpass
 from pathlib import Path
 
 import typer
+from rich import print
+
 from mxbi.path import (
     MOUNT_SERVICE_NAME,
     MOUNT_SERVICE_PATH,
@@ -11,7 +13,6 @@ from mxbi.path import (
     SYNC_SERVICE_NAME,
     SYNC_SERVICE_PATH,
 )
-from rich import print
 
 
 def setup_samba() -> None:

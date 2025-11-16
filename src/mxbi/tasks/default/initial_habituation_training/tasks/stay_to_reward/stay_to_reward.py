@@ -1,7 +1,7 @@
 from datetime import datetime
 from math import ceil
-from typing import TYPE_CHECKING, Final
 from tkinter import Frame
+from typing import TYPE_CHECKING, Final
 
 from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_to_reward_models import (
     DataToShow,
@@ -20,13 +20,13 @@ if TYPE_CHECKING:
 
     from mxbi.models.animal import AnimalState
     from mxbi.models.session import ScreenConfig
+    from mxbi.tasks.default.initial_habituation_training.stages.models import (
+        StageContext,
+    )
     from mxbi.tasks.default.initial_habituation_training.tasks.stay_to_reward.stay_to_reward_models import (
         TrialConfig,
     )
     from mxbi.theater import Theater
-    from mxbi.tasks.default.initial_habituation_training.stages.models import (
-        StageContext,
-    )
 
 
 class DefaultStayToRewardScene:

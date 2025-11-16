@@ -1,12 +1,12 @@
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
 from mxbi.detector.dorset_lid665v42_detector import DorsetLID665v42Detector
 from mxbi.detector.mock_detector import MockDetector
-from dataclasses import dataclass
 
 if TYPE_CHECKING:
-    from mxbi.theater import Theater
     from mxbi.detector.detector import Detector
+    from mxbi.theater import Theater
 
 
 @dataclass

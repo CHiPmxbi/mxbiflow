@@ -1,4 +1,5 @@
 import typer
+
 from mxbi.tools.sync_data.setup_samba import setup_samba
 from mxbi.tools.sync_data.sync_data import sync_data
 
