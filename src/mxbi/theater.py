@@ -18,6 +18,7 @@ from mxbi.scheduler import Scheduler
 from mxbi.utils.aplayer import APlayer
 from mxbi.utils.detect_platform import PlatformEnum
 from mxbi.utils.logger import logger
+from mxbi.utils.stimulus.standard_reward_stimulus import StandardRewardStimulus
 
 
 class Theater:
@@ -45,6 +46,11 @@ class Theater:
         self._scheduler = Scheduler(self)
         self._scheduler.start()
 
+    def new_standard_reward_stimulus(
+        self, stimulus_duration: int
+    ) -> StandardRewardStimulus:
+        return StandardRewardStimulus(stimulus_duration, self)
+
     def _init_rewarder(self) -> Rewarder:
         return PumpFactory.create(self._config.pump_type)
 
@@ -65,7 +71,6 @@ class Theater:
         self._root.config(cursor="none")
         self._root.configure(bg="black")
         self._root.after(1000, lambda: self._root.attributes("-fullscreen", True))
-
 
     def _bind_event(self) -> None:
         self._root.bind("<Escape>", self._quit)
