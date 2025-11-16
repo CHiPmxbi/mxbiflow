@@ -15,6 +15,7 @@ class InitialHabituationTraingStageLeveledParams(BaseModel):
     evaluation_interval: int
 
     level: int
+    entry_reward: float
     reward_interval: int
     reward_duration: int
 

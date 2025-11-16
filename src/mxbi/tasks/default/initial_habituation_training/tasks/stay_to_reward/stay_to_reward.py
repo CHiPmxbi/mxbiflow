@@ -71,7 +71,14 @@ class DefaultStayToRewardScene:
         self._init_data()
         self._bind_events()
         self._start_tracking_data()
-        self._start_timing()
+
+        if (
+            self._trial_config.entry_reward
+            and self._animal_state.current_animal_session_trial_id == 1
+        ):
+            self._direct_stimulus()
+        else:
+            self._start_timing()
 
     def _on_trial_end(self) -> None:
         self._data.trial_end_time = datetime.now().timestamp()
@@ -183,6 +190,16 @@ class DefaultStayToRewardScene:
     def _give_stimulus(self) -> None:
         future = self._theater.aplayer.play_stimulus(self._tone)
         future.add_done_callback(self._on_stimulus_complete)
+
+    def _direct_stimulus(self) -> None:
+        future = self._theater.aplayer.play_stimulus(self._tone)
+        future.add_done_callback(self._on_direct_stimulus_complete)
+
+    def _on_direct_stimulus_complete(self, future: "Future[bool]") -> None:
+        if future.result():
+            self._trigger.after(0, self._give_reward)
+
+            self._trigger.after(self._trial_config.reward_duration, self._start_timing)
 
     def _on_stimulus_complete(self, future: "Future[bool]") -> None:
         if future.result():

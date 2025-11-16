@@ -10,6 +10,7 @@ class Result(StrEnum):
 
 class TrialConfig(BaseModel):
     level: int = 0
+    entry_reward: bool = False
     reward_interval: int = 0
     reward_duration: int = 0
     stimulus_duration: int = 0

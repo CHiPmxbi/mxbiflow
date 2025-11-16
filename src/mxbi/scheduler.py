@@ -224,6 +224,8 @@ class Scheduler:
             )
             return
 
+        animal_state.current_animal_session_trial_id += 1
+
         self._scheduler_state.current_task = self._create_task(animal_state)
         feedback = self._scheduler_state.current_task.start()
         self._scheduler_state.current_task = None
@@ -337,6 +339,7 @@ class Scheduler:
 
     def _on_animal_entered(self, animal_name: str) -> None:
         self._scheduler_state.animal_state = self._get_animal_state(animal_name)
+
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_entered"
         )
@@ -352,6 +355,9 @@ class Scheduler:
             self._scheduler_state.current_task.on_return()
 
     def _on_animal_left(self, _: str) -> None:
+        if self._scheduler_state.animal_state is not None:
+            self._scheduler_state.animal_state.leave_session()
+
         self._transition_to_state(ScheduleRunningStateEnum.IDLE, reason="animal_left")
         if self._scheduler_state.current_task is not None:
             self._scheduler_state.current_task.quit()
