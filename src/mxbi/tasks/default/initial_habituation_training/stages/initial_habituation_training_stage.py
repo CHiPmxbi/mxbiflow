@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Final
+from random import choices
 
 from mxbi.data_logger import DataLogger
 from mxbi.models.animal import ScheduleCondition
@@ -75,8 +76,14 @@ class InitialHabituationTrainingStage:
             _levels_config.evaluation_interval
         )
 
+        entry_reward = choices(
+            [True, False],
+            weights=[_levels_config.entry_reward, 1 - _levels_config.entry_reward],
+        )[0]
+
         _config = TrialConfig(
             level=_levels_config.level,
+            entry_reward=entry_reward,
             reward_interval=_levels_config.reward_interval,
             reward_duration=_levels_config.reward_duration,
             stimulus_duration=_levels_config.stimulus_duration,

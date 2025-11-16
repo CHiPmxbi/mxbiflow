@@ -30,6 +30,7 @@ class ScheduleCondition(BaseModel):
 class AnimalState(AnimalConfig):
     trial_id: int = 0
     current_level_trial_id: int = 0
+    current_animal_session_trial_id: int = 0
     correct_trial: int = 0
     condition: "ScheduleCondition | None" = None
 
@@ -43,6 +44,9 @@ class AnimalState(AnimalConfig):
     def reset(self) -> None:
         self.current_level_trial_id = 0
         self.correct_trial = 0
+
+    def leave_session(self) -> None:
+        self.current_animal_session_trial_id = 0
 
     def update(self, feedback: "Feedback") -> None:
         self.trial_id += 1
