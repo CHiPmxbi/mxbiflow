@@ -19,6 +19,7 @@ class DetectorEvent(StrEnum):
     ANIMAL_RETUREND = auto()
     ANIMAL_CHANGED = auto()
     ANIMAL_LEFT = auto()
+    ANIMAL_STAYED = auto()
     ERROR_DETECTED = auto()
 
 
@@ -69,8 +70,8 @@ class AnimalDetectorStateMachine:
             case (
                 DetectorState.ANIMAL_PRESENT,
                 DetectionResult(animal_name=animal),
-            ) if animal == self.current_animal:
-                pass
+            ) if animal is not None and animal == self.current_animal:
+                self._handle_animal_stayed(animal)
 
             # ERROR -> ANY_STATE
             case (DetectorState.ERROR, DetectionResult(animal_name=animal)):
@@ -108,6 +109,10 @@ class AnimalDetectorStateMachine:
     def _handle_animal_changed(self, new_animal_name: str) -> None:
         self.current_animal = new_animal_name
         self.detector._emit_event(DetectorEvent.ANIMAL_CHANGED, new_animal_name)
+
+    def _handle_animal_stayed(self, animal_name: str) -> None:
+        self.current_animal = animal_name
+        self.detector._emit_event(DetectorEvent.ANIMAL_STAYED, animal_name)
 
     def _handle_recovery_from_error(self, animal_name: str | None) -> None:
         if animal_name is None:
