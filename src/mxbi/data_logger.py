@@ -1,6 +1,7 @@
 import json
 import sys
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,19 +11,34 @@ from mxbi.utils.logger import logger
 if TYPE_CHECKING:
     from mxbi.models.session import SessionState
 
-_now = datetime.now()
+now = datetime.now()
+
+
+class DataLoggerType(StrEnum):
+    JSONL = "jsonl"
+    JSON = "json"
 
 
 class DataLogger:
     def __init__(
-        self, session_config: "SessionState", monkey: str, filename: str
+        self,
+        session_config: "SessionState",
+        monkey: str,
+        filename: str,
+        type: DataLoggerType,
     ) -> None:
         self.__session_state = session_config
         self._monkey = monkey
         self._filename = filename
         self._session_id = self.__session_state.session_id
+        self._type = type
 
         self._data_dir = self._ensure_data_dir()
+        self._data_path = self._data_dir / f"{self._filename}{self._type}"
+
+    @property
+    def path(self) -> Path:
+        return self._data_path
 
     @staticmethod
     def init_session_id() -> int:
@@ -45,7 +61,7 @@ class DataLogger:
         return latest_session_id + 1
 
     def _ensure_data_dir(self) -> Path:
-        date_path = Path(f"{_now.year}{_now.month:02d}{_now.day:02d}")
+        date_path = Path(f"{now.year}{now.month:02d}{now.day:02d}")
         session_path = Path(f"{self._session_id}")
         monkey_path = Path(f"{self._monkey}")
 
@@ -58,38 +74,40 @@ class DataLogger:
             logger.error(f"Failed to create data directory: {e}")
             sys.exit(1)
 
-    def _get_path(self, suffix: str) -> Path:
-        return self._data_dir / f"{self._filename}{suffix}"
+    def save(self, data: dict) -> None:
+        match self._type:
+            case DataLoggerType.JSONL:
+                self._save_jsonl(data)
+            case DataLoggerType.JSON:
+                self._save_json(data)
 
-    def save_jsonl(self, data: dict) -> None:
-        jsonl_path = self._get_path(".jsonl")
+    def _save_jsonl(self, data: dict) -> None:
         try:
             json_line = json.dumps(data, ensure_ascii=False)
 
-            with open(jsonl_path, "a", encoding="utf-8") as f:
+            with open(self._data_path, "a", encoding="utf-8") as f:
                 f.write(json_line + "\n")
 
         except TypeError as e:
             logger.error(f"Data is not JSON serializable: {e}")
             raise
         except IOError as e:
-            logger.error(f"Failed to write to file {jsonl_path}: {e}")
+            logger.error(f"Failed to write to file {self._data_path}: {e}")
             raise
         except Exception as e:
             logger.error(f"Unexpected error while writing data: {e}")
             raise
 
-    def save_json(self, data: dict) -> None:
-        json_path = self._get_path(".json")
+    def _save_json(self, data: dict) -> None:
         try:
-            json_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(json_path, "w", encoding="utf-8") as f:
+            self._data_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._data_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except TypeError as e:
             logger.error(f"Data is not JSON serializable: {e}")
             raise
         except IOError as e:
-            logger.error(f"Failed to write to file {json_path}: {e}")
+            logger.error(f"Failed to write to file {self._data_path}: {e}")
             raise
         except Exception as e:
             logger.error(f"Unexpected error while writing JSON data: {e}")
@@ -110,7 +128,7 @@ if __name__ == "__main__":
         end_time=datetime.now().timestamp(),
     )
 
-    recorder = DataLogger(state, "mock", "mock")
+    recorder = DataLogger(state, "mock", "mock", DataLoggerType.JSONL)
 
     for i in range(10):
-        recorder.save_jsonl(data)
+        recorder.save(data)

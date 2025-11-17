@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, Final
 from random import choices
+from typing import TYPE_CHECKING, Final
 
-from mxbi.data_logger import DataLogger
+from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.models.animal import ScheduleCondition
 from mxbi.tasks.default.initial_habituation_training.stages.models import (
     InitialHabituationTrainingStageConfig,
@@ -91,8 +91,14 @@ class InitialHabituationTrainingStage:
         )
 
         self._data_logger = DataLogger(
-            self._session_state, self._animal_state.name, self.STAGE_NAME
+            self._session_state,
+            self._animal_state.name,
+            self.STAGE_NAME,
+            DataLoggerType.JSONL,
         )
+
+        if self._animal_state.data_path is None:
+            self._animal_state.data_path = self._data_logger.path
 
         assert background is not None
 
@@ -107,7 +113,7 @@ class InitialHabituationTrainingStage:
 
     def start(self) -> "Feedback":
         trial_data = self._task.start()
-        self._data_logger.save_jsonl(trial_data.model_dump())
+        self._data_logger.save(trial_data.model_dump())
 
         feedback = self._handle_result(trial_data.result)
         logger.debug(
