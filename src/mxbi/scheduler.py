@@ -228,9 +228,13 @@ class Scheduler:
 
         self._scheduler_state.current_task = self._create_task(animal_state)
         feedback = self._scheduler_state.current_task.start()
-        self._scheduler_state.current_task = None
+        logger.debug(
+            f"Task completed: {self._scheduler_state.current_task.__class__.__name__}, "
+            f"feedback: {feedback}"
+        )
 
         self._handle_task_feedback(animal_state, feedback)
+        self._scheduler_state.current_task = None
 
     def _run_error_state(self) -> None:
         self._start_system_task(TaskEnum.ERROR)
@@ -259,6 +263,9 @@ class Scheduler:
         if self._scheduler_state.current_task is None:
             return
 
+        logger.debug(
+            f"Handling feedback for task: {self._scheduler_state.current_task.__class__.__name__}"
+        )
         animal_state.update(feedback)
         self._evaluate_and_adjust_difficulty(animal_state)
 
