@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -29,6 +30,7 @@ class ScheduleCondition(BaseModel):
 
 class AnimalState(AnimalConfig):
     trial_id: int = 0
+    data_path: Path | None = None
     current_level_trial_id: int = 0
     current_animal_session_trial_id: int = 0
     correct_trial: int = 0

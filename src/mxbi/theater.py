@@ -1,11 +1,12 @@
 from datetime import datetime
+from pathlib import Path
 from tkinter import Canvas, Event, Tk
 from typing import Callable
 
 from mss import mss, tools
 
 from mxbi.config import session_config
-from mxbi.data_logger import DataLogger
+from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.models.session import SessionConfig, SessionState
 from mxbi.peripheral.audio_player.controller.controller import Controller
 from mxbi.peripheral.audio_player.controller.controller_factory import (
@@ -30,7 +31,9 @@ class Theater:
             session_config=self._config,
         )
 
-        self._session_logger = DataLogger(self._session_state, "", "session_data")
+        self._session_logger = DataLogger(
+            self._session_state, "", "session_data", DataLoggerType.JSON
+        )
 
         # callback for quit event
         self._on_quit: list[Callable[[], None]] = []
@@ -45,6 +48,14 @@ class Theater:
 
         self._scheduler = Scheduler(self)
         self._scheduler.start()
+
+    @property
+    def data_path(self) -> list[Path]:
+        data_paths = []
+        for animal in self._scheduler._animal_states.values():
+            if animal.data_path is not None:
+                data_paths.append(animal.data_path)
+        return data_paths
 
     def new_standard_reward_stimulus(
         self, stimulus_duration: int
@@ -77,9 +88,10 @@ class Theater:
 
     def _quit(self, _: Event) -> None:
         self._session_state.end_time = datetime.now().timestamp()
-        self._session_logger.save_json(self._session_state.model_dump())
+        self._session_logger.save(self._session_state.model_dump())
         for callback in self._on_quit:
             callback()
+
         self._root.destroy()
 
     def register_event_quit(self, callback: Callable[[], None]) -> None:

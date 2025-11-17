@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Final
 
-from mxbi.data_logger import DataLogger
+from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.tasks.two_alternative_choice.models import PersistentData, Result
 from mxbi.tasks.two_alternative_choice.stages.size_reduction_stage.size_reduction_models import (
     config,
@@ -42,7 +42,10 @@ class TWOACSizeReductionStage:
         _config.stimulation_size = _levels_config.stimulation_size
 
         self._data_logger = DataLogger(
-            self._session_state, self._animal_state.name, self.STAGE_NAME
+            self._session_state,
+            self._animal_state.name,
+            self.STAGE_NAME,
+            DataLoggerType.JSONL,
         )
 
         self._presistent_data = _presistent_data.get(self._animal_state.name)
@@ -67,7 +70,7 @@ class TWOACSizeReductionStage:
 
     def start(self) -> "Feedback":
         trial_data = self._task.start()
-        self._data_logger.save_jsonl(trial_data.model_dump())
+        self._data_logger.save(trial_data.model_dump())
 
         feedback = self._handle_result(trial_data.result)
         logger.debug(

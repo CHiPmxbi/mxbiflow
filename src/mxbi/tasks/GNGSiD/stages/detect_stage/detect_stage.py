@@ -1,7 +1,7 @@
 from random import choice, choices, randint
 from typing import TYPE_CHECKING, Final
 
-from mxbi.data_logger import DataLogger
+from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.models.animal import ScheduleCondition
 from mxbi.tasks.GNGSiD.models import PersistentData, Result
 from mxbi.tasks.GNGSiD.stages.detect_stage.detect_stage_models import (
@@ -92,12 +92,15 @@ class GNGSiDDetectStage:
         )
 
         self._data_logger = DataLogger(
-            self._session_state, self._animal_state.name, self.STAGE_NAME
+            self._session_state,
+            self._animal_state.name,
+            self.STAGE_NAME,
+            DataLoggerType.JSONL,
         )
 
     def start(self) -> "Feedback":
         trial_data = self._task.start()
-        self._data_logger.save_jsonl(trial_data.model_dump())
+        self._data_logger.save(trial_data.model_dump())
 
         feedback = self._handle_result(trial_data.result)
         logger.debug(

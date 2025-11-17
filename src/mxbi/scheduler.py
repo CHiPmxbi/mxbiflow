@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from mxbi.config import session_config
-from mxbi.data_logger import DataLogger
+from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.detector.detector import Detector, DetectorEvent
 from mxbi.detector.detector_factory import DetectorFactory, DorsetLID665v42Config
 from mxbi.models.animal import AnimalState
@@ -63,7 +63,7 @@ class Scheduler:
         self._scheduler_state.current_task = None
 
         self._scheduler_logger = DataLogger(
-            self._theater._session_state, "scheduler", "scheduler"
+            self._theater._session_state, "scheduler", "scheduler", DataLoggerType.JSONL
         )
 
         self._bind_events()
@@ -443,7 +443,7 @@ class Scheduler:
 
     def _save_history_record(self, record: SchedulerHistoryRecord) -> None:
         try:
-            self._scheduler_logger.save_jsonl(record.model_dump(mode="json"))
+            self._scheduler_logger.save(record.model_dump(mode="json"))
         except Exception:
             logger.exception("Failed to write scheduler history log")
 
