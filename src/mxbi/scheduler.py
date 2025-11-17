@@ -10,6 +10,7 @@ from mxbi.detector.detector_factory import DetectorFactory, DorsetLID665v42Confi
 from mxbi.models.animal import AnimalState
 from mxbi.models.scheduler import SchedulerState, ScheduleRunningStateEnum
 from mxbi.models.task import TaskEnum
+from mxbi.tasks.default.idle_task.idle_scene import IDLEScene
 from mxbi.tasks.task_protocol import Task
 from mxbi.tasks.task_table import task_table
 from mxbi.utils.logger import logger
@@ -119,6 +120,9 @@ class Scheduler:
         )
         self._detector.register_event(
             DetectorEvent.ERROR_DETECTED, self._on_detect_error
+        )
+        self._detector.register_event(
+            DetectorEvent.ANIMAL_STAYED, self._on_animal_stayed
         )
 
     def _on_manual_next_task(self, _) -> None:
@@ -375,6 +379,23 @@ class Scheduler:
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_changed"
         )
         if self._scheduler_state.current_task is not None:
+            self._scheduler_state.current_task.quit()
+
+    def _on_animal_stayed(self, _: str) -> None:
+        self._transition_to_state(
+            ScheduleRunningStateEnum.SCHEDULE, reason="animal_stayed"
+        )
+
+        if self._scheduler_state.current_task is None:
+            return
+
+        if self._scheduler_state.animal_state is None:
+            return
+
+        if self._scheduler_state.animal_state.task == TaskEnum.IDEL:
+            return
+
+        if isinstance(self._scheduler_state.current_task, IDLEScene):
             self._scheduler_state.current_task.quit()
 
     def _on_detect_error(self, _: str) -> None:
