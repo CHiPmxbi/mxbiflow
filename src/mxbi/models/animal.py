@@ -13,6 +13,7 @@ class AnimalConfig(BaseModel):
     name: str = "mock"
     task: TaskEnum = TaskEnum.IDEL
     level: int = 0
+    level_trial_id: int | None = None
 
 
 class ScheduleConditionConfig(BaseModel):
@@ -20,6 +21,7 @@ class ScheduleConditionConfig(BaseModel):
     difficulty_increase_threshold: float = 0.8
     difficulty_decrease_threshold: float = 0
     allow_decrease: bool = True
+    present_level_trial_id: bool = False
     next_task: TaskEnum | None = None
 
 

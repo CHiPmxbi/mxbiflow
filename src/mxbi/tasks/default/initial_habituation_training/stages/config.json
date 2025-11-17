@@ -3,7 +3,8 @@
         "condition": {
             "config": {
                 "difficulty_increase_threshold": 0,
-                "allow_decrease": false
+                "allow_decrease": false,
+                "present_level_trial_id": true
             }
         },
         "levels_table": {

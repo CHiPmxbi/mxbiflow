@@ -22,8 +22,11 @@ class TrialConfig(BaseModel):
 
 
 class TrialData(BaseModel):
+    level: int
     animal: str
     trial_id: int
+    level_trial_id: int
+    animal_session_trial_id: int
     trial_start_time: float
     trial_end_time: float
     result: Result
@@ -35,6 +38,8 @@ class DataToShow(BaseModel):
     level: int
     name: str
     id: int
+    lid: int
+    ald: int
     t_dur: str
     dur: str
     rewards: int

@@ -51,7 +51,10 @@ class Scheduler:
 
         self._animal_states = {
             animal.name: AnimalState(
-                name=animal.name, task=animal.task, level=animal.level
+                name=animal.name,
+                task=animal.task,
+                level=animal.level,
+                current_level_trial_id=animal.level_trial_id or 0,
             )
             for animal in session_config.value.animals.values()
         }
@@ -267,10 +270,16 @@ class Scheduler:
         if self._scheduler_state.current_task is None:
             return
 
-        logger.debug(
-            f"Handling feedback for task: {self._scheduler_state.current_task.__class__.__name__}"
-        )
         animal_state.update(feedback)
+
+        if animal_state.condition is not None:
+            animal_config = session_config.value.animals[animal_state.name]
+            animal_config.level_trial_id = (
+                animal_state.current_level_trial_id
+                if animal_state.condition.config.present_level_trial_id
+                else None
+            )
+
         self._evaluate_and_adjust_difficulty(animal_state)
 
     def _get_animal_state(self, animal_name: str) -> AnimalState:

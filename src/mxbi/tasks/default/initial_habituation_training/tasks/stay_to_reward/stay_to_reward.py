@@ -113,8 +113,10 @@ class DefaultStayToRewardScene:
         self._show_data_widget.place(relx=0, rely=1, anchor="sw")
         _data = DataToShow(
             name=self._animal_state.name,
+            ald=self._animal_state.current_animal_session_trial_id,
             level=self._animal_state.level,
             id=self._animal_state.trial_id,
+            lid=self._animal_state.current_level_trial_id,
             t_dur=f"{self._context.duration} s",
             dur="0 s",
             rewards=0,
@@ -139,8 +141,10 @@ class DefaultStayToRewardScene:
     def _start_tracking_data(self) -> None:
         data = DataToShow(
             name=self._animal_state.name,
+            ald=self._animal_state.current_animal_session_trial_id,
             level=self._animal_state.level,
             id=self._animal_state.trial_id,
+            lid=self._animal_state.current_level_trial_id,
             t_dur=f"{self._context.duration} s",
             dur=f"{int(self._data.stay_duration)} s",
             rewards=self._context.rewards,
@@ -154,6 +158,9 @@ class DefaultStayToRewardScene:
 
     def _init_data(self) -> None:
         self._data = TrialData(
+            level=self._trial_config.level,
+            level_trial_id=self._animal_state.current_level_trial_id,
+            animal_session_trial_id=self._animal_state.current_animal_session_trial_id,
             animal=self._animal_state.name,
             trial_id=self._animal_state.trial_id,
             trial_start_time=datetime.now().timestamp(),
