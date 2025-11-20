@@ -2,6 +2,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
+from datetime import datetime
 
 from mxbi.config import session_config
 from mxbi.data_logger import DataLogger, DataLoggerType
@@ -360,6 +361,8 @@ class Scheduler:
     def _on_animal_entered(self, animal_name: str) -> None:
         self._scheduler_state.animal_state = self._get_animal_state(animal_name)
 
+        self._scheduler_state.animal_state.animal_session_start_time = datetime.now().timestamp()
+
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_entered"
         )
@@ -368,6 +371,9 @@ class Scheduler:
             self._scheduler_state.current_task.quit()
 
     def _on_animal_returned(self, _: str) -> None:
+        if self._scheduler_state.animal_state is not None:
+            self._scheduler_state.animal_state.animal_session_start_time = datetime.now().timestamp()
+
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_returned"
         )
@@ -376,6 +382,7 @@ class Scheduler:
 
     def _on_animal_left(self, _: str) -> None:
         if self._scheduler_state.animal_state is not None:
+            self._scheduler_state.animal_state.animal_session_start_time = 0.0
             self._scheduler_state.animal_state.leave_session()
 
         self._transition_to_state(ScheduleRunningStateEnum.IDLE, reason="animal_left")
@@ -384,6 +391,7 @@ class Scheduler:
 
     def _on_animal_changed(self, animal_name: str) -> None:
         self._scheduler_state.animal_state = self._get_animal_state(animal_name)
+        self._scheduler_state.animal_state.animal_session_start_time = datetime.now().timestamp()
         self._transition_to_state(
             ScheduleRunningStateEnum.SCHEDULE, reason="animal_changed"
         )

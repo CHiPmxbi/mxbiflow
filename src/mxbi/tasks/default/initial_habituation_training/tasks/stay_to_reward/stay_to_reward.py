@@ -64,7 +64,7 @@ class DefaultStayToRewardScene:
         return self._data
 
     def cancle(self) -> None:
-        self._on_trial_end()
+        self._cleanup()
 
     # endregion
 
