@@ -1,5 +1,6 @@
 from random import choices
 from typing import TYPE_CHECKING, Final
+from datetime import datetime
 
 from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.models.animal import ScheduleCondition
@@ -125,6 +126,20 @@ class InitialHabituationTrainingStage:
             f"result={trial_data}, "
             f"feedback={feedback}"
         )
+
+        now = datetime.now().timestamp()
+        if self._animal_state.animal_session_start_time != 0.0:
+            session_duration = now - self._animal_state.animal_session_start_time
+            if session_duration >= 30:
+                print(session_duration)
+                print(self._animal_state.animal_session_start_time)
+                self._animal_state.animal_session_start_time = (
+                    datetime.now().timestamp()
+                )
+
+                self._theater._scheduler._increase_difficulty(
+                    self._animal_state
+                )
 
         return feedback
 
