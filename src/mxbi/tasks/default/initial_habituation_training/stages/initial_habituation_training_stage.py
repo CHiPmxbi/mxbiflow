@@ -84,9 +84,9 @@ class InitialHabituationTrainingStage:
         _config = TrialConfig(
             level=_levels_config.level,
             entry_reward=entry_reward,
-            reward_interval=_levels_config.reward_interval,
-            reward_duration=_levels_config.reward_duration,
-            stimulus_duration=_levels_config.stimulus_duration,
+            min_stimulus_interval=_levels_config.min_stimulus_interval,
+            max_stimulus_interval=_levels_config.max_stimulus_interval,
+            target=_levels_config.target,
             stimulus_density=_levels_config.stimulus_density,
         )
 

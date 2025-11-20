@@ -12,14 +12,16 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 class InitialHabituationTraingStageLeveledParams(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    evaluation_interval: int
-
     level: int
     entry_reward: float
-    reward_interval: int
-    reward_duration: int
 
-    stimulus_duration: int
+    evaluation_interval: int
+
+    min_stimulus_interval: float
+    max_stimulus_interval: float
+
+    target: float
+
     stimulus_density: int
 
 

@@ -1,0 +1,7 @@
+_key,level,entry_reward,evaluation_interval,min_stimulus_interval,max_stimulus_interval,target,stimulus_density
+0,0,1,10,2,2,5,5
+1,1,0.8,50,2,2,10,5
+2,2,0.6,100,3,5,15,10
+3,3,0.4,100,4,7,20,15
+4,4,0.2,100,5,9,25,20
+5,5,0,200,5,10,30,25
