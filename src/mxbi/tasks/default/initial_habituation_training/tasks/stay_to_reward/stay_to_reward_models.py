@@ -9,12 +9,17 @@ class Result(StrEnum):
 
 
 class TrialConfig(BaseModel):
-    level: int = 0
-    entry_reward: bool = False
-    reward_interval: int = 0
-    reward_duration: int = 0
-    stimulus_duration: int = 0
-    stimulus_density: int = 0
+    level: int
+    entry_reward: bool
+
+    min_stimulus_interval: float  # seconds
+    max_stimulus_interval: float  # seconds
+    target: float  # seconds
+
+    reward_duration: int = 1000  # milliseconds
+    stimulus_duration: int = 1000  # milliseconds
+
+    stimulus_density: int  # volume 0-100
 
     stimulus_freq: int = 2000
     stimulus_freq_duration: int = 100

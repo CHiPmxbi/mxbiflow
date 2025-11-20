@@ -1,5 +1,6 @@
 from datetime import datetime
 from math import ceil
+from random import uniform
 from tkinter import Frame
 from typing import TYPE_CHECKING, Final
 
@@ -46,6 +47,8 @@ class DefaultStayToRewardScene:
         self._context: "Final[StageContext]" = context
         self._background = background
 
+        self._play_future: Future[bool] | None = None
+
         self._tone = self._prepare_stimulus()
         self._standard_reward_stimulus = self._theater.new_standard_reward_stimulus(
             self._trial_config.stimulus_duration
@@ -79,8 +82,15 @@ class DefaultStayToRewardScene:
             self._direct_stimulus()
         else:
             self._start_timing()
+            self._stimulus_loop()
 
     def _on_trial_end(self) -> None:
+        if self._play_future is not None:
+            self._play_future.add_done_callback(lambda _: self._cleanup())
+        else:
+            self._cleanup()
+
+    def _cleanup(self) -> None:
         self._data.trial_end_time = datetime.now().timestamp()
         self._data.stay_duration = (
             self._data.trial_end_time - self._data.trial_start_time
@@ -128,12 +138,19 @@ class DefaultStayToRewardScene:
     # region event binding
     def _bind_events(self) -> None:
         self._trigger.focus_set()
-        self._trigger.bind("<r>", lambda e: self._give_standard_stimulus())
 
     def _start_timing(self) -> None:
-        self._trigger.after(
-            self._trial_config.reward_interval * 1000, self._give_stimulus
+        target_ms = int(self._trial_config.target * 1000)
+        self._trigger.after(target_ms, self._on_correct)
+
+    def _stimulus_loop(self) -> None:
+        stimulus_interval = uniform(
+            self._trial_config.min_stimulus_interval,
+            self._trial_config.max_stimulus_interval,
         )
+        stimulus_interval_ms = int(stimulus_interval * 1000)
+
+        self._trigger.after(stimulus_interval_ms, self._give_stimulus)
 
     # endregion
 
@@ -195,24 +212,27 @@ class DefaultStayToRewardScene:
         self._theater.acontroller.set_master_volume(self._trial_config.stimulus_density)
 
     def _give_stimulus(self) -> None:
-        future = self._theater.aplayer.play_stimulus(self._tone)
-        future.add_done_callback(self._on_stimulus_complete)
+        self._play_future = self._theater.aplayer.play_stimulus(self._tone)
+        self._play_future.add_done_callback(self._on_stimulus_complete)
 
     def _direct_stimulus(self) -> None:
-        future = self._theater.aplayer.play_stimulus(self._tone)
-        future.add_done_callback(self._on_direct_stimulus_complete)
+        self._play_future = self._theater.aplayer.play_stimulus(self._tone)
+        self._play_future.add_done_callback(self._on_direct_stimulus_complete)
 
     def _on_direct_stimulus_complete(self, future: "Future[bool]") -> None:
         if future.result():
             self._trigger.after(0, self._give_reward)
 
-            self._trigger.after(self._trial_config.reward_duration, self._start_timing)
+            self._trigger.after(
+                self._trial_config.reward_duration,
+                lambda: (self._start_timing(), self._stimulus_loop()),
+            )
 
     def _on_stimulus_complete(self, future: "Future[bool]") -> None:
         if future.result():
             self._trigger.after(0, self._give_reward)
 
-            self._trigger.after(self._trial_config.reward_duration, self._on_correct)
+            self._trigger.after(self._trial_config.reward_duration, self._stimulus_loop)
 
     def _on_correct(self) -> None:
         self._data.result = Result.CORRECT
@@ -221,9 +241,5 @@ class DefaultStayToRewardScene:
     def _give_reward(self) -> None:
         self._context.rewards += 1
         self._theater.reward.give_reward(self._trial_config.reward_duration)
-
-    def _give_standard_stimulus(self) -> None:
-        self._context.rewards += 1
-        self._standard_reward_stimulus.play(self._trial_config.reward_duration)
 
     # endregion

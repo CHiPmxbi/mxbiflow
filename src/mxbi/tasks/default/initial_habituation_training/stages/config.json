@@ -11,100 +11,55 @@
             "0": {
                 "level": 0,
                 "entry_reward": 1,
-                "evaluation_interval": 50,
-                "reward_interval": 2,
-                "reward_duration": 1000,
-                "stimulus_duration": 1000,
+                "evaluation_interval": 10,
+                "min_stimulus_interval": 2,
+                "max_stimulus_interval": 2,
+                "target": 5,
                 "stimulus_density": 5
             },
             "1": {
                 "level": 1,
-                "entry_reward": 0.9,
-                "evaluation_interval": 100,
-                "reward_interval": 5,
-                "reward_duration": 1000,
-                "stimulus_duration": 1000,
-                "stimulus_density": 7
+                "entry_reward": 0.8,
+                "evaluation_interval": 50,
+                "min_stimulus_interval": 2,
+                "max_stimulus_interval": 2,
+                "target": 10,
+                "stimulus_density": 5
             },
             "2": {
                 "level": 2,
-                "entry_reward": 0.8,
-                "evaluation_interval": 150,
-                "reward_interval": 8,
-                "reward_duration": 1200,
-                "stimulus_duration": 1200,
-                "stimulus_density": 9
+                "entry_reward": 0.6,
+                "evaluation_interval": 100,
+                "min_stimulus_interval": 3,
+                "max_stimulus_interval": 5,
+                "target": 15,
+                "stimulus_density": 10
             },
             "3": {
                 "level": 3,
-                "entry_reward": 0.7,
-                "evaluation_interval": 200,
-                "reward_interval": 11,
-                "reward_duration": 1400,
-                "stimulus_duration": 1400,
-                "stimulus_density": 11
+                "entry_reward": 0.4,
+                "evaluation_interval": 100,
+                "min_stimulus_interval": 4,
+                "max_stimulus_interval": 7,
+                "target": 20,
+                "stimulus_density": 15
             },
             "4": {
                 "level": 4,
-                "entry_reward": 0.6,
-                "evaluation_interval": 200,
-                "reward_interval": 13,
-                "reward_duration": 1600,
-                "stimulus_duration": 1600,
-                "stimulus_density": 13
+                "entry_reward": 0.2,
+                "evaluation_interval": 100,
+                "min_stimulus_interval": 5,
+                "max_stimulus_interval": 9,
+                "target": 25,
+                "stimulus_density": 20
             },
             "5": {
                 "level": 5,
-                "entry_reward": 0.5,
-                "evaluation_interval": 200,
-                "reward_interval": 16,
-                "reward_duration": 1800,
-                "stimulus_duration": 1800,
-                "stimulus_density": 15
-            },
-            "6": {
-                "level": 6,
-                "entry_reward": 0.4,
-                "evaluation_interval": 200,
-                "reward_interval": 19,
-                "reward_duration": 2000,
-                "stimulus_duration": 2000,
-                "stimulus_density": 17
-            },
-            "7": {
-                "level": 7,
-                "entry_reward": 0.3,
-                "evaluation_interval": 200,
-                "reward_interval": 22,
-                "reward_duration": 2200,
-                "stimulus_duration": 2200,
-                "stimulus_density": 19
-            },
-            "8": {
-                "level": 8,
-                "entry_reward": 0.2,
-                "evaluation_interval": 200,
-                "reward_interval": 24,
-                "reward_duration": 2400,
-                "stimulus_duration": 2400,
-                "stimulus_density": 21
-            },
-            "9": {
-                "level": 9,
-                "entry_reward": 0.1,
-                "evaluation_interval": 200,
-                "reward_interval": 26,
-                "reward_duration": 2600,
-                "stimulus_duration": 2600,
-                "stimulus_density": 23
-            },
-            "10": {
-                "level": 10,
                 "entry_reward": 0,
                 "evaluation_interval": 200,
-                "reward_interval": 30,
-                "reward_duration": 2800,
-                "stimulus_duration": 2800,
+                "min_stimulus_interval": 5,
+                "max_stimulus_interval": 10,
+                "target": 30,
                 "stimulus_density": 25
             }
         }
