@@ -173,6 +173,9 @@ class CrossModalTask:
                 aborted=result.cancelled,
                 timeout=result.timeout,
             )
-            self._data_logger.save_jsonl(rec.model_dump())
+
+            payload = rec.model_dump()
+            self._data_logger.save_jsonl(payload)
+            self._data_logger.save_csv_row(payload)
         except Exception:
             logger.exception("Failed to log cross-modal trial")
