@@ -1,4 +1,5 @@
 from mxbi.models.task import TaskEnum
+from mxbi.tasks.cross_modal.stage import CrossModalTask
 from mxbi.tasks.default.error_task.error_scene import ErrorScene
 from mxbi.tasks.default.idle_task.idle_scene import IDLEScene
 from mxbi.tasks.default.initial_habituation_training.stages.initial_habituation_training_stage import (
@@ -24,4 +25,5 @@ task_table: dict[TaskEnum, type[Task]] = {
     TaskEnum.GNGSiD_DETECT_STAGE: GNGSiDDetectStage,
     TaskEnum.GNGSiD_DISCRIMINATE_STAGE: GNGSiDDiscriminateStage,
     TaskEnum.TWOAC_SIZE_REDUCTION_STAGE: TWOACSizeReductionStage,
+    TaskEnum.CROSS_MODAL: CrossModalTask,
 }
