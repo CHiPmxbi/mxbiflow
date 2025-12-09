@@ -1,15 +1,17 @@
-from __future__ import annotations
 import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from mxbi.data_logger import DataLogger
-from mxbi.tasks.cross_modal.scene import CrossModalScene, CrossModalResult
 from mxbi.utils.logger import logger
 
-from src.mxbi.tasks.cross_modal.models import CrossModalOutcome, CrossModalResultRecord
-from src.mxbi.tasks.cross_modal.trial_io import TrialStore, read_trials
+from mxbi.tasks.cross_modal.models import CrossModalOutcome, CrossModalResultRecord
+from mxbi.tasks.cross_modal.scene import (
+    CrossModalScene,
+    CrossModalResult,
+)
+from mxbi.tasks.cross_modal.trial_io import TrialStore, read_trials
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState
@@ -32,11 +34,17 @@ class CrossModalTask:
         self._animal_state = animal_state
         self._screen = session_state.session_config.screen_type
 
-        trial_file = os.environ.get("MXBI_TRIAL_FILE")
-        if not trial_file:
-            raise RuntimeError("MXBI_TRIAL_FILE not set. Provide path to CSV/JSON/Excel trials.")
-        base_dir_env = os.environ.get("MXBI_TRIAL_BASE")
-        self._base_dir = Path(base_dir_env) if base_dir_env else None
+        cfg = session_state.session_config
+
+        trial_file_str = getattr(cfg, "cross_modal_trial_file", None)
+        if not trial_file_str:
+            raise RuntimeError(
+                "cross_modal_trial_file is not configured in SessionConfig. "
+                "Set it via the launcher for cross_modal_task."
+            )
+
+        media_root_str = getattr(cfg, "cross_modal_media_root", None)
+        self._base_dir = Path(media_root_str) if media_root_str else None
 
         mock_env = os.environ.get("MXBI_MOCK", "0").strip().lower()
         self._mock = mock_env in {"1", "true", "yes", "y"}
@@ -44,9 +52,17 @@ class CrossModalTask:
         self._mock_latency_ms = int(os.environ.get("MXBI_MOCK_LATENCY_MS", "1000"))
 
         verify_paths = not self._mock
-        self._trial_store: TrialStore = read_trials(Path(trial_file), verify_paths=verify_paths, base_dir=self._base_dir)
 
-        self._trial, self._trial_index = self._trial_store.next_for_subject(self._animal_state.name)
+        trial_path = Path(trial_file_str)
+        self._trial_store: TrialStore = read_trials(
+            trial_path,
+            verify_paths=verify_paths,
+            base_dir=self._base_dir,
+        )
+
+        self._trial, self._trial_index = self._trial_store.next_for_subject(
+            self._animal_state.name
+        )
 
         self._scene = CrossModalScene(
             theater=self._theater,
@@ -57,14 +73,18 @@ class CrossModalTask:
             base_dir=self._base_dir,
         )
 
-        self._data_logger = DataLogger(self._session_state, self._animal_state.name, self.STAGE_NAME)
+        self._data_logger = DataLogger(
+            self._session_state, self._animal_state.name, self.STAGE_NAME
+        )
         self._feedback = False
 
     def start(self) -> "Feedback":
         result = self._scene.start()
         self._feedback = result.feedback
+
         if not result.cancelled:
             self._log_trial(result)
+
         self._trial_store.advance(self._animal_state.name, self._trial_index)
 
         logger.debug(
@@ -103,7 +123,11 @@ class CrossModalTask:
             else:
                 outcome = CrossModalOutcome.INCORRECT
 
-            if result.trial_start_time is not None and result.choice_time is not None and not result.timeout:
+            if (
+                result.trial_start_time is not None
+                and result.choice_time is not None
+                and not result.timeout
+            ):
                 latency = result.choice_time - result.trial_start_time
             else:
                 latency = None

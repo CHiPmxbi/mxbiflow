@@ -1,7 +1,8 @@
 import sys
 from datetime import datetime
-from tkinter import Tk
-from tkinter.ttk import Button, Frame, Label
+from pathlib import Path
+from tkinter import Tk, filedialog
+from tkinter.ttk import Button, Frame, Label, Entry
 
 from mxbi.config import session_config, session_options
 from mxbi.models.animal import AnimalConfig
@@ -21,9 +22,7 @@ from mxbi.utils.detect_platform import PlatformEnum
 class LaunchPanel:
     """Tkinter based configuration launcher for MXBI sessions."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         self._root = Tk()
         self._root.title("mxbi")
         self._init_ui()
@@ -93,6 +92,56 @@ class LaunchPanel:
 
         self.entry_comments = create_textbox(frame_general, "Comments: ", height=4)
         self.entry_comments.pack(fill="x")
+
+        # Cross-modal trial file (CSV/JSON/XLSX)
+        frame_trial = Frame(frame_general)
+        frame_trial.pack(fill="x", pady=(4, 0))
+
+        Label(frame_trial, text="Cross-modal trial file").pack(side="left")
+
+        self.entry_cross_modal_trial_file = Entry(frame_trial)
+        initial_trial_file = (
+            getattr(session_config.value, "cross_modal_trial_file", "") or ""
+        )
+        if initial_trial_file:
+            self.entry_cross_modal_trial_file.insert(0, initial_trial_file)
+        self.entry_cross_modal_trial_file.pack(
+            side="left",
+            fill="x",
+            expand=True,
+            padx=(4, 4),
+        )
+
+        Button(
+            frame_trial,
+            text="Browse…",
+            command=self._choose_cross_modal_trial_file,
+        ).pack(side="right")
+
+        # Cross-modal media root (folder with WAV/JPG)
+        frame_media = Frame(frame_general)
+        frame_media.pack(fill="x", pady=(4, 0))
+
+        Label(frame_media, text="Cross-modal media root").pack(side="left")
+
+        self.entry_cross_modal_media_root = Entry(frame_media)
+        initial_media_root = (
+            getattr(session_config.value, "cross_modal_media_root", "") or ""
+        )
+        if initial_media_root:
+            self.entry_cross_modal_media_root.insert(0, initial_media_root)
+        self.entry_cross_modal_media_root.pack(
+            side="left",
+            fill="x",
+            expand=True,
+            padx=(4, 4),
+        )
+
+        Button(
+            frame_media,
+            text="Browse…",
+            command=self._choose_cross_modal_media_root,
+        ).pack(side="right")
 
     def _init_detector_ui(self) -> None:
         frame_detector = self._create_section_frame("Detector")
@@ -249,6 +298,12 @@ class LaunchPanel:
             screen_type=self._selected_screen_type(),
             comments=comments,
             animals=self._collect_animals(),
+            cross_modal_trial_file=self._normalize_path(
+                self.entry_cross_modal_trial_file.get()
+            ),
+            cross_modal_media_root=self._normalize_path(
+                self.entry_cross_modal_media_root.get()
+            ),
         )
 
     def _collect_animals(self) -> dict[str, AnimalConfig]:
@@ -273,6 +328,11 @@ class LaunchPanel:
     def _selected_screen_type(self):
         screen_key = ScreenTypeEnum(self.combo_screen.get())
         return session_options.value.screen_type[screen_key]
+
+    @staticmethod
+    def _normalize_path(value: str) -> str | None:
+        value = value.strip()
+        return value or None
 
     def _save_and_close(self, config: SessionConfig) -> None:
         session_config.save(config)
@@ -311,6 +371,45 @@ class LaunchPanel:
         combo = create_cobmbo(parent, label, values, default_value, state=state)
         combo.pack(fill="x", expand=True)
         return combo
+
+    def _choose_cross_modal_trial_file(self) -> None:
+        current = self.entry_cross_modal_trial_file.get().strip()
+        initial_dir = "."
+        if current:
+            p = Path(current)
+            if p.is_dir():
+                initial_dir = str(p)
+            elif p.parent.exists():
+                initial_dir = str(p.parent)
+
+        path = filedialog.askopenfilename(
+            title="Select cross-modal trial file",
+            initialdir=initial_dir,
+            filetypes=(
+                ("Table files", "*.csv *.json *.xlsx"),
+                ("CSV", "*.csv"),
+                ("JSON", "*.json"),
+                ("Excel", "*.xlsx"),
+                ("All files", "*.*"),
+            ),
+        )
+        if path:
+            self.entry_cross_modal_trial_file.delete(0, "end")
+            self.entry_cross_modal_trial_file.insert(0, path)
+
+    def _choose_cross_modal_media_root(self) -> None:
+        current = self.entry_cross_modal_media_root.get().strip()
+        initial_dir = (
+            current if current and Path(current).is_dir() else "."
+        )
+
+        path = filedialog.askdirectory(
+            title="Select cross-modal media root",
+            initialdir=initial_dir,
+        )
+        if path:
+            self.entry_cross_modal_media_root.delete(0, "end")
+            self.entry_cross_modal_media_root.insert(0, path)
 
 
 if __name__ == "__main__":

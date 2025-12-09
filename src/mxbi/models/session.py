@@ -37,6 +37,10 @@ class SessionConfig(BaseModel):
     screen_type: ScreenConfig = Field(default_factory=ScreenConfig)
     animals: dict[str, AnimalConfig] = Field(default_factory=dict)
 
+    # Cross-modal recognition specific configuration
+    cross_modal_trial_file: str | None = None
+    cross_modal_media_root: str | None = None
+
 
 class SessionState(BaseModel):
     session_id: int = 0
