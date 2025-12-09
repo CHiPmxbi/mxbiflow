@@ -12,6 +12,7 @@ class AnimalConfig(BaseModel):
     name: str = "mock"
     task: TaskEnum = TaskEnum.IDEL
     level: int = 0
+    cross_modal_trial_file: str | None = None
 
 
 class ScheduleConditionConfig(BaseModel):

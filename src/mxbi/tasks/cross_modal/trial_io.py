@@ -43,7 +43,7 @@ _TRIAL_STORE_CACHE: dict[tuple[Path, Path | None], TrialStore] = {}
 
 
 def read_trials(
-    path: Path, verify_paths: bool = True, base_dir: Path | None = None
+    path: Path, base_dir: Path | None = None
 ) -> TrialStore:
     if not path.exists():
         raise FileNotFoundError(f"Trial file not found: {path}")
@@ -66,8 +66,7 @@ def read_trials(
     trials: list[Trial] = []
     for rec in records:
         t = Trial.model_validate(rec)
-        if verify_paths:
-            _assert_paths_exist(t, base_dir)
+        _assert_paths_exist(t, base_dir)
         trials.append(t)
 
     logger.info("Loaded %d trials from %s", len(trials), path)
@@ -123,4 +122,7 @@ def _assert_paths_exist(t: Trial, base_dir: Path | None) -> None:
     rp = t.right_image_path_obj(base_dir)
     missing = [str(p) for p in (ap, lp, rp) if not p.exists()]
     if missing:
-        raise FileNotFoundError(f"Stimulus paths do not exist: {missing}")
+        raise FileNotFoundError(
+            "Stimulus paths do not exist for "
+            f"trial_id={t.trial_id}, subject_id={t.subject_id}: {missing}"
+        )

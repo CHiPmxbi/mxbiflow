@@ -1,17 +1,18 @@
-import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from mxbi.data_logger import DataLogger
-from mxbi.utils.logger import logger
-
-from mxbi.tasks.cross_modal.models import CrossModalOutcome, CrossModalResultRecord
+from mxbi.tasks.cross_modal.models import (
+    CrossModalOutcome,
+    CrossModalResultRecord,
+)
 from mxbi.tasks.cross_modal.scene import (
-    CrossModalScene,
     CrossModalResult,
+    CrossModalScene
 )
 from mxbi.tasks.cross_modal.trial_io import TrialStore, read_trials
+from mxbi.utils.logger import logger
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState
@@ -34,29 +35,37 @@ class CrossModalTask:
         self._animal_state = animal_state
         self._screen = session_state.session_config.screen_type
 
-        cfg = session_state.session_config
+        animals_cfg = session_state.session_config.animals
 
-        trial_file_str = getattr(cfg, "cross_modal_trial_file", None)
+        try:
+            animal_cfg = animals_cfg[animal_state.name]
+        except KeyError as e:
+            raise RuntimeError(
+                f"No animal config found for '{animal_state.name}' "
+                f"in session_config.animals"
+            ) from e
+
+        trial_file_str = getattr(animal_cfg, "cross_modal_trial_file", None)
         if not trial_file_str:
             raise RuntimeError(
-                "cross_modal_trial_file is not configured in SessionConfig. "
-                "Set it via the launcher for cross_modal_task."
+                f"No cross-modal trial file configured for animal "
+                f"'{animal_state.name}'. "
+                f"Set animal['{animal_state.name}'].cross_modal_trial_file "
+                f"in config_session.json or via the launcher."
             )
 
-        media_root_str = getattr(cfg, "cross_modal_media_root", None)
-        self._base_dir = Path(media_root_str) if media_root_str else None
+        trial_path = Path(trial_file_str).expanduser().resolve()
+        if not trial_path.exists():
+            raise FileNotFoundError(
+                f"Cross-modal trial file does not exist for animal "
+                f"'{animal_state.name}': {trial_path}"
+            )
 
-        mock_env = os.environ.get("MXBI_MOCK", "0").strip().lower()
-        self._mock = mock_env in {"1", "true", "yes", "y"}
-        self._mock_strategy = os.environ.get("MXBI_MOCK_STRATEGY", "always_correct")
-        self._mock_latency_ms = int(os.environ.get("MXBI_MOCK_LATENCY_MS", "1000"))
-
-        verify_paths = not self._mock
+        self._base_dir = trial_path.parent
 
         trial_path = Path(trial_file_str)
         self._trial_store: TrialStore = read_trials(
             trial_path,
-            verify_paths=verify_paths,
             base_dir=self._base_dir,
         )
 
