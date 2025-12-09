@@ -30,6 +30,7 @@ class TrialStore:
         subject_trials = self.trials_for_subject(subject_id)
         if not subject_trials:
             raise ValueError(f"No trials for subject_id '{subject_id}'")
+
         idx = self.indices.get(subject_id, 0)
         i = idx % len(subject_trials)
         return subject_trials[i], i
@@ -38,9 +39,19 @@ class TrialStore:
         self.indices[subject_id] = last_index + 1
 
 
-def read_trials(path: Path, verify_paths: bool = True, base_dir: Path | None = None) -> TrialStore:
+_TRIAL_STORE_CACHE: dict[tuple[Path, Path | None], TrialStore] = {}
+
+
+def read_trials(
+    path: Path, verify_paths: bool = True, base_dir: Path | None = None
+) -> TrialStore:
     if not path.exists():
         raise FileNotFoundError(f"Trial file not found: {path}")
+
+    key = (path.resolve(), base_dir.resolve() if base_dir else None)
+    cached = _TRIAL_STORE_CACHE.get(key)
+    if cached is not None:
+        return cached
 
     ext = path.suffix.lower()
     if ext == ".csv":
@@ -52,7 +63,7 @@ def read_trials(path: Path, verify_paths: bool = True, base_dir: Path | None = N
     else:
         raise ValueError(f"Unsupported trial file format: {path.suffix}")
 
-    trials = []
+    trials: list[Trial] = []
     for rec in records:
         t = Trial.model_validate(rec)
         if verify_paths:
@@ -60,7 +71,9 @@ def read_trials(path: Path, verify_paths: bool = True, base_dir: Path | None = N
         trials.append(t)
 
     logger.info("Loaded %d trials from %s", len(trials), path)
-    return TrialStore.from_trials(trials)
+    store = TrialStore.from_trials(trials)
+    _TRIAL_STORE_CACHE[key] = store
+    return store
 
 
 def _read_csv(path: Path) -> Iterable[dict]:
@@ -98,7 +111,7 @@ def _read_xlsx(path: Path) -> Iterable[dict]:
         return []
     header = [str(h) for h in rows[0]]
     for r in rows[1:]:
-        rec = {}
+        rec: dict[str, object] = {}
         for k, v in zip(header, r):
             rec[k] = v
         yield rec
@@ -108,6 +121,6 @@ def _assert_paths_exist(t: Trial, base_dir: Path | None) -> None:
     ap = t.audio_path_obj(base_dir)
     lp = t.left_image_path_obj(base_dir)
     rp = t.right_image_path_obj(base_dir)
-    missing = [str(p) for p in [ap, lp, rp] if not p.exists()]
+    missing = [str(p) for p in (ap, lp, rp) if not p.exists()]
     if missing:
         raise FileNotFoundError(f"Stimulus paths do not exist: {missing}")
