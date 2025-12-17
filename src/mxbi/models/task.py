@@ -12,3 +12,4 @@ class TaskEnum(StrEnum):
     GNGSiD_DETECT_STAGE = auto()
     GNGSiD_DISCRIMINATE_STAGE = auto()
     TWOAC_SIZE_REDUCTION_STAGE = auto()
+    CROSS_MODAL = auto()

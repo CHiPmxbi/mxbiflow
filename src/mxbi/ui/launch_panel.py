@@ -1,7 +1,8 @@
 import sys
 from datetime import datetime
-from tkinter import Tk
-from tkinter.ttk import Button, Frame, Label
+from pathlib import Path
+from tkinter import Tk, filedialog
+from tkinter.ttk import Button, Frame, Label, Entry
 
 from mxbi.config import session_config, session_options
 from mxbi.models.animal import AnimalConfig
@@ -21,9 +22,7 @@ from mxbi.utils.detect_platform import PlatformEnum
 class LaunchPanel:
     """Tkinter based configuration launcher for MXBI sessions."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         self._root = Tk()
         self._root.title("mxbi")
         self._init_ui()
@@ -273,6 +272,11 @@ class LaunchPanel:
     def _selected_screen_type(self):
         screen_key = ScreenTypeEnum(self.combo_screen.get())
         return session_options.value.screen_type[screen_key]
+
+    @staticmethod
+    def _normalize_path(value: str) -> str | None:
+        value = value.strip()
+        return value or None
 
     def _save_and_close(self, config: SessionConfig) -> None:
         session_config.save(config)

@@ -1,6 +1,8 @@
+import wave
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from threading import Event
 from typing import TYPE_CHECKING
 
@@ -183,6 +185,63 @@ class APlayer:
 
         self._stop_event.clear()
         return True
+
+    def play_file(self, path: str | Path) -> Future[bool]:
+        """
+        Play a mono 16-bit WAV file using the same PyAudio stream.
+
+        Returns a Future[bool] that resolves to:
+        - True  if playback finished normally
+        - False if it was interrupted by stop() or an error
+        """
+        self._stop_event.clear()
+        wav_path = Path(path)
+
+        def _play_wav() -> bool:
+            try:
+                if not wav_path.exists():
+                    print(f"[APlayer] WAV file not found: {wav_path}")
+                    return False
+
+                with wave.open(str(wav_path), "rb") as wf:
+                    # Basic sanity checks – we still stream even if mismatch,
+                    # but playback speed/pitch may differ if the sample rate is not SAMPLE_RATE.
+                    channels = wf.getnchannels()
+                    width = wf.getsampwidth()
+                    rate = wf.getframerate()
+
+                    if channels != 1 or width != 2:
+                        print(
+                            f"[APlayer] Warning: expected mono 16-bit WAV, "
+                            f"got channels={channels}, width={width * 8} bits."
+                        )
+                    if rate != SAMPLE_RATE:
+                        print(
+                            f"[APlayer] Warning: expected sample rate {SAMPLE_RATE}, "
+                            f"got {rate}. Audio will play at a different speed."
+                        )
+
+                    chunk_size = 1024
+                    while True:
+                        if self._stop_event.is_set():
+                            self._stop_event.clear()
+                            return False
+
+                        data = wf.readframes(chunk_size)
+                        if not data:
+                            break
+
+                        self._stream.write(data)
+
+                self._stop_event.clear()
+                return True
+
+            except Exception as e:
+                print(f"[APlayer] Error playing WAV file {wav_path}: {e}")
+                self._stop_event.clear()
+                return False
+
+        return self._executor.submit(_play_wav)
 
     def play_stimulus(self, stimulus: NDArray[np.int16]) -> Future[bool]:
         """Play a single stimulus without adjusting system volume between tones."""
