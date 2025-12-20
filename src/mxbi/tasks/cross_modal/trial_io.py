@@ -6,7 +6,7 @@ from typing import Iterable
 
 from mxbi.utils.logger import logger
 
-from src.mxbi.tasks.cross_modal.trial_schema import Trial
+from mxbi.tasks.cross_modal.trial_schema import Trial
 
 
 @dataclass
@@ -42,9 +42,7 @@ class TrialStore:
 _TRIAL_STORE_CACHE: dict[tuple[Path, Path | None], TrialStore] = {}
 
 
-def read_trials(
-    path: Path, base_dir: Path | None = None
-) -> TrialStore:
+def read_trials(path: Path, base_dir: Path | None = None) -> TrialStore:
     if not path.exists():
         raise FileNotFoundError(f"Trial file not found: {path}")
 

@@ -1,0 +1,15 @@
+{
+    "visual": {
+        "image_scale": 0.6549222797927462
+    },
+    "audio": {
+        "master_volume": 70,
+        "digital_volume": 70,
+        "gain": 1.0,
+        "wav_rate_policy": "resample"
+    },
+    "timing": {
+        "fixation_ms": 300,
+        "trial_timeout_ms": 10000
+    }
+}

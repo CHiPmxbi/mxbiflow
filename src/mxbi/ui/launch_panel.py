@@ -1,8 +1,7 @@
 import sys
 from datetime import datetime
-from pathlib import Path
-from tkinter import Tk, filedialog
-from tkinter.ttk import Button, Frame, Label, Entry
+from tkinter import Tk
+from tkinter.ttk import Button, Frame, Label, Notebook
 
 from mxbi.config import session_config, session_options
 from mxbi.models.animal import AnimalConfig
@@ -10,11 +9,17 @@ from mxbi.models.detector import DetectorEnum
 from mxbi.models.reward import RewardEnum
 from mxbi.models.session import ScreenTypeEnum, SessionConfig
 from mxbi.peripheral.pumps.pump_factory import PumpEnum
+from mxbi.tasks.cross_modal.config import (
+    CrossModalConfig,
+    load_cross_modal_config,
+    save_cross_modal_config,
+)
 from mxbi.ui.components.animal_card import AnimalCard
 from mxbi.ui.components.fileds.labeled_combobox import (
     LabeledCombobox,
     create_cobmbo,
 )
+from mxbi.ui.components.fileds.labeled_scale import LabeledScale
 from mxbi.ui.components.fileds.labeled_textbox import create_textbox
 from mxbi.utils.detect_platform import PlatformEnum
 
@@ -25,18 +30,34 @@ class LaunchPanel:
     def __init__(self) -> None:
         self._root = Tk()
         self._root.title("mxbi")
+
+        try:
+            self._cross_modal_config = load_cross_modal_config()
+        except FileNotFoundError:
+            self._cross_modal_config = CrossModalConfig()
+
         self._init_ui()
         self._root.mainloop()
 
     def _init_ui(self) -> None:
-        self._frame = Frame(self._root)
-        self._frame.pack()
+        self._notebook = Notebook(self._root)
+        self._notebook.pack(fill="both", expand=True)
+
+        self._frame_session = Frame(self._notebook)
+        self._frame_cross_modal = Frame(self._notebook)
+
+        self._notebook.add(self._frame_session, text="Session")
+        self._notebook.add(self._frame_cross_modal, text="Cross-modal")
+
+        self._frame = self._frame_session
 
         self._init_general_ui()
         self._init_detector_ui()
         self._init_animals_ui()
         self._init_animals_buttons_ui()
         self._init_buttons_ui()
+
+        self._init_cross_modal_ui()
 
         self._bind_events()
 
@@ -117,7 +138,6 @@ class LaunchPanel:
         if "" not in available_ports:
             available_ports.insert(0, "")
 
-        # Allow typing a custom device path when auto-detection fails.
         self.combo_detector_port = self._pack_combo(
             frame_detector,
             "Port: ",
@@ -193,6 +213,64 @@ class LaunchPanel:
         button_start = Button(frame_button, text="Start", command=self.save)
         button_start.grid(row=0, column=1, padx=2, pady=2, sticky="e")
 
+    def _init_cross_modal_ui(self) -> None:
+        self._frame = self._frame_cross_modal
+
+        frame_visual = self._create_section_frame("Visual")
+
+        self.scale_cross_modal_image_scale = LabeledScale(
+            frame_visual,
+            "Image size: ",
+            from_value=0.2,
+            to_value=0.8,
+            default_value=self._cross_modal_config.visual.image_scale,
+            value_format="{:.2f}",
+        )
+        self.scale_cross_modal_image_scale.pack(fill="x", expand=True)
+
+        frame_audio = self._create_section_frame("Audio")
+
+        self.scale_cross_modal_master_volume = LabeledScale(
+            frame_audio,
+            "Master volume: ",
+            from_value=0,
+            to_value=100,
+            default_value=float(self._cross_modal_config.audio.master_volume),
+            value_format="{:.0f}",
+        )
+        self.scale_cross_modal_master_volume.pack(fill="x", expand=True)
+
+        self.scale_cross_modal_digital_volume = LabeledScale(
+            frame_audio,
+            "Digital volume: ",
+            from_value=0,
+            to_value=100,
+            default_value=float(self._cross_modal_config.audio.digital_volume),
+            value_format="{:.0f}",
+        )
+        self.scale_cross_modal_digital_volume.pack(fill="x", expand=True)
+
+        self.scale_cross_modal_gain = LabeledScale(
+            frame_audio,
+            "Gain: ",
+            from_value=0.0,
+            to_value=2.0,
+            default_value=self._cross_modal_config.audio.gain,
+            value_format="{:.2f}",
+        )
+        self.scale_cross_modal_gain.pack(fill="x", expand=True)
+
+        frame_policy = self._create_section_frame("WAV sample rate")
+
+        self.combo_cross_modal_wav_policy = self._pack_combo(
+            frame_policy,
+            "Policy: ",
+            ["resample", "error"],
+            self._cross_modal_config.audio.wav_rate_policy,
+        )
+
+        self._frame = self._frame_session
+
     def _add_animal(self) -> None:
         if self.frame_animals is None:
             return
@@ -212,12 +290,10 @@ class LaunchPanel:
         animal_card.destroy()
 
     def _bind_events(self) -> None:
-        # Auto-start provides a safety net if the panel is left unattended.
         self._root.after(60000, self._auto_start)
         self._root.protocol("WM_DELETE_WINDOW", sys.exit)
 
     def _auto_start(self):
-        """Kick off a session automatically when the operator does not interact in time."""
         current_time = datetime.now().strftime("%Y%m%d-%H-%M-%S-%f")[:-3]
         timezone = datetime.now().astimezone().tzinfo
 
@@ -250,6 +326,20 @@ class LaunchPanel:
             animals=self._collect_animals(),
         )
 
+    def _build_cross_modal_config(self) -> CrossModalConfig:
+        return CrossModalConfig(
+            visual={
+                "image_scale": self.scale_cross_modal_image_scale.get_float(),
+            },
+            audio={
+                "master_volume": self.scale_cross_modal_master_volume.get_int(),
+                "digital_volume": self.scale_cross_modal_digital_volume.get_int(),
+                "gain": self.scale_cross_modal_gain.get_float(),
+                "wav_rate_policy": self.combo_cross_modal_wav_policy.get(),
+            },
+            timing=self._cross_modal_config.timing.model_dump(),
+        )
+
     def _collect_animals(self) -> dict[str, AnimalConfig]:
         return {
             animal_card.data.name: animal_card.data
@@ -273,17 +363,12 @@ class LaunchPanel:
         screen_key = ScreenTypeEnum(self.combo_screen.get())
         return session_options.value.screen_type[screen_key]
 
-    @staticmethod
-    def _normalize_path(value: str) -> str | None:
-        value = value.strip()
-        return value or None
-
     def _save_and_close(self, config: SessionConfig) -> None:
+        save_cross_modal_config(self._build_cross_modal_config())
         session_config.save(config)
         self._root.destroy()
 
     def _available_detector_ports(self) -> list[str]:
-        """Return serial device paths detected on the host."""
         try:
             from serial.tools import list_ports
         except ModuleNotFoundError:
@@ -297,7 +382,6 @@ class LaunchPanel:
         return sorted(ports)
 
     def _create_section_frame(self, title: str) -> Frame:
-        """Create a vertically stacked frame with a section heading."""
         frame = Frame(self._frame)
         frame.pack(fill="x")
         frame.columnconfigure(0, weight=1)
