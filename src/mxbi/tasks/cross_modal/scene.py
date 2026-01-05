@@ -3,18 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from time import time
 from tkinter import CENTER, Canvas, Event
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING
 
-from PIL import Image, ImageTk
-from mxbi.tasks.cross_modal.media import load_wav_as_int16
+import numpy as np
+from numpy.typing import NDArray
+from PIL import ImageTk
+
+from mxbi.tasks.cross_modal.config import CrossModalConfig
 from mxbi.utils.logger import logger
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 from mxbi.utils.tkinter.components.showdata_widget import ShowDataWidget
 
 if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
+
     from mxbi.models.animal import AnimalState
     from mxbi.models.session import ScreenConfig, SessionState
-    from src.mxbi.tasks.cross_modal.trial_schema import Trial
+    from mxbi.tasks.cross_modal.trial_schema import Trial
     from mxbi.theater import Theater
 
 
@@ -31,8 +36,6 @@ class CrossModalResult:
 
 
 class CrossModalScene:
-    TRIAL_TIMEOUT_MS: Final[int] = 10_000
-
     def __init__(
         self,
         theater: "Theater",
@@ -40,14 +43,21 @@ class CrossModalScene:
         animal_state: "AnimalState",
         screen: "ScreenConfig",
         trial: "Trial",
-        base_dir: "Path | None" = None,
+        cross_modal_config: CrossModalConfig,
+        left_image: "PILImage",
+        right_image: "PILImage",
+        audio_stimulus: "NDArray[np.int16]",
     ) -> None:
         self._theater = theater
         self._session_state = session_state
         self._animal_state = animal_state
         self._screen = screen
         self._trial = trial
-        self._base_dir = base_dir
+        self._cross_modal_config = cross_modal_config
+
+        self._left_image_pil = left_image
+        self._right_image_pil = right_image
+        self._audio_stimulus = audio_stimulus
 
         self._background: CanvasWithInnerBorder | None = None
         self._left_canvas: Canvas | None = None
@@ -123,7 +133,9 @@ class CrossModalScene:
             fill="white",
             font=("Helvetica", 40),
         )
-        self._background.after(300, self._show_images)
+
+        fixation_ms = self._cross_modal_config.timing.fixation_ms
+        self._background.after(fixation_ms, self._show_images)
 
     def _show_images(self) -> None:
         if self._background is None:
@@ -131,7 +143,7 @@ class CrossModalScene:
 
         self._background.delete("all")
 
-        img_size = int(min(self._screen.width, self._screen.height) * 0.35)
+        img_size = int(self._left_image_pil.size[0])
 
         self._left_canvas = Canvas(
             self._background, width=img_size, height=img_size, bg="grey", highlightthickness=0
@@ -148,28 +160,11 @@ class CrossModalScene:
         if self._right_canvas is not None:
             self._right_canvas.bind("<ButtonPress-1>", lambda e: self._on_choice("right", e))
 
-        left_path = self._trial.left_image_path_obj(self._base_dir)
-        right_path = self._trial.right_image_path_obj(self._base_dir)
+        self._left_image = ImageTk.PhotoImage(self._left_image_pil)
+        self._left_canvas.create_image(img_size // 2, img_size // 2, image=self._left_image)
 
-        try:
-            img = Image.open(left_path).resize((img_size, img_size), Image.LANCZOS)
-            self._left_image = ImageTk.PhotoImage(img)
-            self._left_canvas.create_image(img_size // 2, img_size // 2, image=self._left_image)
-        except Exception:
-            logger.exception("Failed to load left image %s", left_path)
-            self._left_canvas.create_text(
-                img_size // 2, img_size // 2, text=self._trial.left_image_identity_id, fill="white"
-            )
-
-        try:
-            img = Image.open(right_path).resize((img_size, img_size), Image.LANCZOS)
-            self._right_image = ImageTk.PhotoImage(img)
-            self._right_canvas.create_image(img_size // 2, img_size // 2, image=self._right_image)
-        except Exception:
-            logger.exception("Failed to load right image %s", right_path)
-            self._right_canvas.create_text(
-                img_size // 2, img_size // 2, text=self._trial.right_image_identity_id, fill="white"
-            )
+        self._right_image = ImageTk.PhotoImage(self._right_image_pil)
+        self._right_canvas.create_image(img_size // 2, img_size // 2, image=self._right_image)
 
         self._background.create_text(
             self._screen.width * 0.25,
@@ -185,7 +180,8 @@ class CrossModalScene:
         )
 
         self._trial_start_time = time()
-        self._background.after(self.TRIAL_TIMEOUT_MS, self._on_timeout)
+        timeout_ms = self._cross_modal_config.timing.trial_timeout_ms
+        self._background.after(timeout_ms, self._on_timeout)
 
     def _bind_events(self) -> None:
         if self._background is None:
@@ -194,13 +190,17 @@ class CrossModalScene:
         self._background.bind("<s>", lambda e: self._theater.caputre(self._background))
 
     def _play_audio(self) -> None:
-        ap = self._trial.audio_path_obj(self._base_dir)
         try:
-            stim = load_wav_as_int16(ap)
+            self._theater.acontroller.set_master_volume(
+                self._cross_modal_config.audio.master_volume
+            )
+            self._theater.acontroller.set_digital_volume(
+                self._cross_modal_config.audio.digital_volume
+            )
         except Exception:
-            logger.exception("Failed to load WAV file %s", ap)
-            return
-        self._theater.aplayer.play_stimulus(stim)
+            logger.exception("Failed to set cross-modal audio volume")
+
+        self._theater.aplayer.play_stimulus(self._audio_stimulus)
 
     def _on_choice(self, side: str, event: Event) -> None:
         if self._cancelled or self._chosen_side is not None:
