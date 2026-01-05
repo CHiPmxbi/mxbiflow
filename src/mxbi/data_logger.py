@@ -1,3 +1,4 @@
+import csv
 import json
 import sys
 from datetime import datetime
@@ -111,6 +112,23 @@ class DataLogger:
             raise
         except Exception as e:
             logger.error(f"Unexpected error while writing JSON data: {e}")
+            raise
+
+    def save_csv_row(self, data: dict) -> None:
+        csv_path = self._get_path(".csv")
+        try:
+            csv_path.parent.mkdir(parents=True, exist_ok=True)
+            file_exists = csv_path.exists() and csv_path.stat().st_size > 0
+
+            fieldnames = sorted(data.keys())
+
+            with csv_path.open("a", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow({k: data.get(k, "") for k in fieldnames})
+        except Exception as e:
+            logger.error(f"Failed to write CSV row to {csv_path}: {e}")
             raise
 
 

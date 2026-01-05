@@ -1,4 +1,5 @@
-from tkinter.ttk import Frame, Label
+from tkinter import filedialog
+from tkinter.ttk import Frame, Label, Button, Entry
 
 from mxbi.models.session import AnimalConfig, AnimalOptions
 from mxbi.models.task import TaskEnum
@@ -43,11 +44,45 @@ class AnimalCard(Frame):
         )
         self.combo_task.pack(fill="x", expand=True)
 
+        trial_frame = Frame(self)
+        trial_frame.pack(fill="x", expand=True)
+
+        Label(trial_frame, text="Cross-modal trials:").pack(side="left")
+
+        self.entry_cross_modal_trial_file = Entry(trial_frame)
+        existing = getattr(animal, "cross_modal_trial_file", None)
+        if existing:
+            self.entry_cross_modal_trial_file.insert(0, existing)
+        self.entry_cross_modal_trial_file.pack(side="left", fill="x", expand=True)
+
+        browse_btn = Button(
+            trial_frame,
+            text="Browse…",
+            command=self._browse_cross_modal_trial_file,
+        )
+        browse_btn.pack(side="left")
+
+    def _browse_cross_modal_trial_file(self) -> None:
+        path = filedialog.askopenfilename(
+            title=f"Select cross-modal trials for {self.__animal.name or 'animal'}",
+            filetypes=[
+                ("Trial files", "*.csv *.json *.xlsx"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not path:
+            return
+        self.entry_cross_modal_trial_file.delete(0, "end")
+        self.entry_cross_modal_trial_file.insert(0, path)
+
     @property
     def data(self) -> AnimalConfig:
         self.__animal.name = self.combo_name.get()
         self.__animal.level = int(self.combo_step.get())
         self.__animal.task = TaskEnum(self.combo_task.get())
+        self.__animal.cross_modal_trial_file = (
+            self.entry_cross_modal_trial_file.get().strip() or None
+        )
 
         return self.__animal
 

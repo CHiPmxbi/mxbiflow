@@ -14,6 +14,7 @@ class AnimalConfig(BaseModel):
     task: TaskEnum = TaskEnum.IDEL
     level: int = 0
     level_trial_id: int | None = None
+    cross_modal_trial_file: str | None = None
 
 
 class ScheduleConditionConfig(BaseModel):
