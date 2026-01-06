@@ -27,14 +27,20 @@ class SessionConfig(BaseModel):
     experimenter: str = ""
     xbi_id: str = ""
     comments: str = ""
+
     reward_type: RewardEnum = RewardEnum.AGUM_ONE_FIFTH
     pump_type: PumpEnum = DEFAULT_PUMP
     platform: PlatformEnum = PlatformEnum.RASPBERRY
+
     detector: DetectorEnum = DetectorEnum.MOCK
     detector_port: str | None = None
     detector_baudrate: int | None = None
     detector_interval: float | None = None
+
     screen_type: ScreenConfig = Field(default_factory=ScreenConfig)
+
+    cross_modal_bundle_dir: str | None = None
+
     animals: dict[str, AnimalConfig] = Field(default_factory=dict)
 
 
@@ -42,7 +48,6 @@ class SessionState(BaseModel):
     session_id: int = 0
     start_time: float = Field(default=0.0, frozen=True)
     end_time: float = 0.0
-
     session_config: SessionConfig = Field(default_factory=SessionConfig, frozen=True)
 
 

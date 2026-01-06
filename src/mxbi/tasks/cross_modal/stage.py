@@ -5,11 +5,12 @@ from typing import TYPE_CHECKING, Final
 from PIL import Image
 
 from mxbi.data_logger import DataLogger
+from mxbi.tasks.cross_modal.bundle_dir import CrossModalBundleDir
 from mxbi.tasks.cross_modal.config import CrossModalConfig, load_cross_modal_config
 from mxbi.tasks.cross_modal.media import load_wav_as_int16
 from mxbi.tasks.cross_modal.models import CrossModalOutcome, CrossModalResultRecord
 from mxbi.tasks.cross_modal.scene import CrossModalResult, CrossModalScene
-from mxbi.tasks.cross_modal.trial_io import TrialStore, read_trials
+from mxbi.tasks.cross_modal.trial_io import TrialCursor
 from mxbi.utils.logger import logger
 
 if TYPE_CHECKING:
@@ -37,61 +38,47 @@ class CrossModalTask:
         self._animal_state = animal_state
         self._screen = session_state.session_config.screen_type
 
-        animals_cfg = session_state.session_config.animals
-
-        try:
-            animal_cfg = animals_cfg[animal_state.name]
-        except KeyError as e:
+        bundle_dir_str = getattr(session_state.session_config, "cross_modal_bundle_dir", None)
+        if not bundle_dir_str:
             raise RuntimeError(
-                f"No animal config found for '{animal_state.name}' "
-                f"in session_config.animals"
-            ) from e
-
-        trial_file_str = getattr(animal_cfg, "cross_modal_trial_file", None)
-        if not trial_file_str:
-            raise RuntimeError(
-                f"No cross-modal trial file configured for animal "
-                f"'{animal_state.name}'. "
-                f"Set animal['{animal_state.name}'].cross_modal_trial_file "
-                f"in config_session.json or via the launcher."
+                "No cross-modal bundle directory configured. "
+                "Set session_config.cross_modal_bundle_dir via the launcher."
             )
 
-        trial_path = Path(trial_file_str).expanduser().resolve()
-        if not trial_path.exists():
-            raise FileNotFoundError(
-                f"Cross-modal trial file does not exist for animal "
-                f"'{animal_state.name}': {trial_path}"
-            )
+        bundle_root = Path(bundle_dir_str).expanduser().resolve()
+        self._bundle_dir = CrossModalBundleDir.from_dir_path(bundle_root)
+
+        subject_id = self._animal_state.name
+        trials = self._bundle_dir.load_trials(subject_id)
+        if not trials:
+            raise RuntimeError(f"Bundle contains zero trials for subject '{subject_id}'.")
+
+        self._cursor = TrialCursor(bundle_root=self._bundle_dir.root_dir, subject_id=subject_id)
+        self._trial_index = self._cursor.next_index(len(trials))
+        self._trial = trials[self._trial_index]
 
         self._cross_modal_config: CrossModalConfig = load_cross_modal_config()
-
-        self._base_dir = trial_path.parent
-
-        self._trial_store = read_trials(
-            Path(trial_file_str),
-            base_dir=self._base_dir,
-        )
-
-        self._trial, self._trial_index = self._trial_store.next_for_subject(
-            self._animal_state.name
-        )
 
         image_size = int(
             min(self._screen.width, self._screen.height)
             * self._cross_modal_config.visual.image_scale
         )
 
+        left_image_path = self._bundle_dir.resolve_media_path(self._trial.left_image_path)
+        right_image_path = self._bundle_dir.resolve_media_path(self._trial.right_image_path)
+        audio_path = self._bundle_dir.resolve_media_path(self._trial.audio_path)
+
         left_image = self._prepare_image(
-            self._trial.left_image_path_obj(self._base_dir),
+            left_image_path,
             image_size=image_size,
         )
         right_image = self._prepare_image(
-            self._trial.right_image_path_obj(self._base_dir),
+            right_image_path,
             image_size=image_size,
         )
 
         audio_stimulus = load_wav_as_int16(
-            self._trial.audio_path_obj(self._base_dir),
+            audio_path,
             rate_policy=self._cross_modal_config.audio.wav_rate_policy,
             gain=self._cross_modal_config.audio.gain,
         )
@@ -120,11 +107,11 @@ class CrossModalTask:
         if not result.cancelled:
             self._log_trial(result)
 
-        self._trial_store.advance(self._animal_state.name, self._trial_index)
+        self._cursor.advance(self._trial_index)
 
         logger.debug(
             "cross_modal_task: session_id=%s, subject=%s, level=%s, "
-            "csv_index=%s, is_partner=%s, feedback=%s",
+            "trial_index=%s, is_partner=%s, feedback=%s",
             getattr(self._session_state, "session_id", None),
             self._animal_state.name,
             self._animal_state.level,

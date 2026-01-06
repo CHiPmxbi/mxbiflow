@@ -1,14 +1,17 @@
 import sys
 from datetime import datetime
-from tkinter import Tk
-from tkinter.ttk import Button, Frame, Label, Notebook
+from pathlib import Path
+from tkinter import END, Listbox, Tk, filedialog
+from tkinter.ttk import Button, Frame, Label, Notebook, Entry
 
 from mxbi.config import session_config, session_options
 from mxbi.models.animal import AnimalConfig
 from mxbi.models.detector import DetectorEnum
 from mxbi.models.reward import RewardEnum
 from mxbi.models.session import ScreenTypeEnum, SessionConfig
+from mxbi.models.task import TaskEnum
 from mxbi.peripheral.pumps.pump_factory import PumpEnum
+from mxbi.tasks.cross_modal.bundle_dir import BundleValidationError, CrossModalBundleDir
 from mxbi.tasks.cross_modal.config import (
     CrossModalConfig,
     load_cross_modal_config,
@@ -35,6 +38,8 @@ class LaunchPanel:
             self._cross_modal_config = load_cross_modal_config()
         except FileNotFoundError:
             self._cross_modal_config = CrossModalConfig()
+
+        self._cross_modal_bundle: CrossModalBundleDir | None = None
 
         self._init_ui()
         self._root.mainloop()
@@ -216,6 +221,31 @@ class LaunchPanel:
     def _init_cross_modal_ui(self) -> None:
         self._frame = self._frame_cross_modal
 
+        frame_bundle = self._create_section_frame("Dataset bundle")
+
+        bundle_row = Frame(frame_bundle)
+        bundle_row.pack(fill="x", expand=True)
+        bundle_row.columnconfigure(1, weight=1)
+
+        Label(bundle_row, text="Bundle dir:").grid(row=0, column=0, padx=(10, 0), pady=2, sticky="w")
+        self.entry_cross_modal_bundle_dir = Entry(bundle_row)
+        self.entry_cross_modal_bundle_dir.grid(row=0, column=1, padx=(0, 10), pady=2, sticky="ew")
+
+        browse_btn = Button(
+            bundle_row,
+            text="Browse…",
+            command=self._browse_cross_modal_bundle_dir,
+        )
+        browse_btn.grid(row=0, column=2, padx=(0, 10), pady=2, sticky="e")
+
+        frame_subjects = self._create_section_frame("Subjects")
+        self.listbox_cross_modal_subjects = Listbox(frame_subjects, selectmode="extended", height=6, exportselection=False)
+        self.listbox_cross_modal_subjects.pack(fill="x", expand=True, padx=10, pady=2)
+
+        frame_validation = self._create_section_frame("Validation")
+        self.text_cross_modal_validation = create_textbox(frame_validation, "Errors: ", height=6)
+        self.text_cross_modal_validation.pack(fill="x")
+
         frame_visual = self._create_section_frame("Visual")
 
         self.scale_cross_modal_image_scale = LabeledScale(
@@ -271,6 +301,73 @@ class LaunchPanel:
 
         self._frame = self._frame_session
 
+    def _browse_cross_modal_bundle_dir(self) -> None:
+        path = filedialog.askdirectory(title="Select cross-modal dataset bundle directory")
+        if not path:
+            return
+        self.entry_cross_modal_bundle_dir.delete(0, "end")
+        self.entry_cross_modal_bundle_dir.insert(0, path)
+        self._load_cross_modal_bundle()
+
+    def _load_cross_modal_bundle(self) -> None:
+        bundle_dir_str = self.entry_cross_modal_bundle_dir.get().strip()
+        if not bundle_dir_str:
+            self._cross_modal_bundle = None
+            self._set_cross_modal_subjects([])
+            self._set_cross_modal_errors("")
+            return
+
+        bundle_dir = Path(bundle_dir_str).expanduser().resolve()
+        try:
+            bundle = CrossModalBundleDir.from_dir_path(bundle_dir)
+        except BundleValidationError as e:
+            self._cross_modal_bundle = None
+            self._set_cross_modal_subjects([])
+            self._set_cross_modal_errors("\n".join(e.errors))
+            return
+
+        allowed_animals = set(session_options.value.animal.name)
+        unknown_subjects = [s for s in bundle.subject_ids() if s not in allowed_animals]
+        if unknown_subjects:
+            self._cross_modal_bundle = None
+            self._set_cross_modal_subjects(bundle.subject_ids())
+            self._set_cross_modal_errors(
+                "Bundle subjects are not present in options_session.json animal names:\n"
+                + "\n".join(f"- {s}" for s in unknown_subjects)
+            )
+            return
+
+        self._cross_modal_bundle = bundle
+        self._set_cross_modal_subjects(bundle.subject_ids())
+        self._set_cross_modal_errors("")
+
+    def _set_cross_modal_subjects(self, subject_ids: list[str]) -> None:
+        self.listbox_cross_modal_subjects.delete(0, END)
+        for s in subject_ids:
+            self.listbox_cross_modal_subjects.insert(END, s)
+        if subject_ids:
+            self.listbox_cross_modal_subjects.selection_set(0, END)
+
+    def _set_cross_modal_errors(self, text: str) -> None:
+        self.text_cross_modal_validation.set(text)
+
+    def _selected_cross_modal_subjects(self) -> list[str]:
+        selections = self.listbox_cross_modal_subjects.curselection()
+        return [self.listbox_cross_modal_subjects.get(i) for i in selections]
+
+    def _init_cross_modal_mode_animals(self) -> dict[str, AnimalConfig]:
+        if self._cross_modal_bundle is None:
+            return {}
+
+        selected_subjects = self._selected_cross_modal_subjects()
+        if not selected_subjects:
+            return {}
+
+        return {
+            subject_id: AnimalConfig(name=subject_id, task=TaskEnum.CROSS_MODAL, level=0)
+            for subject_id in selected_subjects
+        }
+
     def _add_animal(self) -> None:
         if self.frame_animals is None:
             return
@@ -304,6 +401,25 @@ class LaunchPanel:
         self._save_and_close(config)
 
     def save(self) -> None:
+        self._load_cross_modal_bundle()
+        if self.entry_cross_modal_bundle_dir.get().strip():
+            if self._cross_modal_bundle is None:
+                self._notebook.select(self._frame_cross_modal)
+                return
+
+            selected_subjects = self._selected_cross_modal_subjects()
+            if not selected_subjects:
+                self._set_cross_modal_errors("Select at least one subject to start the cross-modal task.")
+                self._notebook.select(self._frame_cross_modal)
+                return
+
+            try:
+                self._cross_modal_bundle.validate_selected_subjects(selected_subjects)
+            except BundleValidationError as e:
+                self._set_cross_modal_errors("\n".join(e.errors))
+                self._notebook.select(self._frame_cross_modal)
+                return
+
         config = self._build_session_config(
             experimenter=self.combo_experimenter.get(),
             comments=self.entry_comments.get(),
@@ -311,6 +427,9 @@ class LaunchPanel:
         self._save_and_close(config)
 
     def _build_session_config(self, experimenter: str, comments: str) -> SessionConfig:
+        bundle_dir = self.entry_cross_modal_bundle_dir.get().strip() or None
+        animals_from_bundle = self._init_cross_modal_mode_animals() if bundle_dir else {}
+
         return SessionConfig(
             experimenter=experimenter,
             xbi_id=self.combo_xbi.get(),
@@ -323,7 +442,8 @@ class LaunchPanel:
             detector_interval=self._selected_detector_interval(),
             screen_type=self._selected_screen_type(),
             comments=comments,
-            animals=self._collect_animals(),
+            cross_modal_bundle_dir=bundle_dir,
+            animals=animals_from_bundle if bundle_dir else self._collect_animals(),
         )
 
     def _build_cross_modal_config(self) -> CrossModalConfig:
