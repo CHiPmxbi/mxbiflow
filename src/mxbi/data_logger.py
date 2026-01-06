@@ -26,7 +26,7 @@ class DataLogger:
         session_config: "SessionState",
         monkey: str,
         filename: str,
-        type: DataLoggerType,
+        type: DataLoggerType = DataLoggerType.JSONL,
     ) -> None:
         self.__session_state = session_config
         self._monkey = monkey
@@ -35,7 +35,7 @@ class DataLogger:
         self._type = type
 
         self._data_dir = self._ensure_data_dir()
-        self._data_path = self._data_dir / f"{self._filename}{self._type}"
+        self._data_path = self._get_path(f".{self._type.value}")
 
     @property
     def path(self) -> Path:
@@ -75,12 +75,18 @@ class DataLogger:
             logger.error(f"Failed to create data directory: {e}")
             sys.exit(1)
 
+    def _get_path(self, suffix: str) -> Path:
+        return self._data_dir / f"{self._filename}{suffix}"
+
     def save(self, data: dict) -> None:
         match self._type:
             case DataLoggerType.JSONL:
                 self._save_jsonl(data)
             case DataLoggerType.JSON:
                 self._save_json(data)
+
+    def save_jsonl(self, data: dict) -> None:
+        self._save_jsonl(data)
 
     def _save_jsonl(self, data: dict) -> None:
         try:
@@ -146,7 +152,7 @@ if __name__ == "__main__":
         end_time=datetime.now().timestamp(),
     )
 
-    recorder = DataLogger(state, "mock", "mock", DataLoggerType.JSONL)
+    recorder = DataLogger(state, "mock", "mock")
 
     for i in range(10):
-        recorder.save(data)
+        recorder.save_jsonl(data)

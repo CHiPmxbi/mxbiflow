@@ -21,6 +21,10 @@ class LabeledTextbox(Frame):
     def insert(self, text: str) -> None:
         self._textbox.insert("end", text)
 
+    def set(self, text: str) -> None:
+        self._textbox.delete("1.0", "end")
+        self._textbox.insert("end", text)
+
 
 def create_textbox(
     master, label_text: str, width: int = 15, height: int = 1

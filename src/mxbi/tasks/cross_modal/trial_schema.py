@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class Trial(BaseModel):
@@ -32,7 +32,44 @@ class Trial(BaseModel):
     right_image_index: int
     right_image_path: str
 
-    seed: int | None = None
+    seed: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_bundle_trial(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+
+        if "trialId" not in values:
+            return values
+
+        audio = values.get("audio") if isinstance(values.get("audio"), dict) else {}
+        left_image = values.get("leftImage") if isinstance(values.get("leftImage"), dict) else {}
+        right_image = values.get("rightImage") if isinstance(values.get("rightImage"), dict) else {}
+
+        return {
+            "trial_id": values.get("trialId"),
+            "trial_number": values.get("trialNumber"),
+            "subject_id": values.get("subjectId"),
+            "partner_id": values.get("partnerId"),
+            "call_identity_id": values.get("callIdentityId"),
+            "call_category": values.get("callCategory"),
+            "is_partner_call": values.get("isPartnerCall"),
+            "other_identity_id": values.get("otherIdentityId"),
+            "other_category": values.get("otherCategory"),
+            "partner_side": values.get("partnerSide"),
+            "correct_side": values.get("correctSide"),
+            "audio_identity_id": audio.get("identityId"),
+            "audio_index": audio.get("exemplarIndex"),
+            "audio_path": audio.get("path"),
+            "left_image_identity_id": left_image.get("identityId"),
+            "left_image_index": left_image.get("exemplarIndex"),
+            "left_image_path": left_image.get("path"),
+            "right_image_identity_id": right_image.get("identityId"),
+            "right_image_index": right_image.get("exemplarIndex"),
+            "right_image_path": right_image.get("path"),
+            "seed": values.get("seed"),
+        }
 
     @field_validator("partner_side", "correct_side")
     @classmethod
