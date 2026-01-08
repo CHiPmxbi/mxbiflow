@@ -1,0 +1,19 @@
+from typing import Protocol
+from enum import Enum, auto
+
+class Direction(Enum):
+    FORWARD = auto()
+    REVERSE = auto()
+
+class Rewarder(Protocol):
+    def open(self) -> None: ...
+
+    def give_reward(self) -> None: ...
+
+    def stop_reward(self) -> None: ...
+
+    def set_direction(self, direction: Direction) -> None: ...
+
+    def toggle_direction(self) -> None: ...
+
+    def close(self) -> None: ...
