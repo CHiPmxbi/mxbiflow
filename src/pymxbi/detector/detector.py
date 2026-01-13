@@ -136,26 +136,13 @@ class DetectorStateMachine:
 
 
 class Detector(ABC):
-    def __init__(self) -> None:
+    def __init__(self, animal_db: dict[str, str]) -> None:
         self._callbacks: dict[DetectorEvent, list[Callable[[str], None]]] = {}
 
-        self._is_running: bool = False
         self._state_lock = Lock()
         self._state_machine = DetectorStateMachine(self)
 
-    def begin(self) -> None:
-        if self._is_running:
-            return
-
-        self._is_running = True
-        self._begin()
-
-    def quit(self) -> None:
-        if not self._is_running:
-            return
-
-        self._is_running = False
-        self._quit()
+        self.animal_db = animal_db
 
     def register_event(
         self, event: DetectorEvent, callback: Callable[[str], None]
@@ -171,17 +158,14 @@ class Detector(ABC):
             callback(animal_name)
 
     def process_detection(self, detection_result: DetectionResult) -> None:
-        if not self._is_running:
-            return
-
         with self._state_lock:
             self._state_machine.transition(detection_result)
 
     @abstractmethod
-    def _begin(self) -> None: ...
+    def begin(self) -> None: ...
 
     @abstractmethod
-    def _quit(self) -> None: ...
+    def quit(self) -> None: ...
 
     @property
     def current_animal(self) -> str | None:
