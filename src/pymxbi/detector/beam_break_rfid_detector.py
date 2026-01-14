@@ -1,12 +1,4 @@
-"""
-Author: HuYang huyangcommit@gmail.com
-Date: 2026-01-05 22:13:26
-LastEditors: HuYang huyangcommit@gmail.com
-LastEditTime: 2026-01-13 23:55:46
-Description: Beam-break + RFID based detector implementation.
-
-Copyright (c) 2026 by HuYang huyangcommit@gmail.com, All Rights Reserved.
-"""
+"""Detector combining a through-beam sensor and an RFID reader."""
 
 from threading import Thread
 from time import sleep
@@ -17,7 +9,19 @@ from pymxbi.peripheral.through_beam_sensor.through_beam_sensor import ThroughBea
 
 
 class BeamBreakRFIDDetector(Detector):
-    """Detect animals using a beam-break sensor and an RFID reader."""
+    """Detect animals using a beam-break sensor and an RFID reader.
+
+    Parameters
+    ----------
+    animal_db : dict[str, str]
+        Mapping from animal ID to animal name.
+    rfid_reader : DorsetLID665v42
+        RFID reader used to fetch tags.
+    beam_break_sensor : ThroughBeamSensor
+        Through-beam sensor used to detect presence.
+    detection_frequency : int
+        Polling interval in milliseconds.
+    """
 
     def __init__(
         self,
@@ -28,11 +32,16 @@ class BeamBreakRFIDDetector(Detector):
     ) -> None:
         """Initialize the detector.
 
-        Args:
-            animal_db: Mapping from animal ID to animal name.
-            rfid_reader: RFID reader used to fetch tags.
-            beam_break_sensor: Through-beam sensor to detect presence.
-            detection_frequency: Polling interval in milliseconds.
+        Parameters
+        ----------
+        animal_db : dict[str, str]
+            Mapping from animal ID to animal name.
+        rfid_reader : DorsetLID665v42
+            RFID reader used to fetch tags.
+        beam_break_sensor : ThroughBeamSensor
+            Through-beam sensor used to detect presence.
+        detection_frequency : int
+            Polling interval in milliseconds.
         """
         super().__init__(animal_db)
         self.detection_frequency = detection_frequency / 1000.0

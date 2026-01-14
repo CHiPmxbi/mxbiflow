@@ -1,17 +1,4 @@
-"""
-Author: HuYang huyangcommit@gmail.com
-Date: 2026-01-05 22:10:15
-LastEditors: HuYang huyangcommit@gmail.com
-LastEditTime: 2026-01-13 01:23:35
-Description:
-    Detector base types and state machine implementation.
-
-    This module abstracts one sampling cycle (e.g., sensor read + RFID read) as a
-    :class:`DetectionResult`, then uses :class:`DetectorStateMachine` to map
-    detection results into **state transitions** and **event emissions**.
-
-Copyright (c) 2026 by HuYang huyangcommit@gmail.com, All Rights Reserved.
-"""
+"""Detector abstractions and the built-in detector state machine."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -21,7 +8,17 @@ from typing import Callable
 
 
 class DetectorState(StrEnum):
-    """Detector finite states."""
+    """Detector finite states.
+
+    Attributes
+    ----------
+    IDLE
+        No animal is currently detected.
+    ANIMAL_PRESENT
+        An animal is currently detected.
+    FAULT
+        A fault was detected and the detector is in an error state.
+    """
 
     IDLE = auto()
     ANIMAL_PRESENT = auto()
@@ -29,7 +26,23 @@ class DetectorState(StrEnum):
 
 
 class DetectorEvent(StrEnum):
-    """Detector events emitted on state transitions."""
+    """Detector events emitted on state transitions.
+
+    Attributes
+    ----------
+    ANIMAL_ENTERED
+        Transition from idle to an animal being present.
+    ANIMAL_RETURNED
+        Animal reappeared after a brief absence.
+    ANIMAL_CHANGED
+        A different animal replaced the currently detected one.
+    ANIMAL_LEFT
+        Transition from an animal being present to idle.
+    ANIMAL_REMAINED
+        The same animal remains present across cycles.
+    FAULT_DETECTED
+        A fault occurred while detecting.
+    """
 
     ANIMAL_ENTERED = auto()
     ANIMAL_RETURNED = auto()
@@ -41,14 +54,28 @@ class DetectorEvent(StrEnum):
 
 @dataclass
 class DetectionResult:
-    """Detection result from a detector input cycle."""
+    """Detection result from a detector input cycle.
+
+    Parameters
+    ----------
+    animal_name : str | None, default=None
+        Name of the detected animal, if any.
+    error : bool, default=False
+        Whether a fault was detected while reading inputs.
+    """
 
     animal_name: str | None = None
     error: bool = False
 
 
 class DetectorStateMachine:
-    """State machine that drives detector events."""
+    """State machine that drives detector events.
+
+    Parameters
+    ----------
+    detector : Detector
+        Detector instance used to emit events to registered callbacks.
+    """
 
     def __init__(self, detector: Detector) -> None:
         """Initialize with a detector for event emission."""
@@ -158,7 +185,13 @@ class DetectorStateMachine:
 
 
 class Detector(ABC):
-    """Abstract detector base class."""
+    """Abstract detector base class.
+
+    Parameters
+    ----------
+    animal_db : dict[str, str]
+        Mapping from animal ID to animal name.
+    """
 
     def __init__(self, animal_db: dict[str, str]) -> None:
         """Initialize with a mapping from animal ID to animal name."""
@@ -172,7 +205,15 @@ class Detector(ABC):
     def register_event(
         self, event: DetectorEvent, callback: Callable[[str], None]
     ) -> None:
-        """Register a callback for a detector event."""
+        """Register a callback for a detector event.
+
+        Parameters
+        ----------
+        event : DetectorEvent
+            Event type to register for.
+        callback : Callable[[str], None]
+            Function called with the detected animal name (or ``""`` for faults).
+        """
         if event not in self._callbacks:
             self._callbacks[event] = []
         self._callbacks[event].append(callback)
@@ -185,7 +226,13 @@ class Detector(ABC):
             callback(animal_name)
 
     def process_detection(self, detection_result: DetectionResult) -> None:
-        """Process a detection result in a thread-safe manner."""
+        """Process a detection result in a thread-safe manner.
+
+        Parameters
+        ----------
+        detection_result : DetectionResult
+            Output from a single detection cycle (sensor/reader read).
+        """
         with self._state_lock:
             self._state_machine.transition(detection_result)
 

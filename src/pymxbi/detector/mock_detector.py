@@ -1,20 +1,19 @@
-'''
-Author: HuYang huyangcommit@gmail.com
-Date: 2026-01-05 22:13:50
-LastEditors: HuYang huyangcommit@gmail.com
-LastEditTime: 2026-01-13 01:21:47
-Description: 
+"""Mock detector implementation for testing and development."""
 
-Copyright (c) 2026 by HuYang huyangcommit@gmail.com, All Rights Reserved. 
-'''
 from pymxbi.detector.detector import Detector
 
+
 class MockDetector(Detector):
+    """Detector stub that performs no I/O."""
+
     def __init__(self) -> None:
-        super().__init__()
+        """Create a mock detector with an empty animal database."""
+        super().__init__({})
 
     def _begin(self) -> None:
+        """Begin detection (no-op)."""
         ...
 
     def _quit(self) -> None:
+        """Stop detection (no-op)."""
         ...

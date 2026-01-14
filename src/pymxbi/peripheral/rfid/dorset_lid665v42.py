@@ -1,23 +1,4 @@
-"""
-Author: HuYang huyangcommit@gmail.com
-Date: 2026-01-05 22:49:18
-LastEditors: HuYang huyangcommit@gmail.com
-LastEditTime: 2026-01-08 00:00:54
-Description:
-Driver and frame parser for the Dorset `LID665v42` RFID reader.
-
-This module reads bytes from a serial port and reconstructs Dorset frames using a
-DLE-based escaping scheme:
-
-- Frames are delimited by `DLE + STX` (start) and `DLE + ETX` (end).
-- Inside the payload, any byte following a `DLE` is duplicated by the transport.
-  The parser treats `DLE` as an escape indicator and keeps only the following byte.
-
-The public entry point is `DorsetLID665v42`, which stores the latest `Result`
-from the background read loop and exposes it via `read()`.
-
-Copyright (c) 2026 by HuYang huyangcommit@gmail.com, All Rights Reserved.
-"""
+"""RFID reader implementation for Dorset LID665v42 devices."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -66,8 +47,12 @@ class FrameData:
 class Result:
     """High-level output produced by the reader.
 
-    :ivar detect_time: UNIX timestamp when the frame start marker was received.
-    :ivar animal_id: Extracted animal identifier (format depends on device config).
+    Attributes
+    ----------
+    detect_time : float
+        UNIX timestamp when the frame start marker was received.
+    animal_id : str
+        Extracted animal identifier (format depends on device config).
     """
 
     detect_time: float
@@ -234,11 +219,21 @@ class DorsetLID665v42:
     ) -> None:
         """Initialize the reader bound to a serial port.
 
-        :param port: Serial device path (for example, ``/dev/ttyUSB0``).
-        :param baudrate: Serial baud rate (device-dependent).
-        :param unit: Unit identifier used by the protocol (currently stored only).
-        :param host: Host identifier used by the protocol (currently stored only).
-        :raises SerialException: If the serial port cannot be configured.
+        Parameters
+        ----------
+        port : str
+            Serial device path (for example, ``/dev/ttyUSB0``).
+        baudrate : int
+            Serial baud rate (device-dependent).
+        unit : str, default="01"
+            Unit identifier used by the protocol (currently stored only).
+        host : str, default="FE"
+            Host identifier used by the protocol (currently stored only).
+
+        Raises
+        ------
+        SerialException
+            If the serial port cannot be configured.
         """
         self._serial = Serial(
             port,
@@ -262,12 +257,21 @@ class DorsetLID665v42:
     def errno(self) -> str:
         """Get the latest parser error message.
 
-        :param self: The instance.
-        :return: Error message, or an empty string when healthy.
+        Returns
+        -------
+        str
+            Error message, or an empty string when healthy.
         """
         return self._parser.last_error
 
     def read(self) -> Result | None:
+        """Return the most recently parsed result.
+
+        Returns
+        -------
+        Result | None
+            Latest parsed result, or ``None`` if nothing has been read yet.
+        """
         with self._current_result_lock:
             result = self._current_result
             return result
