@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import subprocess
+import shlex
 
 
 def rsync_one_way(source: Path, destination: Path) -> None:
@@ -70,5 +71,5 @@ def rsync_one_way(source: Path, destination: Path) -> None:
     except subprocess.CalledProcessError as e:
         raise RuntimeError(
             f"rsync failed with exit code {e.returncode}\n"
-            f"command: {' '.join(rsync_cmd)}"
+            f"command: {shlex.join(rsync_cmd)}"
         ) from e
