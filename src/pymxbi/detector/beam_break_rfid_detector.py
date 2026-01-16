@@ -1,7 +1,7 @@
 """Detector combining a through-beam sensor and an RFID reader."""
 
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 from pymxbi.detector.detector import DetectionResult, Detector
 from pymxbi.peripheral.rfid.dorset_lid665v42 import DorsetLID665v42
@@ -21,6 +21,8 @@ class BeamBreakRFIDDetector(Detector):
         Through-beam sensor used to detect presence.
     detection_frequency : int
         Polling interval in milliseconds.
+    max_tag_age_seconds : float, default=5.0
+        Maximum allowed tag age in seconds. Older tag reads are treated as stale.
     """
 
     def __init__(
@@ -29,6 +31,7 @@ class BeamBreakRFIDDetector(Detector):
         rfid_reader: DorsetLID665v42,
         beam_break_sensor: ThroughBeamSensor,
         detection_frequency: int,  # milliseconds
+        max_tag_age_seconds: float = 5.0,
     ) -> None:
         """Initialize the detector.
 
@@ -42,9 +45,12 @@ class BeamBreakRFIDDetector(Detector):
             Through-beam sensor used to detect presence.
         detection_frequency : int
             Polling interval in milliseconds.
+        max_tag_age_seconds : float, default=5.0
+            Maximum allowed tag age in seconds. Older tag reads are treated as stale.
         """
         super().__init__(animal_db)
         self.detection_frequency = detection_frequency / 1000.0
+        self.max_tag_age_seconds = max_tag_age_seconds
 
         self._rfid_reader = rfid_reader
         self._beam_break_sensor = beam_break_sensor
@@ -57,11 +63,17 @@ class BeamBreakRFIDDetector(Detector):
         while self._is_running:
             has_animal = self._beam_break_sensor.read()
             if not has_animal:
+                sleep(self.detection_frequency)
                 continue
 
             tag = self._rfid_reader.read()
             if tag is None:
-                break
+                sleep(self.detection_frequency)
+                continue
+
+            if time() - tag.detect_time > self.max_tag_age_seconds:
+                sleep(self.detection_frequency)
+                continue
 
             animal_name = self.animal_db.get(tag.animal_id)
 
