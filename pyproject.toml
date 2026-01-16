@@ -3,9 +3,7 @@ name = "pymxbi"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-authors = [
-    { name = "HuYang", email = "huyangcommit@gmail.com" }
-]
+authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "gpiozero>=2.0.1",
@@ -14,7 +12,11 @@ dependencies = [
     "pymotego>=0.1.3",
     "pyserial>=3.5",
     "rich>=14.2.0",
+    "typer>=0.21.1",
 ]
+
+[project.scripts]
+pymxbi = "pymxbi:main"
 
 [build-system]
 requires = ["uv_build>=0.9.21,<0.10.0"]
