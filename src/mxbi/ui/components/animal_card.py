@@ -38,8 +38,9 @@ class AnimalCard(Frame):
         )
         self.combo_step.pack(fill="x", expand=True)
 
+        task_values = [i for i in schema.task if i != TaskEnum.CROSS_MODAL]
         self.combo_task = create_cobmbo(
-            self, "Task:", [i for i in schema.task], animal.task, 8
+            self, "Task:", [i for i in task_values], animal.task, 8
         )
         self.combo_task.pack(fill="x", expand=True)
 
