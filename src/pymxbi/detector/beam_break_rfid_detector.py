@@ -78,7 +78,7 @@ class BeamBreakRFIDDetector(Detector):
             animal_name = self.animal_db.get(tag.animal_id)
 
             result = DetectionResult(animal_name=animal_name, error=False)
-            self._state_machine.transition(result)
+            self.process_detection(result)
 
             sleep(self.detection_frequency)
 
