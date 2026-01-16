@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "gpiozero>=2.0.1",
     "keyring>=25.6.0",
