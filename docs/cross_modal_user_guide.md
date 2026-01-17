@@ -611,6 +611,30 @@ MXBI will adapt mismatched WAV sample rates automatically so playback works.
 **Policy = error**
 MXBI will refuse to run a trial if an audio file has the wrong sample rate.
 
+Below is a **surgical, drop-in add-on** you can paste into the guide, consistent with the existing “Cross-modal Launch Panel” section and aligned to the actual UI + config behavior in your code.
+
+### Step 6.5 — Set the trial timeout (Timing)
+
+**Trial timeout (s)** controls the maximum allowed duration of a single cross-modal trial before MXBI treats it as timed out.
+
+* This value is entered in **seconds** (e.g., `10`, `12.5`).
+* Decimals are allowed (`12.5`). On systems using a comma decimal separator, `12,5` also works.
+* The value must be **greater than 0**. If it is empty or ≤ 0, the Launch Panel will show an error and won’t start.
+
+**What it does under the hood**
+
+* MXBI converts the seconds you enter into **milliseconds** and saves it as `trial_timeout_ms` in the Cross-modal config.
+* Example: `12.5` seconds → `12500` ms.
+
+**If you see an error when pressing Start**
+
+You may see an error like:
+
+* `Trial timeout (s) is required.`
+* `Trial timeout (s) must be > 0.`
+
+Fix by entering a valid positive number in **Trial timeout (s)**, then press **Start** again.
+
 ---
 
 ### Starting the session
