@@ -27,31 +27,72 @@ This guide covers **macOS** and **Windows (PowerShell)**. Follow the steps in or
 
 ### Windows (PowerShell) — recommended location and unzip
 
-**Important:** Avoid long paths and synced folders like OneDrive if possible. Recommended locations:
+**Important**
+* Avoid long paths and synced folders like OneDrive.
+* Use a short, stable folder such as `C:\mxbi`.
 
-* `C:\mxbi` (simple and robust), or
-* `$HOME\Documents\mxbi`
+#### Step 1 — Create the destination folder
+You will unzip the project into `C:\mxbi`.
 
-#### Option A — unzip via File Explorer
+```powershell
+New-Item -ItemType Directory -Force C:\mxbi | Out-Null
+````
+
+#### Step 2 — Unzip (choose ONE method)
+
+**Option A — Unzip via File Explorer**
 
 1. Right-click the ZIP → **Extract All…**
-2. Extract to `C:\mxbi` (or `$HOME\Documents`)
-3. You should end up with a folder like `C:\mxbi\mxbi` (or similar)
+2. Set the destination to: `C:\mxbi`
+3. Extract.
 
-#### Option B — unzip via PowerShell (works reliably)
+**Option B — Unzip via PowerShell (reliable)**
 
 1. Open **Windows Terminal** → **PowerShell**
-2. Run (update the ZIP name/path as needed):
+2. Run (update the ZIP name if needed):
+
+```powershell
+Expand-Archive -Path "$HOME\Downloads\mxbi.zip" -DestinationPath "C:\mxbi" -Force
+```
+
+#### Step 3 — Find the repo root (this is the folder you will `cd` into later)
+
+The **repo root** is the folder that contains:
+`config\`, `src\`, and `pyproject.toml`.
+
+Start here:
+
+```powershell
+cd C:\mxbi
+dir
+```
+
+Now do the “go in and check” loop:
+
+1. If you see a single folder (commonly named `mxbi`), go into it:
 
    ```powershell
-   New-Item -ItemType Directory -Force C:\mxbi | Out-Null
-   Expand-Archive -Path "$HOME\Downloads\mxbi.zip" -DestinationPath "C:\mxbi"
+   cd .\mxbi
+   dir
    ```
-3. Confirm you see the extracted folder:
+2. If you still don’t see `config`, `src`, and `pyproject.toml`, you are one level too high. Go into the next folder you see and run `dir` again.
 
-   ```powershell
-   dir C:\mxbi
-   ```
+**You are done when `dir` shows `config`, `src`, and `pyproject.toml`.**
+
+#### If you ended up with an extra nested `mxbi\mxbi\` folder (common with ZIPs)
+
+Example problem:
+`C:\mxbi\mxbi\mxbi\` contains `pyproject.toml` (too deep).
+
+If you are currently at `C:\mxbi\mxbi` and you see another `mxbi` folder inside it, run:
+
+```powershell
+Move-Item -Force .\mxbi\* .\
+Remove-Item -Recurse -Force .\mxbi
+dir
+```
+
+After this, `dir` should show `config`, `src`, and `pyproject.toml` directly in `C:\mxbi\mxbi`.
 
 ---
 
