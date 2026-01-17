@@ -4,6 +4,8 @@ from pathlib import Path
 from tkinter import END, Listbox, Tk, filedialog
 from tkinter.ttk import Button, Frame, Label, Notebook, Entry
 
+from pydantic import ValidationError
+
 from mxbi.config import session_config, session_options
 from mxbi.models.animal import AnimalConfig
 from mxbi.models.detector import DetectorEnum
@@ -22,6 +24,7 @@ from mxbi.ui.components.fileds.labeled_combobox import (
     LabeledCombobox,
     create_cobmbo,
 )
+from mxbi.ui.components.fileds.labeled_entey import LabeledEntry, create_entry
 from mxbi.ui.components.fileds.labeled_scale import LabeledScale
 from mxbi.ui.components.fileds.labeled_textbox import create_textbox
 from mxbi.utils.detect_platform import PlatformEnum
@@ -290,6 +293,15 @@ class LaunchPanel:
         )
         self.scale_cross_modal_gain.pack(fill="x", expand=True)
 
+        frame_timing = self._create_section_frame("Timing")
+
+        self.entry_cross_modal_trial_timeout_sec: LabeledEntry = create_entry(
+            frame_timing,
+            "Trial timeout (s): ",
+            self._format_seconds(self._cross_modal_config.timing.trial_timeout_ms),
+        )
+        self.entry_cross_modal_trial_timeout_sec.pack(fill="x", expand=True)
+
         frame_policy = self._create_section_frame("WAV sample rate")
 
         self.combo_cross_modal_wav_policy = self._pack_combo(
@@ -420,11 +432,20 @@ class LaunchPanel:
                 self._notebook.select(self._frame_cross_modal)
                 return
 
+        try:
+            cross_modal_config = self._build_cross_modal_config()
+        except (ValidationError, ValueError) as e:
+            self._set_cross_modal_errors(str(e))
+            self._notebook.select(self._frame_cross_modal)
+            return
+
         config = self._build_session_config(
             experimenter=self.combo_experimenter.get(),
             comments=self.entry_comments.get(),
         )
-        self._save_and_close(config)
+        save_cross_modal_config(cross_modal_config)
+        session_config.save(config)
+        self._root.destroy()
 
     def _build_session_config(self, experimenter: str, comments: str) -> SessionConfig:
         bundle_dir = self.entry_cross_modal_bundle_dir.get().strip() or None
@@ -457,7 +478,10 @@ class LaunchPanel:
                 "gain": self.scale_cross_modal_gain.get_float(),
                 "wav_rate_policy": self.combo_cross_modal_wav_policy.get(),
             },
-            timing=self._cross_modal_config.timing.model_dump(),
+            timing={
+                "fixation_ms": self._cross_modal_config.timing.fixation_ms,
+                "trial_timeout_ms": self._selected_cross_modal_trial_timeout_ms(),
+            },
         )
 
     def _collect_animals(self) -> dict[str, AnimalConfig]:
@@ -519,6 +543,24 @@ class LaunchPanel:
         combo = create_cobmbo(parent, label, values, default_value, state=state)
         combo.pack(fill="x", expand=True)
         return combo
+
+    @staticmethod
+    def _format_seconds(milliseconds: int) -> str:
+        seconds = milliseconds / 1000.0
+        formatted = f"{seconds:.3f}".rstrip("0").rstrip(".")
+        return formatted or "0"
+
+    def _selected_cross_modal_trial_timeout_ms(self) -> int:
+        raw = self.entry_cross_modal_trial_timeout_sec.get().strip()
+        if not raw:
+            raise ValueError("Trial timeout (s) is required.")
+
+        normalized = raw.replace(",", ".")
+        seconds = float(normalized)
+        if seconds <= 0:
+            raise ValueError("Trial timeout (s) must be > 0.")
+
+        return int(round(seconds * 1000.0))
 
 
 if __name__ == "__main__":
