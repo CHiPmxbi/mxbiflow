@@ -149,6 +149,13 @@ python --version
 
 If `python` still isn’t found, close and re-open Windows Terminal, then try again.
 
+If **`python --version` is NOT 3.11**
+Some PCs have multiple Python versions installed. In PowerShell, you can use the Windows Python launcher to target 3.11 explicitly:
+
+```powershell
+py -3.11 --version
+```
+
 ---
 
 ## 4) Go to the mxbi project folder (repo root)
@@ -289,8 +296,14 @@ This keeps the project packages isolated.
 1. Create:
 
    ```powershell
+   py -3.11 -m venv .venv
+   ```
+    
+    Alternatively try
+    ```powershell
    python -m venv .venv
    ```
+    
 2. Activate:
 
    ```powershell
@@ -310,6 +323,11 @@ Then activate again:
 ```
 
 You should see `(.venv)` at the start of your prompt.
+
+Verify the Python version. It should be 3.13 for Mac and 3.11 for Windows:
+```powershell
+   python --version
+   ```
 
 ---
 
