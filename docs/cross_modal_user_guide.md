@@ -195,27 +195,75 @@ If you don’t see those, you are not in the repo root yet.
 
 ---
 
-## 5) Patch the repo dependency: remove `pymotego` from `pyproject.toml`
+Yes. You can make that “remove `pymotego`” portion a single coherent mini-procedure (goal → do → verify → what if it didn’t work), instead of “optional” plus scattered code blocks.
 
-The project currently includes this line in `pyproject.toml`:
+Below is a **drop-in replacement** for the entire “remove `pymotego`” subsection (keep your section header `## 5) ...` and replace the contents under it with this). It preserves the manual editor route but makes the command route first-class and idiot-proof.
 
-```toml
-"pymotego>=0.1.3",
+---
+
+## 5) Remove `pymotego` from `pyproject.toml` (required)
+
+MXBI currently includes a dependency line that must be removed before installing packages.
+
+### Step 1 — Confirm you are in the repo root
+You must run this in the folder that contains `pyproject.toml`.
+
+**macOS**
+```bash
+ls
+````
+
+**Windows (PowerShell)**
+
+```powershell
+dir
 ```
 
-Remove it before installing dependencies.
+You should see `pyproject.toml` in the output.
 
-### macOS / Windows (same idea)
+### Step 2 — Remove the `pymotego` line (choose ONE method)
 
-1. Open `pyproject.toml` in a text editor (VS Code recommended).
-2. Find and delete:
+#### Method A — Remove it using a command (recommended)
+
+**macOS (Terminal)**
+
+```bash
+# Removes any line that contains the text "pymotego"
+perl -i -ne 'print unless /pymotego/' pyproject.toml
+```
+
+**Windows (PowerShell)**
+
+```powershell
+# Removes any line that contains the text "pymotego"
+(Get-Content .\pyproject.toml) | Where-Object { $_ -notmatch 'pymotego' } | Set-Content .\pyproject.toml
+```
+
+#### Method B — Remove it manually in an editor
+
+1. Open `pyproject.toml` (VS Code recommended).
+2. Find and delete the line that looks like:
 
    ```toml
    "pymotego>=0.1.3",
    ```
 3. Save the file.
 
-> If you already installed dependencies before removing it: remove the line, then re-run the install step in section 7.
+### Step 3 — Verify it is removed
+
+**macOS**
+
+```bash
+grep -n "pymotego" pyproject.toml || echo "OK: pymotego removed"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+if (Select-String -Path .\pyproject.toml -Pattern "pymotego" -Quiet) { "Still present (not removed)" } else { "OK: pymotego removed" }
+```
+
+> If you already ran the dependency installation step before removing `pymotego`, remove it now, then re-run the install step in section 7.
 
 ---
 
