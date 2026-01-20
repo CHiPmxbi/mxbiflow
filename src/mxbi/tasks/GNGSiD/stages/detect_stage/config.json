@@ -11,7 +11,7 @@
         "params": {
             "stimulation_size": 250,
             "visual_stimulus_delay": 500,
-            "stimulus_freq": 2000,
+            "stimulus_freq": 7000,
             "stimulus_freq_duration": 100,
             "stimulus_interval": 130,
             "time_out": 10000,
