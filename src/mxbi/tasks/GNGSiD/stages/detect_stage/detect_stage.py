@@ -153,7 +153,7 @@ class GNGSiDDetectStage:
 
     def _prepare_stimulus_intensity(self, monkey: str, frequency: int):
         bt = choice(([[10, 30], [50, 70]])) if monkey == "wolfgang" else []
-        at = [80, 80, 80] if monkey == "wolfgang" else [80, 80, 80]
+        at = [80, 80, 80] if monkey == "wolfgang" else [54,56,58]
         intensity_options = at * 10 + bt
 
         stimulus_intensity = choice(intensity_options)
