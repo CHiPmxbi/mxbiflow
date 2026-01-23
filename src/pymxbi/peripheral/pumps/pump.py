@@ -1,7 +1,7 @@
 """Pump abstractions used by reward delivery hardware."""
 
-from typing import Protocol
 from enum import Enum, auto
+from typing import Protocol
 
 
 class Direction(Enum):

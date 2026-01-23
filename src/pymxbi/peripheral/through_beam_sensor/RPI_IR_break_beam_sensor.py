@@ -1,7 +1,8 @@
 """Raspberry Pi IR through-beam sensor implementation."""
 
-from gpiozero import DigitalInputDevice
 from typing import Callable
+
+from gpiozero import DigitalInputDevice
 
 
 class RPIIRBreakBeamSensor:

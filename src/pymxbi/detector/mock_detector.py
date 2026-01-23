@@ -50,7 +50,9 @@ class MockDetector(Detector):
         while self._is_running:
             with self._input_lock:
                 animal_name = self._current_animal
-            self.process_detection(DetectionResult(animal_name=animal_name, error=False))
+            self.process_detection(
+                DetectionResult(animal_name=animal_name, error=False)
+            )
             sleep(self.detection_frequency)
 
     def begin(self) -> None:

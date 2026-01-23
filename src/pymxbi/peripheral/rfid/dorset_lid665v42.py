@@ -319,8 +319,8 @@ if __name__ == "__main__":
     import time
 
     from prompt_toolkit import prompt
-    from prompt_toolkit.shortcuts import choice
     from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.shortcuts import choice
     from prompt_toolkit.validation import Validator
     from serial.tools import list_ports
 

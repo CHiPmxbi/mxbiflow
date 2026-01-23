@@ -33,4 +33,3 @@ class RFIDReader(Protocol):
     def close(self) -> None:
         """Close the reader and release resources."""
         ...
-
