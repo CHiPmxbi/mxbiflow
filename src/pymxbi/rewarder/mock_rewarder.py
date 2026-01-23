@@ -4,8 +4,6 @@ This rewarder does not control any hardware. Instead, it logs calls to its
 methods to a provided ``loguru.Logger`` sink.
 """
 
-from loguru import Logger
-
 
 class MockRewarder:
     """A rewarder backend that logs reward actions.
@@ -16,7 +14,7 @@ class MockRewarder:
         Logger used to record rewarder operations.
     """
 
-    def __init__(self, sink: Logger) -> None:
+    def __init__(self, sink) -> None:
         """Create a new mock rewarder.
 
         Parameters
@@ -69,3 +67,23 @@ class MockRewarder:
     def close(self) -> None:
         """Close the rewarder (no-op other than logging)."""
         self._sink.info("MockRewarder closed.")
+
+
+if __name__ == "__main__":
+    import time
+
+    from loguru import logger
+
+    logger.info
+
+    rewarder = MockRewarder(logger)
+
+    rewarder.open()
+    rewarder.give_reward(500)
+    time.sleep(1)
+    rewarder.give_reward_by_volume(250)
+    time.sleep(1)
+    rewarder.give_reward_by_count(3)
+    time.sleep(1)
+    rewarder.stop_reward()
+    rewarder.close()
