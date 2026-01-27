@@ -97,7 +97,7 @@ class TwoACTouchScene:
 
     def _create_show_data_widget(self) -> None:
         self._show_data_widget = ShowDataWidget(self._background)
-        self._show_data_widget.place(relx=0, rely=1, anchor="sw")
+        self._show_data_widget.place(relx=0, rely=1.2, anchor="sw")
         data = DataToShow(
             name=self._animal_state.name,
             id=self._animal_state.trial_id,
