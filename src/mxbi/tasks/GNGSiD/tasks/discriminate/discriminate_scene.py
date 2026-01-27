@@ -1,7 +1,8 @@
 from concurrent.futures import Future
 from datetime import datetime
-from tkinter import CENTER, Canvas, Event
-from typing import TYPE_CHECKING, Final
+from queue import Empty, SimpleQueue
+from tkinter import CENTER, Canvas, Event, TclError
+from typing import TYPE_CHECKING, Callable, Final
 
 from mxbi.tasks.GNGSiD.models import Result, TouchEvent
 from mxbi.tasks.GNGSiD.tasks.discriminate.discriminate_models import (
@@ -13,6 +14,7 @@ from mxbi.tasks.GNGSiD.tasks.utils.targets import DiscriminateTarget
 from mxbi.utils.aplayer import StimulusSequenceUnit
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 from mxbi.utils.tkinter.components.showdata_widget import ShowDataWidget
+from mxbi.utils.logger import logger
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState
@@ -38,6 +40,23 @@ class GNGSiDDiscriminateScene:
         self._screen_type: Final[ScreenConfig] = screen_type
         self._trial_config: Final[TrialConfig] = trial_config
         self._persistent_data: Final["PersistentData"] = persistent_data
+
+        # NOTE: Scheduler callbacks may call task.quit() from non-Tk threads.
+        # Keep all Tk operations on the Tk main thread by dispatching through a queue
+        # drained via root.after().
+        self._ended = False
+        self._result_finalized = False
+        self._after_ids: set[str] = set()
+        self._ui_queue: SimpleQueue[Callable[[], None]] = SimpleQueue()
+
+        self._ui_dispatch_after_id: str | None = None
+        self._stage_timeout_after_id: str | None = None
+        self._auto_result_after_id: str | None = None
+        self._attention_poll_after_id: str | None = None
+        self._reward_after_id: str | None = None
+        self._inter_trial_after_id: str | None = None
+        self._reward_adjust_after_ids: list[str] = []
+        self._attention_future: Future[bool] | None = None
 
         # Build stimulus units for attention, high, and low tones
         attention_unit = self._build_stimulus_unit(
@@ -84,6 +103,7 @@ class GNGSiDDiscriminateScene:
             self._trial_config.stimulus_duration
         )
 
+        self._start_ui_dispatcher()
         self._on_trial_start()
 
     # region public api
@@ -92,9 +112,74 @@ class GNGSiDDiscriminateScene:
         return self._data
 
     def cancle(self) -> None:
-        self._data.result = Result.CANCEL
         self._theater.aplayer.stop()
-        self._on_trial_end()
+        self._request_ui(self._cancel_on_ui)
+
+    # endregion
+
+    # region ui thread helpers
+    def _request_ui(self, action: Callable[[], None]) -> None:
+        self._ui_queue.put(action)
+
+    def _start_ui_dispatcher(self) -> None:
+        self._ui_dispatch_after_id = self._after(10, self._drain_ui_queue)
+
+    def _drain_ui_queue(self) -> None:
+        while True:
+            try:
+                action = self._ui_queue.get_nowait()
+            except Empty:
+                break
+
+            try:
+                action()
+            except Exception:
+                logger.exception("Error while handling queued UI action")
+
+        if self._ended:
+            return
+
+        self._ui_dispatch_after_id = self._after(10, self._drain_ui_queue)
+
+    def _after(self, delay_ms: int, callback: Callable, *args) -> str:
+        after_id: str | None = None
+
+        def wrapped(*wrapped_args) -> None:
+            if after_id is not None:
+                self._after_ids.discard(after_id)
+
+            if self._ended:
+                return
+
+            callback(*wrapped_args)
+
+        after_id = self._theater.root.after(delay_ms, wrapped, *args)
+        self._after_ids.add(after_id)
+        return after_id
+
+    def _cancel_after(self, after_id: str | None) -> None:
+        if after_id is None:
+            return
+
+        try:
+            self._theater.root.after_cancel(after_id)
+        except TclError:
+            pass
+        finally:
+            self._after_ids.discard(after_id)
+
+    def _cancel_all_afters(self) -> None:
+        for after_id in list(self._after_ids):
+            self._cancel_after(after_id)
+        self._after_ids.clear()
+
+    def _safe_destroy(self, widget) -> None:
+        if widget is None:
+            return
+        try:
+            widget.destroy()
+        except TclError:
+            pass
 
     # endregion
 
@@ -105,13 +190,26 @@ class GNGSiDDiscriminateScene:
         self._bind_first_stage()
 
     def _on_inter_trial(self) -> None:
-        self._background.after(
+        self._cancel_after(self._inter_trial_after_id)
+        self._inter_trial_after_id = self._after(
             self._trial_config.inter_trial_interval, self._on_trial_end
         )
 
     def _on_trial_end(self) -> None:
-        self._background.destroy()
-        self._theater.root.quit()
+        if self._ended:
+            return
+
+        self._ended = True
+        self._data.trial_end_time = datetime.now().timestamp()
+
+        self._cancel_all_afters()
+
+        self._safe_destroy(getattr(self, "_trigger_canvas", None))
+        self._safe_destroy(getattr(self, "_background", None))
+        try:
+            self._theater.root.quit()
+        except TclError:
+            pass
 
     # endregion
 
@@ -174,16 +272,23 @@ class GNGSiDDiscriminateScene:
         self._background.focus_set()
         self._background.bind("<r>", lambda e: self._give_standard_stimulus())
         self._trigger_canvas.bind("<ButtonPress>", self._on_first_touched)
-        self._trigger_canvas.after(self._trial_config.time_out, self._on_timeout)
+        self._cancel_after(self._stage_timeout_after_id)
+        self._stage_timeout_after_id = self._after(
+            self._trial_config.time_out, self._on_timeout
+        )
 
     def _bind_second_stage(self) -> None:
         self._reward_duration = self._trial_config.reward_duration
         self._trigger_canvas.bind("<ButtonPress>", self._on_second_touched)
         if self._trial_config.is_stimulus_trial:
-            self._trigger_canvas.after(self._response_duration, self._on_incorrect)
+            self._cancel_after(self._auto_result_after_id)
+            self._auto_result_after_id = self._after(
+                self._response_duration, self._on_incorrect
+            )
             self._schedule_reward_adjustments()
         else:
-            self._trigger_canvas.after(
+            self._cancel_after(self._auto_result_after_id)
+            self._auto_result_after_id = self._after(
                 self._trial_config.stimulus_duration, self._on_correct
             )
 
@@ -191,29 +296,65 @@ class GNGSiDDiscriminateScene:
 
     # region event handlers
     def _on_first_touched(self, event: Event) -> None:
-        self._trigger_canvas.destroy()
+        if self._ended or self._result_finalized:
+            return
+
+        self._cancel_after(self._stage_timeout_after_id)
+        self._safe_destroy(self._trigger_canvas)
         self._record_touch(event)
-        future = self._give_stimulus(self._attention_stimulus)
-        future.add_done_callback(self._start_stimulus_stage)
+        self._attention_future = self._give_stimulus(self._attention_stimulus)
+        self._poll_attention_future()
 
     def _start_stimulus_stage(self, future: Future) -> None:
-        if not future.result():
+        if self._ended or self._result_finalized:
             return
+
+        try:
+            ok = future.result()
+        except Exception:
+            logger.exception("Attention stimulus playback failed")
+            return
+
+        if not ok:
+            return
+
         self._give_stimulus(self._stimulus)
-        self._background.after(0, self._prepare_second_stage)
+        self._after(0, self._prepare_second_stage)
 
     def _prepare_second_stage(self) -> None:
+        if self._ended or self._result_finalized:
+            return
+
         self._create_target()
         self._bind_second_stage()
 
     def _on_second_touched(self, event: Event) -> None:
-        self._trigger_canvas.destroy()
+        if self._ended or self._result_finalized:
+            return
+
+        self._cancel_after(self._auto_result_after_id)
+        self._cancel_reward_adjustments()
         self._record_touch(event)
 
         if self._trial_config.is_stimulus_trial:
             self._on_correct()
         else:
             self._on_incorrect()
+
+    def _poll_attention_future(self) -> None:
+        if self._ended or self._result_finalized:
+            return
+
+        future = self._attention_future
+        if future is None:
+            return
+
+        if future.done():
+            self._attention_poll_after_id = None
+            self._start_stimulus_stage(future)
+            return
+
+        self._attention_poll_after_id = self._after(10, self._poll_attention_future)
 
     def _record_touch(self, event: Event) -> None:
         self._data.touch_events.append(
@@ -224,10 +365,21 @@ class GNGSiDDiscriminateScene:
 
     # region result handlers
     def _on_correct(self) -> None:
-        self._theater.aplayer.stop()
-        self._trigger_canvas.destroy()
+        if self._ended or self._result_finalized:
+            return
+        self._result_finalized = True
 
-        self._background.after(self._trial_config.reward_delay, self._give_reward)
+        self._theater.aplayer.stop()
+        self._cancel_after(self._stage_timeout_after_id)
+        self._cancel_after(self._auto_result_after_id)
+        self._cancel_after(self._attention_poll_after_id)
+        self._cancel_reward_adjustments()
+        self._safe_destroy(self._trigger_canvas)
+
+        self._cancel_after(self._reward_after_id)
+        self._reward_after_id = self._after(
+            self._trial_config.reward_delay, self._give_reward
+        )
         self._data.result = Result.CORRECT
         self._data.correct_rate = (self._animal_state.correct_trial + 1) / (
             self._animal_state.current_level_trial_id + 1
@@ -235,8 +387,16 @@ class GNGSiDDiscriminateScene:
         self._on_inter_trial()
 
     def _on_incorrect(self) -> None:
+        if self._ended or self._result_finalized:
+            return
+        self._result_finalized = True
+
         self._theater.aplayer.stop()
-        self._trigger_canvas.destroy()
+        self._cancel_after(self._stage_timeout_after_id)
+        self._cancel_after(self._auto_result_after_id)
+        self._cancel_after(self._attention_poll_after_id)
+        self._cancel_reward_adjustments()
+        self._safe_destroy(self._trigger_canvas)
 
         self._data.result = Result.INCORRECT
         self._data.correct_rate = self._animal_state.correct_trial / (
@@ -247,7 +407,16 @@ class GNGSiDDiscriminateScene:
         self._on_inter_trial()
 
     def _on_timeout(self) -> None:
+        if self._ended or self._result_finalized:
+            return
+        self._result_finalized = True
+
         self._theater.aplayer.stop()
+        self._cancel_after(self._stage_timeout_after_id)
+        self._cancel_after(self._auto_result_after_id)
+        self._cancel_after(self._attention_poll_after_id)
+        self._cancel_reward_adjustments()
+        self._safe_destroy(getattr(self, "_trigger_canvas", None))
         self._data.result = Result.TIMEOUT
         self._data.correct_rate = self._animal_state.correct_trial / (
             self._animal_state.current_level_trial_id + 1
@@ -256,6 +425,15 @@ class GNGSiDDiscriminateScene:
         self._on_inter_trial()
 
     # endregion
+
+    def _cancel_on_ui(self) -> None:
+        if self._ended:
+            return
+
+        self._result_finalized = True
+        self._data.result = Result.CANCEL
+
+        self._on_trial_end()
 
     # region stimulus and reward
     def _build_stimulus_unit(
@@ -303,16 +481,26 @@ class GNGSiDDiscriminateScene:
         self._standard_reward_stimulus.play(self._trial_config.reward_duration)
 
     def _schedule_reward_adjustments(self) -> None:
-        self._background.after(
-            self._trial_config.medium_reward_threshold,
-            self._adjust_reward_duration,
-            self._trial_config.medium_reward_duration,
+        self._cancel_reward_adjustments()
+        self._reward_adjust_after_ids.append(
+            self._after(
+                self._trial_config.medium_reward_threshold,
+                self._adjust_reward_duration,
+                self._trial_config.medium_reward_duration,
+            )
         )
-        self._background.after(
-            self._trial_config.stimulus_duration,
-            self._adjust_reward_duration,
-            self._trial_config.low_reward_duration,
+        self._reward_adjust_after_ids.append(
+            self._after(
+                self._trial_config.stimulus_duration,
+                self._adjust_reward_duration,
+                self._trial_config.low_reward_duration,
+            )
         )
+
+    def _cancel_reward_adjustments(self) -> None:
+        for after_id in list(self._reward_adjust_after_ids):
+            self._cancel_after(after_id)
+        self._reward_adjust_after_ids.clear()
 
     def _adjust_reward_duration(self, duration: int) -> None:
         self._reward_duration = duration
