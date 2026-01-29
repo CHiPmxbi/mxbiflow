@@ -6,7 +6,7 @@ class MockDetector(Detector):
     def __init__(self, theater) -> None:
         super().__init__(theater)
 
-        self.__result = DetectionResult("mock_001", False)
+        self.__result = DetectionResult("belly", False)
         self._theater.root.bind("<p>", self.__on_mock_001_animal_entered)
         self._theater.root.bind("<o>", self.__on_mock_002_animal_entered)
         self._theater.root.bind("<l>", self.__on_mock_animal_left)
@@ -20,13 +20,13 @@ class MockDetector(Detector):
         """Debug detector has no long-running resources to release."""
 
     def __on_mock_001_animal_entered(self, _) -> None:
-        self.__result = DetectionResult("mock_001", False)
-        logger.info("Mock_001 animal entered")
+        self.__result = DetectionResult("belly", False)
+        logger.info("belly animal entered")
         self.process_detection(self.__result)
 
     def __on_mock_002_animal_entered(self, _) -> None:
-        self.__result = DetectionResult("mock_002", False)
-        logger.info("Mock_002 animal entered")
+        self.__result = DetectionResult("orizzo", False)
+        logger.info("orizzo animal entered")
         self.process_detection(self.__result)
 
     def __on_mock_animal_left(self, _) -> None:
@@ -35,12 +35,12 @@ class MockDetector(Detector):
         self.process_detection(self.__result)
 
     def __on_mock_animal_changed(self, _) -> None:
-        if self.__result.animal_name == "mock_001":
-            self.__result = DetectionResult("mock_002", False)
-            logger.info("Mock animal changed to mock_002")
+        if self.__result.animal_name == "belly":
+            self.__result = DetectionResult("belly", False)
+            logger.info("Mock animal changed to belly")
         else:
-            self.__result = DetectionResult("mock_001", False)
-            logger.info("Mock animal changed to mock_001")
+            self.__result = DetectionResult("orizzo", False)
+            logger.info("Mock animal changed to orizzo")
         self.process_detection(self.__result)
 
     def __on_mock_error(self, _) -> None:
