@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QApplication,
@@ -10,7 +8,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..path import MXBI_CONFIG_PATH
+from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
 from ..config import Configure
 from ..models.mxbi import (
     DetectorModel,
@@ -19,6 +17,7 @@ from ..models.mxbi import (
     RewarderModel,
     RewarderTypeEnum,
 )
+from ..models.session import Options
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
     MockRewarderCard,
@@ -48,6 +47,7 @@ class MXBIPanel(QMainWindow):
     def __init__(self):
         super().__init__()
         self._config = Configure(MXBI_CONFIG_PATH, MXBIModel)
+        self._options = Configure(OPTIONS_PATH, Options)
 
         self._build_ui()
         self._load_from_config()
@@ -65,7 +65,7 @@ class MXBIPanel(QMainWindow):
         self._widget_main.setLayout(self._layout_main)
         self.setCentralWidget(self._widget_main)
 
-        self.base_config = BaseConfig(self)
+        self.base_config = BaseConfig(self, self._options.value.mxbis)
         self._layout_main.addWidget(self.base_config)
         self._build_device_groups()
         self._layout_main.addLayout(self._build_buttons_row())
