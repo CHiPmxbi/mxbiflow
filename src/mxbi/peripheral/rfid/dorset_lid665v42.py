@@ -267,8 +267,8 @@ if __name__ == "__main__":
         t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(result.detect_time))
         print(f"[{t}] 🐑 Animal detected #{animal_count}: ID={result.animal_id}")
 
-    PORT = "/dev/ttyUSB0"
-    BAUDRATE = 57600
+    PORT = "/dev/cu.usbserial-0001"
+    BAUDRATE = 19200
 
     reader = DorsetLID665v42(port=PORT, baudrate=BAUDRATE)
 
