@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Optional
 
@@ -10,7 +11,7 @@ from pygame.event import Event
 from .scene_protocol import SceneProtocol
 from .models.animal import Animals
 from pymxbi import get_mxbi, MXBI
-from pymxbi.detector.detector import DetectorEvent
+from pymxbi.detector.detector import DetectionResult, DetectorEvent
 
 
 EVT_DETECTOR = pygame.USEREVENT + 1
@@ -91,25 +92,39 @@ class DetectorBridge:
         self._mxbi.detector.register_event(
             DetectorEvent.ANIMAL_RETURNED, self._emit_returned
         )
+        self._mxbi.detector.register_event(
+            DetectorEvent.FAULT_DETECTED, self._emit_fault
+        )
 
     def _emit(self, kind: str, animal: Optional[str]) -> None:
         # ✅ 线程安全：只入队
         self._q.put(DetectorMsg(kind=kind, animal=animal))
 
-    def _emit_entered(self, animal: str) -> None:
-        self._emit("entered", animal)
+    def _emit_entered(self, detection_result: DetectionResult) -> None:
+        self._emit(
+            "entered", detection_result.animal_id or detection_result.animal_name
+        )
 
-    def _emit_left(self, animal: str) -> None:
-        self._emit("left", animal)
+    def _emit_left(self, detection_result: DetectionResult) -> None:
+        self._emit("left", detection_result.animal_id or detection_result.animal_name)
 
-    def _emit_changed(self, animal: str) -> None:
-        self._emit("changed", animal)
+    def _emit_changed(self, detection_result: DetectionResult) -> None:
+        self._emit(
+            "changed", detection_result.animal_id or detection_result.animal_name
+        )
 
-    def _emit_remained(self, animal: str) -> None:
-        self._emit("remained", animal)
+    def _emit_remained(self, detection_result: DetectionResult) -> None:
+        self._emit(
+            "remained", detection_result.animal_id or detection_result.animal_name
+        )
 
-    def _emit_returned(self, animal: str) -> None:
-        self._emit("returned", animal)
+    def _emit_returned(self, detection_result: DetectionResult) -> None:
+        self._emit(
+            "returned", detection_result.animal_id or detection_result.animal_name
+        )
+
+    def _emit_fault(self, detection_result: DetectionResult) -> None:
+        self._emit("fault", detection_result.animal_id or detection_result.animal_name)
 
 
 class Scheduler:
@@ -117,13 +132,13 @@ class Scheduler:
         self,
         animals: Animals,
         scene_manager: SceneManager,
-        scenes: dict[str, SceneProtocol],
+        scenes: Mapping[str, type[SceneProtocol]],
     ) -> None:
         self._animals = animals
         self._scene_manager = scene_manager
         self._scenes = scenes
 
-        self._current_animal: Optional[str] = None
+        self._current_animal: Optional[str] = "mock_001"
         self._need_refresh = True
 
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -136,7 +151,7 @@ class Scheduler:
         # 统一折算为“当前动物”
         if kind in ("entered", "changed", "returned", "remained"):
             self._current_animal = animal
-        elif kind == "left":
+        elif kind in ("left", "fault"):
             # 简化：left 直接置空（如果你有 left->entered 的闪烁问题，可以做 debounce）
             self._current_animal = None
 
@@ -155,16 +170,16 @@ class Scheduler:
     def _refresh_by_state(self) -> None:
         animal = self._current_animal
         if animal is None:
-            self._scene_manager.switch(self._scenes["size_reduction"])
+            self._scene_manager.switch(self._scenes["size_reduction"]())
             return
 
         animal_state = self._animals.root[animal]
-        stage = getattr(animal_state, "active_stage", None)
+        stage = getattr(animal_state.state, "active_stage", None)
         if stage is None:
-            self._scene_manager.switch(self._scenes["size_reduction"])
+            self._scene_manager.switch(self._scenes["size_reduction"]())
             return
 
-        self._scene_manager.switch(self._scenes[stage])
+        self._scene_manager.switch(self._scenes[stage]())
 
 
 class Game:
@@ -172,8 +187,9 @@ class Game:
         self,
         animals: Animals,
         scene_manager: SceneManager,
-        scenes: dict[str, SceneProtocol],
+        scenes: Mapping[str, type[SceneProtocol]],
     ) -> None:
+        print(animals.root.keys())
         pygame.init()
 
         self._animals = animals
@@ -200,7 +216,7 @@ class Game:
         while True:
             try:
                 msg = self._detector_q.get_nowait()
-            except Exception:
+            except queue.Empty:
                 break
 
             pygame.event.post(
