@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from threading import Lock, Thread
-from time import sleep
+from time import sleep, time
 
 from pymxbi.detector.detector import (
     DetectionResult,
@@ -41,7 +41,7 @@ class MockDetector(Detector):
         self.detection_frequency = detection_frequency_ms / 1000.0
 
         self._input_lock = Lock()
-        self._current_animal: str | None = None
+        self._current_animal: str | None = self.animals[0]
 
         self._is_running = False
         self._thread: Thread = Thread(target=self._worker, daemon=True)
@@ -51,7 +51,12 @@ class MockDetector(Detector):
             with self._input_lock:
                 animal_name = self._current_animal
             self.process_detection(
-                DetectionResult(animal_name=animal_name, error=False)
+                DetectionResult(
+                    timestamp=time(),
+                    animal_id=animal_name if animal_name is not None else None,
+                    animal_name=animal_name,
+                    error=False,
+                )
             )
             sleep(self.detection_frequency)
 

@@ -97,7 +97,7 @@ class RFIDDetector(Detector):
             errno = self._rfid_reader.errno
             if errno and errno != self._last_errno:
                 self._last_errno = errno
-                self.process_detection(DetectionResult(error=True))
+                self.process_detection(DetectionResult(timestamp=time(), error=True))
             elif not errno and self._last_errno:
                 self._last_errno = ""
 
@@ -138,7 +138,14 @@ class RFIDDetector(Detector):
             self._timer.daemon = True
             self._timer.start()
 
-        self.process_detection(DetectionResult(animal_name=animal_name, error=False))
+        self.process_detection(
+            DetectionResult(
+                timestamp=tag.detect_time,
+                animal_id=tag.animal_id,
+                animal_name=animal_name,
+                error=False,
+            )
+        )
 
     def _on_timeout(self) -> None:
         with self._lock:
@@ -147,4 +154,6 @@ class RFIDDetector(Detector):
 
             self._timer = None
 
-        self.process_detection(DetectionResult(animal_name=None, error=False))
+        self.process_detection(
+            DetectionResult(timestamp=time(), animal_name=None, error=False)
+        )

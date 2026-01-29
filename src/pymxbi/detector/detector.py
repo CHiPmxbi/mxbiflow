@@ -1,7 +1,7 @@
 """Detector abstractions and the built-in detector state machine."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum, auto
 from threading import Lock
 from typing import Callable
@@ -64,6 +64,8 @@ class DetectionResult:
         Whether a fault was detected while reading inputs.
     """
 
+    timestamp: float = 0.0
+    animal_id: str | None = None
     animal_name: str | None = None
     error: bool = False
 
@@ -84,21 +86,23 @@ class DetectorStateMachine:
         self.current_state: DetectorState = DetectorState.IDLE
         self.current_animal: str | None = None
         self.last_seen_animal: str | None = None
+        self.current_detection: DetectionResult | None = None
+        self.last_seen_detection: DetectionResult | None = None
 
     def transition(self, detection_result: DetectionResult) -> None:
         """Apply a detection result and advance the state machine."""
         match (self.current_state, detection_result):
             case (_, DetectionResult(error=True)):
-                self._handle_error()
+                self._handle_error(detection_result)
 
             # NO_ANIMAL -> ANIMAL_PRESENT
             case (DetectorState.IDLE, DetectionResult(animal_name=animal_name)) if (
                 animal_name is not None
             ):
                 if animal_name != self.last_seen_animal:
-                    self._handle_animal_entered(animal_name)
+                    self._handle_animal_entered(detection_result)
                 else:
-                    self._handle_animal_returned(animal_name)
+                    self._handle_animal_returned(detection_result)
 
             # NO_ANIMAL -> NO_ANIMAL
             case (DetectorState.IDLE, DetectionResult(animal_name=None)):
@@ -106,82 +110,101 @@ class DetectorStateMachine:
 
             # ANIMAL_PRESENT -> NO_ANIMAL
             case (DetectorState.ANIMAL_PRESENT, DetectionResult(animal_name=None)):
-                self._handle_animal_left()
+                self._handle_animal_left(detection_result)
 
             # ANIMAL_PRESENT -> DIFFERENT_ANIMAL
             case (
                 DetectorState.ANIMAL_PRESENT,
                 DetectionResult(animal_name=animal_name),
             ) if animal_name is not None and animal_name != self.current_animal:
-                self._handle_animal_changed(animal_name)
+                self._handle_animal_changed(detection_result)
 
             # ANIMAL_PRESENT -> SAME_ANIMAL
             case (
                 DetectorState.ANIMAL_PRESENT,
                 DetectionResult(animal_name=animal_name),
             ) if animal_name is not None and animal_name == self.current_animal:
-                self._handle_animal_stayed(animal_name)
+                self._handle_animal_stayed(detection_result)
 
             # ERROR -> ANY_STATE
-            case (DetectorState.FAULT, DetectionResult(animal_name=animal_name)):
-                self._handle_recovery_from_error(animal_name)
+            case (DetectorState.FAULT, DetectionResult()):
+                self._handle_recovery_from_error(detection_result)
 
             case _:
                 print(
                     f"Unexpected state transition: {self.current_state}, {detection_result}"
                 )
 
-    def _handle_error(self) -> None:
+    def _handle_error(self, detection_result: DetectionResult) -> None:
         """Move to fault state and emit the fault event."""
         if self.current_state != DetectorState.FAULT:
             self.current_animal = None
+            self.current_detection = None
             self.current_state = DetectorState.FAULT
-            self.detector._emit_event(DetectorEvent.FAULT_DETECTED, "")
+            self.detector._emit_event(DetectorEvent.FAULT_DETECTED, detection_result)
 
-    def _handle_animal_entered(self, animal: str) -> None:
+    def _handle_animal_entered(self, detection_result: DetectionResult) -> None:
         """Handle an animal entering from idle state."""
+        assert detection_result.animal_name is not None
         self.current_state = DetectorState.ANIMAL_PRESENT
 
-        self.current_animal = animal
+        self.current_animal = detection_result.animal_name
         self.last_seen_animal = self.current_animal
+        self.current_detection = detection_result
+        self.last_seen_detection = self.current_detection
 
-        self.detector._emit_event(DetectorEvent.ANIMAL_ENTERED, animal)
+        self.detector._emit_event(DetectorEvent.ANIMAL_ENTERED, detection_result)
 
-    def _handle_animal_returned(self, animal: str) -> None:
+    def _handle_animal_returned(self, detection_result: DetectionResult) -> None:
         """Handle an animal returning after a brief absence."""
+        assert detection_result.animal_name is not None
         self.current_state = DetectorState.ANIMAL_PRESENT
 
-        self.current_animal = animal
+        self.current_animal = detection_result.animal_name
         self.last_seen_animal = self.current_animal
+        self.current_detection = detection_result
+        self.last_seen_detection = self.current_detection
 
-        self.detector._emit_event(DetectorEvent.ANIMAL_RETURNED, animal)
+        self.detector._emit_event(DetectorEvent.ANIMAL_RETURNED, detection_result)
 
-    def _handle_animal_left(self) -> None:
+    def _handle_animal_left(self, detection_result: DetectionResult) -> None:
         """Handle the current animal leaving."""
         assert self.current_animal is not None
-        left_animal = self.current_animal
+        assert self.current_detection is not None
+        left_detection = replace(
+            self.current_detection,
+            timestamp=detection_result.timestamp,
+            error=False,
+        )
         self.current_state = DetectorState.IDLE
         self.current_animal = None
-        self.detector._emit_event(DetectorEvent.ANIMAL_LEFT, left_animal)
+        self.current_detection = None
+        self.detector._emit_event(DetectorEvent.ANIMAL_LEFT, left_detection)
 
-    def _handle_animal_changed(self, new_animal_name: str) -> None:
+    def _handle_animal_changed(self, detection_result: DetectionResult) -> None:
         """Handle a different animal replacing the current one."""
+        assert detection_result.animal_name is not None
         self.last_seen_animal = self.current_animal
-        self.current_animal = new_animal_name
+        self.last_seen_detection = self.current_detection
+        self.current_animal = detection_result.animal_name
+        self.current_detection = detection_result
 
-        self.detector._emit_event(DetectorEvent.ANIMAL_CHANGED, new_animal_name)
+        self.detector._emit_event(DetectorEvent.ANIMAL_CHANGED, detection_result)
 
-    def _handle_animal_stayed(self, animal_name: str) -> None:
+    def _handle_animal_stayed(self, detection_result: DetectionResult) -> None:
         """Handle the same animal remaining present."""
-        self.detector._emit_event(DetectorEvent.ANIMAL_REMAINED, animal_name)
+        assert detection_result.animal_name is not None
+        self.current_detection = detection_result
+        self.detector._emit_event(DetectorEvent.ANIMAL_REMAINED, detection_result)
 
-    def _handle_recovery_from_error(self, animal_name: str | None) -> None:
+    def _handle_recovery_from_error(self, detection_result: DetectionResult) -> None:
         """Recover from fault state based on current detection."""
-        if animal_name is None:
+        if detection_result.animal_name is None:
             self.current_state = DetectorState.IDLE
             self.current_animal = None
+            self.current_detection = None
         else:
-            self._handle_animal_entered(animal_name)
+            self._handle_animal_entered(detection_result)
 
 
 class Detector(ABC):
@@ -195,7 +218,9 @@ class Detector(ABC):
 
     def __init__(self, animal_db: dict[str, str]) -> None:
         """Initialize with a mapping from animal ID to animal name."""
-        self._callbacks: dict[DetectorEvent, list[Callable[[str], None]]] = {}
+        self._callbacks: dict[
+            DetectorEvent, list[Callable[[DetectionResult], None]]
+        ] = {}
 
         self._state_lock = Lock()
         self._state_machine = DetectorStateMachine(self)
@@ -203,7 +228,7 @@ class Detector(ABC):
         self.animal_db = animal_db
 
     def register_event(
-        self, event: DetectorEvent, callback: Callable[[str], None]
+        self, event: DetectorEvent, callback: Callable[[DetectionResult], None]
     ) -> None:
         """Register a callback for a detector event.
 
@@ -211,19 +236,21 @@ class Detector(ABC):
         ----------
         event : DetectorEvent
             Event type to register for.
-        callback : Callable[[str], None]
-            Function called with the detected animal name (or ``""`` for faults).
+        callback : Callable[[DetectionResult], None]
+            Function called with the detection result for the transition.
         """
         if event not in self._callbacks:
             self._callbacks[event] = []
         self._callbacks[event].append(callback)
 
-    def _emit_event(self, event: DetectorEvent, animal_name: str) -> None:
+    def _emit_event(
+        self, event: DetectorEvent, detection_result: DetectionResult
+    ) -> None:
         """Emit an event to registered callbacks."""
         if event not in self._callbacks:
             return
         for callback in self._callbacks[event]:
-            callback(animal_name)
+            callback(detection_result)
 
     def process_detection(self, detection_result: DetectionResult) -> None:
         """Process a detection result in a thread-safe manner.
