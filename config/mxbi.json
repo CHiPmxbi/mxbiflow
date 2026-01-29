@@ -1,0 +1,31 @@
+{
+    "mxbi_id": 0,
+    "platform": "windows",
+    "rewarders": [
+        {
+            "rewarder_type": "gpio_rewarder",
+            "rewarder_id": 0,
+            "pin": 0,
+            "enabled": false
+        },
+        {
+            "rewarder_type": "mock_rewarder",
+            "rewarder_id": 0,
+            "enabled": true
+        }
+    ],
+    "detectors": [
+        {
+            "detector_type": "rfid_detector",
+            "detector_id": 0,
+            "port": "COM1",
+            "baudrate": 57600,
+            "enabled": false
+        },
+        {
+            "detector_type": "mock_detector",
+            "detector_id": 0,
+            "enabled": true
+        }
+    ]
+}
