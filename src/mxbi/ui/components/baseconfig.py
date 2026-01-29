@@ -9,7 +9,7 @@ from ...models.mxbi import MXBIModel, MXBIPlatformEnum
 class BaseConfig(QGroupBox):
     changed = Signal(str)
 
-    def __init__(self, parent):
+    def __init__(self, parent, mxbi_options: list[str]):
         super().__init__(parent)
 
         self.setTitle("Base config")
@@ -19,7 +19,7 @@ class BaseConfig(QGroupBox):
 
         self._label_mxbi = QLabel("mxbi id:")
         self._combo_mxbi = QComboBox()
-        self._combo_mxbi.setEditable(True)
+        self._combo_mxbi.addItems(mxbi_options)
         self._layout.addRow(self._label_mxbi, self._combo_mxbi)
 
         self._label_platform = QLabel("platform:")
