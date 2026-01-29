@@ -10,6 +10,7 @@ import pygame
 
 class SizeReductionStage:
     def __init__(self) -> None:
+        self._running = False
         self._mxbi = get_mxbi()
         pos = (
             pygame.display.get_window_size()[0] // 2,
@@ -26,6 +27,16 @@ class SizeReductionStage:
 
         event_bus.subscribe("reward", self.give_reward)
 
+    def start(self) -> None:
+        self._running = True
+
+    def quit(self) -> None:
+        self._running = False
+
+    @property
+    def running(self) -> bool:
+        return self._running
+
     def give_reward(self, reward_ms: int) -> None:
         self._mxbi.rewarder.give_reward(reward_ms)
 
@@ -39,7 +50,3 @@ class SizeReductionStage:
         self._target_group.draw(screen)
 
     def decide(self) -> type[SceneProtocol]: ...
-
-    @property
-    def running(self) -> bool:
-        return True
