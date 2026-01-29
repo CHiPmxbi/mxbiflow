@@ -168,6 +168,6 @@ class GNGSiDDiscriminateStage:
         return self._stage_config.condition
 
     def _prepare_stimulus_intensity(self, monkey: str, frequency: int):
-        stimulus_intensity = choice([60])
+        stimulus_intensity = choice([60,62,64])
 
         return self._theater.acontroller.get_amp_value(frequency, stimulus_intensity)
