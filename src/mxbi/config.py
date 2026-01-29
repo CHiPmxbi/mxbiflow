@@ -5,8 +5,6 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from mxbi.models.session import SessionConfig, SessionOptions
-from mxbi.path import CONFIG_SESSION_PATH, OPTIONS_SESSION_PATH
 from mxbi.utils.logger import logger
 
 T = TypeVar("T", bound=BaseModel)
@@ -75,16 +73,3 @@ class Configure(Generic[T]):
         except Exception as e:
             logger.error(f"Failed to save configuration file: {e}")
             raise
-
-
-session_options = Configure(OPTIONS_SESSION_PATH, SessionOptions)
-session_config = Configure(CONFIG_SESSION_PATH, SessionConfig)
-
-
-if __name__ == "__main__":
-    from rich.console import Console
-    from rich.json import JSON
-
-    console = Console()
-    console.print(JSON(session_config.value.model_dump_json()))
-    console.print(JSON(session_options.value.model_dump_json()))
