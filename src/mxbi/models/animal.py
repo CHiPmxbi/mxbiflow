@@ -1,68 +1,228 @@
-from pathlib import Path
-from typing import TYPE_CHECKING
+"""
+Animal models split into:
+- Config (identity/static)
+- State (persistable)
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+No runtime-only fields.
+All timestamps are timezone-aware UTC datetimes.
+"""
 
-from mxbi.models.task import TaskEnum
+from datetime import datetime, timezone
+from typing import Dict, List
 
-if TYPE_CHECKING:
-    from mxbi.models.task import Feedback
+from pydantic import BaseModel, Field, RootModel, computed_field, model_validator
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# -------------------- TrainState --------------------
+
+
+class TrainState(BaseModel):
+    stage: str
+    stage_trial_id: int = Field(default=0, ge=0)
+
+    level: int = Field(default=0, ge=0)
+    total_levels: int = Field(default=0, ge=0)
+    level_trial_id: int = Field(default=0, ge=0)
+
+    def record_trial(self, n: int = 1) -> None:
+        if n < 0:
+            raise ValueError("n must be >= 0")
+        self.stage_trial_id += n
+        self.level_trial_id += n
+
+    def reset_trial_counters(self) -> None:
+        self.stage_trial_id = 0
+        self.level_trial_id = 0
+
+    def set_level(self, new_level: int) -> None:
+        if new_level < 0:
+            raise ValueError("new_level must be >= 0")
+        if new_level != self.level:
+            self.level = new_level
+            self.level_trial_id = 0
+
+
+# -------------------- Session (persistable) --------------------
+
+
+class AnimalSession(BaseModel):
+    session_id: int = Field(..., ge=0)
+    start_at: datetime = Field(default_factory=utcnow)
+    end_at: datetime | None = None
+    trial_id: int = Field(0, ge=0)
+
+    def end(self, at: datetime | None = None) -> None:
+        if self.end_at is None:
+            self.end_at = at or utcnow()
+
+    def record_trial(self, n: int = 1) -> None:
+        if n < 0:
+            raise ValueError("n must be >= 0")
+        self.trial_id += n
+
+
+# -------------------- Config --------------------
 
 
 class AnimalConfig(BaseModel):
-    name: str = "mock"
-    task: TaskEnum = TaskEnum.IDEL
-    level: int = 0
-    level_trial_id: int | None = None
+    rfid_id: str = Field(default="", frozen=True)
+    name: str = Field(default="mock", frozen=True)
+    stage: str = Field(default="idle", frozen=True)
+    level: int = Field(default=0, ge=0, frozen=True)
 
 
-class ScheduleConditionConfig(BaseModel):
-    evaluation_interval: int = 20
-    difficulty_increase_threshold: float = 0.8
-    difficulty_decrease_threshold: float = 0
-    allow_decrease: bool = True
-    present_level_trial_id: bool = False
-    next_task: TaskEnum | None = None
+# -------------------- State (+ API facade) --------------------
 
 
-class ScheduleCondition(BaseModel):
-    level_count: int = 0
-    config: ScheduleConditionConfig
+class AnimalState(BaseModel):
+    """
+    Persistable state for a single animal.
+
+    Notes
+    -----
+    - sessions are persisted
+    - active_session_id points to sessions[*].session_id, enabling restore
+    - active_stage stores the key of the active TrainState
+    """
+
+    trial_id: int = Field(default=0, ge=0)
+
+    train_states: Dict[str, TrainState] = Field(default_factory=dict)
+    active_stage: str | None = None
+
+    sessions: List[AnimalSession] = Field(default_factory=list)
+    active_session_id: int | None = None
 
 
-class AnimalState(AnimalConfig):
-    trial_id: int = 0
-    data_path: Path | None = None
-    current_level_trial_id: int = 0
-    current_animal_session_trial_id: int = 0
-    animal_session_start_time: float = 0.0
-    correct_trial: int = 0
-    condition: "ScheduleCondition | None" = None
+class Animal(BaseModel):
+    config: AnimalConfig
+    state: AnimalState
+    # ---- Derived / Views ----
 
     @computed_field
     @property
-    def correct_rate(self) -> float:
-        if self.current_level_trial_id == 0:
-            return 0.0
-        return self.correct_trial / self.current_level_trial_id
+    def rfid_id(self) -> str:
+        return self.config.rfid_id
 
-    def reset(self) -> None:
-        self.current_level_trial_id = 0
-        self.correct_trial = 0
+    @computed_field
+    @property
+    def name(self) -> str:
+        return self.config.name
 
-    def leave_session(self) -> None:
-        self.current_animal_session_trial_id = 0
+    @computed_field
+    @property
+    def active_train_state(self) -> TrainState | None:
+        if self.active_stage is None:
+            return None
+        return self.state.train_states.get(self.active_stage)
 
-    def update(self, feedback: "Feedback") -> None:
-        self.trial_id += 1
-        self.current_level_trial_id += 1
-        if feedback:
-            self.correct_trial += 1
+    @computed_field
+    @property
+    def active_session(self) -> AnimalSession | None:
+        """
+        Return the active session object, if active_session_id is set.
+
+        We assume session_id == index-in-sessions (monotonic append),
+        but we still search safely in case of future changes.
+        """
+        if self.active_session_id is None:
+            return None
+        for s in self.state.sessions:
+            if s.session_id == self.active_session_id:
+                return s
+        return None
+
+    @computed_field
+    @property
+    def current_session_id(self) -> int | None:
+        return self.active_session_id
+
+    @computed_field
+    @property
+    def current_session_trials(self) -> int:
+        s = self.active_session
+        return s.trial_id if s else 0
+
+    # ---- Actions ----
+
+    def start_session(self, *, at: datetime | None = None) -> AnimalSession:
+        if self.active_session_id is not None:
+            raise ValueError("Session already active")
+
+        sid = len(self.state.sessions)
+        s = AnimalSession(session_id=sid, start_at=at or utcnow(), trial_id=0)
+        self.state.sessions.append(s)
+        self.active_session_id = sid
+        return s
+
+    def end_session(self, *, at: datetime | None = None) -> None:
+        s = self.active_session
+        if s is None:
+            return
+        s.end(at=at)
+        self.active_session_id = None
+
+    def record_trial(self, n: int = 1) -> None:
+        if n < 0:
+            raise ValueError("n must be >= 0")
+
+        s = self.active_session
+        if s is None:
+            raise ValueError("No active session")
+
+        ts = self.active_train_state
+        if ts is None:
+            raise ValueError("No active training state")
+
+        self.trial_id += n
+        s.record_trial(n)
+        ts.record_trial(n)
+
+    def set_level(self, new_level: int) -> None:
+        ts = self.active_train_state
+        if ts is None:
+            raise ValueError("No active training state")
+        ts.set_level(new_level)
+
+    def set_stage(self, new_stage: str, *, reset_level: bool = True) -> None:
+        if new_stage not in self.state.train_states:
+            self.state.train_states[new_stage] = TrainState(stage=new_stage)
+
+        ts = self.state.train_states[new_stage]
+        ts.reset_trial_counters()
+        if reset_level:
+            ts.set_level(0)
+
+        self.active_stage = new_stage
 
 
-class AnimalOptions(BaseModel):
-    model_config = ConfigDict(frozen=True)
+# -------------------- Container mapping by RFID --------------------
 
-    name: list[str]
-    level: list[int] = Field(default_factory=lambda: [i for i in range(-1, 88)])
-    task: list[TaskEnum] = Field(default_factory=lambda: list(TaskEnum))
+
+class Animals(RootModel[dict[str, Animal]]):
+    """Container mapping RFID ids to AnimalState."""
+
+    @model_validator(mode="after")
+    def _validate_keys(self) -> "Animals":
+        for rfid, st in self.root.items():
+            if rfid != st.config.rfid_id:
+                raise ValueError(
+                    f"RFID key '{rfid}' does not match state.config.rfid_id '{st.config.rfid_id}'"
+                )
+        return self
+
+    def add(self, animal: Animal) -> None:
+        rfid = animal.rfid_id
+        if rfid in self.root:
+            raise ValueError(f"Animal {rfid} already exists")
+        self.root[rfid] = animal
+
+    def get(self, rfid_id: str) -> Animal | None:
+        return self.root.get(rfid_id)
+
+    def remove(self, rfid_id: str) -> None:
+        self.root.pop(rfid_id, None)
