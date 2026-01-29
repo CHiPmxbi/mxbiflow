@@ -200,29 +200,55 @@ class Animal(BaseModel):
         self.active_stage = new_stage
 
 
-# -------------------- Container mapping by RFID --------------------
+# -------------------- Container mapping by name --------------------
 
 
 class Animals(RootModel[dict[str, Animal]]):
-    """Container mapping RFID ids to AnimalState."""
+    """
+    Container mapping animal names to Animal.
+
+    Note: historically this container used `rfid_id` as the key. We now treat
+    `Animal.config.name` as the canonical key and auto-migrate old keying on load.
+    """
 
     @model_validator(mode="after")
     def _validate_keys(self) -> "Animals":
-        for rfid, st in self.root.items():
-            if rfid != st.config.rfid_id:
-                raise ValueError(
-                    f"RFID key '{rfid}' does not match state.config.rfid_id '{st.config.rfid_id}'"
-                )
+        migrated: dict[str, Animal] = {}
+        for key, animal in self.root.items():
+            name = animal.config.name
+            rfid_id = animal.config.rfid_id
+
+            # Canonical: keyed by name
+            if key == name:
+                if name in migrated:
+                    raise ValueError(f"Duplicate animal name key '{name}'")
+                migrated[name] = animal
+                continue
+
+            # Back-compat: previously keyed by rfid_id
+            if key == rfid_id and name:
+                if name in migrated:
+                    raise ValueError(
+                        f"RFID key '{key}' maps to duplicate name key '{name}'"
+                    )
+                migrated[name] = animal
+                continue
+
+            raise ValueError(
+                f"Animal key '{key}' must match config.name '{name}' (or legacy config.rfid_id '{rfid_id}')"
+            )
+
+        self.root = migrated
         return self
 
     def add(self, animal: Animal) -> None:
-        rfid = animal.rfid_id
-        if rfid in self.root:
-            raise ValueError(f"Animal {rfid} already exists")
-        self.root[rfid] = animal
+        name = animal.name
+        if name in self.root:
+            raise ValueError(f"Animal '{name}' already exists")
+        self.root[name] = animal
 
-    def get(self, rfid_id: str) -> Animal | None:
-        return self.root.get(rfid_id)
+    def get(self, animal_name: str) -> Animal | None:
+        return self.root.get(animal_name)
 
-    def remove(self, rfid_id: str) -> None:
-        self.root.pop(rfid_id, None)
+    def remove(self, animal_name: str) -> None:
+        self.root.pop(animal_name, None)
