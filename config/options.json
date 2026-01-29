@@ -1,0 +1,43 @@
+{
+    "mxbis": [
+        "debug",
+        "mxbi1",
+        "mxbi2",
+        "mxbi3",
+        "mxbi4",
+        "mxbi5",
+        "mxbi6",
+        "mxbi7",
+        "mxbi8",
+        "mxbi9"
+    ],
+    "experimenter": [
+        "jgr",
+        "jcm",
+        "mjk",
+        "cko",
+        "kud",
+        "yang"
+    ],
+    "animals": {
+        "6254": "mock_001",
+        "e678": "mock_002",
+        "ea26": "test",
+        "97z3": "debug",
+        "b37d": "dualina",
+        "7fad": "elero",
+        "fb96": "bremer",
+        "c037": "brillux",
+        "3b64": "durin",
+        "e3f2": "ivvy",
+        "ea12": "almo",
+        "f0e9": "blake",
+        "cad9": "wolfgang",
+        "ae82": "clia",
+        "7fe6": "intro",
+        "6f53": "belly",
+        "0b39": "vin",
+        "8a19": "bristol",
+        "1b44": "ulmax"
+    }
+}
