@@ -6,10 +6,10 @@ class EventBus:
         self._events_dict: dict[str, list[Callable]] = {}
 
     def subscribe(self, event: str, handler: Callable) -> None:
-        if event not in self._events_dict:
-            self._events_dict[event] = [handler]
+        if event in self._events_dict:
+            return
 
-        self._events_dict[event].append(handler)
+        self._events_dict[event] = [handler]
 
     def unsubscribe(self, event: str, handler: Callable) -> None:
         if event not in self._events_dict:
