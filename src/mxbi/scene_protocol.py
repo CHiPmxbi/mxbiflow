@@ -1,10 +1,15 @@
 from typing import Protocol, runtime_checkable
 from pygame.surface import Surface
 from pygame.event import Event
+from .models.session import Session
 
 
 @runtime_checkable
 class SceneProtocol(Protocol):
+    _running: bool
+    def __init__(self, session: Session) -> None:
+        ...
+
     def start(self) -> None: ...
 
     def quit(self) -> None: ...

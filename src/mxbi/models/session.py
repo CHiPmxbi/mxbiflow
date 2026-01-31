@@ -10,12 +10,16 @@ class SessionConfig(BaseModel):
 
     animals: list[AnimalConfig] = Field(default_factory=list)
 
+class ScreenSize(BaseModel):
+    width: int = Field(default=1920)
+    height: int = Field(default=1080)
 
 class SessionState(BaseModel):
     session_id: int = Field(frozen=True)
     start_at: float = Field(frozen=True)
     end_at: float = Field(frozen=True)
     note: str = Field(frozen=True)
+    screen_szie: ScreenSize = Field(frozen=True)
 
     animals: Animals = Field(frozen=True)
 
@@ -23,6 +27,7 @@ class SessionState(BaseModel):
 class Session(BaseModel):
     config: SessionConfig
     state: SessionState
+
 
 class Options(BaseModel):
     mxbis: list[str] = Field(default_factory=list, frozen=True)

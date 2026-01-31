@@ -10,6 +10,7 @@ from pygame.event import Event
 
 from .scene_protocol import SceneProtocol
 from .models.animal import Animals
+from .models.session import Session
 from pymxbi import get_mxbi, MXBI
 from pymxbi.detector.detector import DetectionResult, DetectorEvent
 
@@ -130,6 +131,7 @@ class DetectorBridge:
 class Scheduler:
     def __init__(
         self,
+        session: Session,
         animals: Animals,
         scene_manager: SceneManager,
         scenes: Mapping[str, type[SceneProtocol]],
@@ -137,6 +139,7 @@ class Scheduler:
         self._animals = animals
         self._scene_manager = scene_manager
         self._scenes = scenes
+        self._session = session
 
         self._current_animal: Optional[str] = "mock_001"
         self._need_refresh = True
@@ -148,14 +151,17 @@ class Scheduler:
         kind: str = event.kind
         animal: Optional[str] = event.animal
 
-        # 统一折算为“当前动物”
+        # 统一折算为“当前动物”，并且只在“发生变化”时刷新；
+        # 避免 detector 的 "remained" 等心跳事件导致场景被反复重建/初始化。
         if kind in ("entered", "changed", "returned", "remained"):
-            self._current_animal = animal
+            if animal != self._current_animal:
+                self._current_animal = animal
+                self._need_refresh = True
         elif kind in ("left", "fault"):
             # 简化：left 直接置空（如果你有 left->entered 的闪烁问题，可以做 debounce）
-            self._current_animal = None
-
-        self._need_refresh = True
+            if self._current_animal is not None:
+                self._current_animal = None
+                self._need_refresh = True
 
     def update(self) -> None:
         current = self._scene_manager.current
@@ -170,21 +176,22 @@ class Scheduler:
     def _refresh_by_state(self) -> None:
         animal = self._current_animal
         if animal is None:
-            self._scene_manager.switch(self._scenes["size_reduction"]())
+            self._scene_manager.switch(self._scenes["size_reduction"](self._session))
             return
 
         animal_state = self._animals.root[animal]
         stage = getattr(animal_state.state, "active_stage", None)
         if stage is None:
-            self._scene_manager.switch(self._scenes["size_reduction"]())
+            self._scene_manager.switch(self._scenes["size_reduction"](self._session))
             return
 
-        self._scene_manager.switch(self._scenes[stage]())
+        self._scene_manager.switch(self._scenes[stage](self._session))
 
 
 class Game:
     def __init__(
         self,
+        session: Session,
         animals: Animals,
         scene_manager: SceneManager,
         scenes: Mapping[str, type[SceneProtocol]],
@@ -195,8 +202,14 @@ class Game:
         self._animals = animals
         self._scene_manager = scene_manager
         self._scenes = scenes
+        self._session = session
 
-        self._screen = pygame.display.set_mode((1024, 600))
+        self._screen = pygame.display.set_mode(
+            (
+                self._session.state.screen_szie.width,
+                self._session.state.screen_szie.height,
+            )
+        )
         self._clock = pygame.time.Clock()
         self._running = True
 
@@ -207,7 +220,9 @@ class Game:
         self._detector_binder = DetectorBridge(self._mxbi, self._detector_q)
         self._detector_binder.start()
 
-        self._scheduler = Scheduler(self._animals, self._scene_manager, self._scenes)
+        self._scheduler = Scheduler(
+            self._session, self._animals, self._scene_manager, self._scenes
+        )
 
     def _flush_detector_queue_into_pygame_events(self) -> None:
         """

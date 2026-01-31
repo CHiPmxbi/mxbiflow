@@ -1,34 +1,52 @@
-from pygame import Event, Surface
+import pygame
+from pygame import Event, Surface, Vector2, Color
 from pygame.sprite import Group
+from pymxbi import get_mxbi
+from pymxbi.audioplayer import AudioPlayer, PureToneUnit, PureToneGenerator, PlayResult
+
+from ..infra.eventbus import event_bus
+from ..models.session import Session
 from ..scene_protocol import SceneProtocol
 from .target import RectCircleSprite
-from pymxbi import get_mxbi
-from ..infra.eventbus import event_bus
-
-import pygame
 
 
 class SizeReductionStage:
-    def __init__(self) -> None:
+    def __init__(self, session: Session) -> None:
+        print("start")
         self._running = False
+
+        self._session = session
         self._mxbi = get_mxbi()
-        pos = (
-            pygame.display.get_window_size()[0] // 2,
-            pygame.display.get_window_size()[1] // 2,
-        )
-        size = (100, 100)
-        rect_color = (255, 0, 0)
-        circle_color = (0, 0, 255)
+
+        self._screen_size = self._session.state.screen_szie
+
+        pos = Vector2(self._screen_size.width // 2, self._screen_size.height // 2)
+        size = Vector2(100, 100)
+
+        rect_color = Color(255, 0, 0)
+        circle_color = Color(0, 0, 255)
+
         radius = 50
         self._target = RectCircleSprite(pos, size, rect_color, circle_color, radius)
 
         self._target_group = Group()
         self._target_group.add(self._target)
 
-        event_bus.subscribe("reward", self.give_reward)
+        pure_tone_config = PureToneUnit(frequency=2000, duration=200)
+        s_ton_config = PureToneUnit(frequency=0, duration=200)
+        pure_tone_generator = PureToneGenerator()
+        self.pure_tone = pure_tone_generator.generate_stimulus_sequence([pure_tone_config, s_ton_config], 100000)
+
+        self._player = AudioPlayer()
+
+
+        event_bus.subscribe("touch", self.give_reward)
 
     def start(self) -> None:
         self._running = True
+
+    def on_finished(self, p: PlayResult) -> None:
+        print(p)
 
     def quit(self) -> None:
         self._running = False
@@ -37,13 +55,18 @@ class SizeReductionStage:
     def running(self) -> bool:
         return self._running
 
-    def give_reward(self, reward_ms: int) -> None:
-        self._mxbi.rewarder.give_reward(reward_ms)
+    def give_reward(self) -> None:
+        self._mxbi.rewarder.give_reward(1000)
+        self.task = self._player.play_puretone_sequence(self.pure_tone, on_done=self.on_finished)
 
     def handle_event(self, event: Event) -> None:
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.task.cancel()
         self._target.handle_event(event, pygame.display.get_window_size())
 
     def update(self, dt_s: float) -> None:
+        self._player.update()
         self._target.update(dt_s)
 
     def draw(self, screen: Surface) -> None:

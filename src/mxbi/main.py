@@ -5,9 +5,10 @@ def main():
     from .game import Game, SceneManager
     from .config import Configure
     from .path import SESSION_CONFIG_PATH
-    from .models.session import SessionConfig
+    from .models.session import SessionConfig, Session, SessionState, ScreenSize
     from .models.animal import Animal, AnimalState, TrainState, Animals
     from .touch_screen.size_reduction_stage import SizeReductionStage
+    from datetime import datetime
 
     run_config()
     mxbi = build_mxbi()
@@ -33,8 +34,17 @@ def main():
 
     scene_manager = SceneManager()
     scenes = {"idle": SizeReductionStage}
+    state = SessionState(
+        session_id=0,
+        start_at=datetime.now().timestamp(),
+        note="",
+        screen_szie=ScreenSize(width=1024, height=600),
+        animals=animals,
+        end_at=datetime.now().timestamp(),
+    )
+    session = Session(config=session_config, state=state)
 
-    game = Game(animals, scene_manager, scenes)
+    game = Game(session, animals, scene_manager, scenes)
     game.play()
 
 

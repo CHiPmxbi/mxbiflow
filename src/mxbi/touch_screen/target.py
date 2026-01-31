@@ -1,14 +1,15 @@
 import pygame
 from ..infra.eventbus import event_bus
+from pygame import Vector2, Color
 
 
 class RectCircleSprite(pygame.sprite.Sprite):
     def __init__(
         self,
-        pos: tuple[int, int],
-        size: tuple[int, int],
-        rect_color: tuple[int, int, int],
-        circle_color: tuple[int, int, int],
+        pos: Vector2,
+        size: Vector2,
+        rect_color: Color,
+        circle_color: Color,
         radius: int,
     ) -> None:
         super().__init__()
@@ -20,10 +21,9 @@ class RectCircleSprite(pygame.sprite.Sprite):
         pygame.draw.circle(surface, circle_color, (width // 2, height // 2), radius)
 
         self.image: pygame.Surface = surface
-        self.rect: pygame.Rect = surface.get_rect(topleft=pos)
+        self.rect: pygame.Rect = surface.get_rect(center=pos)
 
     def on_touch(self) -> None:
-        print("hello world")
         event_bus.publish("touch")
 
     def handle_event(
