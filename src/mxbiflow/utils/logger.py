@@ -2,7 +2,7 @@ import sys
 
 from loguru import logger
 
-from mxbi.path import LOG_PATH
+from ..path import LOG_PATH
 
 logger.remove()
 
