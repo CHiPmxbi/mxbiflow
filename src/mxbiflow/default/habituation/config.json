@@ -1,0 +1,64 @@
+{
+    "default": {
+        "0": {
+            "level": 0,
+            "entry_reward": 1,
+            "evaluation_interval": 10,
+            "min_stimulus_interval": 2000,
+            "max_stimulus_interval": 2000,
+            "target": 5000,
+            "reward_dutration": 1000,
+            "stimulus_density": 5
+        },
+        "1": {
+            "level": 1,
+            "entry_reward": 0.8,
+            "evaluation_interval": 50,
+            "min_stimulus_interval": 2000,
+            "max_stimulus_interval": 2000,
+            "target": 10000,
+            "reward_dutration": 1000,
+            "stimulus_density": 5
+        },
+        "2": {
+            "level": 2,
+            "entry_reward": 0.6,
+            "evaluation_interval": 100,
+            "min_stimulus_interval": 3000,
+            "max_stimulus_interval": 5000,
+            "target": 15000,
+            "reward_dutration": 1000,
+            "stimulus_density": 10
+        },
+        "3": {
+            "level": 3,
+            "entry_reward": 0.4,
+            "evaluation_interval": 100,
+            "min_stimulus_interval": 4000,
+            "max_stimulus_interval": 7000,
+            "target": 20000,
+            "reward_dutration": 1000,
+            "stimulus_density": 15
+        },
+        "4": {
+            "level": 4,
+            "entry_reward": 0.2,
+            "evaluation_interval": 100,
+            "min_stimulus_interval": 5000,
+            "max_stimulus_interval": 9000,
+            "target": 25000,
+            "reward_dutration": 1000,
+            "stimulus_density": 20
+        },
+        "5": {
+            "level": 5,
+            "entry_reward": 0,
+            "evaluation_interval": 200,
+            "min_stimulus_interval": 5000,
+            "max_stimulus_interval": 10000,
+            "target": 30000,
+            "reward_dutration": 1000,
+            "stimulus_density": 25
+        }
+    }
+}
