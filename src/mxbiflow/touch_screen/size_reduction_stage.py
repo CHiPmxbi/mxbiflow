@@ -6,7 +6,7 @@ from pymxbi.audioplayer import AudioPlayer, PureToneUnit, PureToneGenerator, Pla
 
 from ..infra.eventbus import event_bus
 from ..models.session import Session
-from ..scene_protocol import SceneProtocol
+from ..scene.scene_protocol import SceneProtocol
 from .target import RectCircleSprite
 
 
@@ -18,9 +18,9 @@ class SizeReductionStage:
         self._session = session
         self._mxbi = get_mxbi()
 
-        self._screen_size = self._session.state.screen_szie
+        self._screen_size = self._mxbi.screen_size
 
-        pos = Vector2(self._screen_size.width // 2, self._screen_size.height // 2)
+        pos = Vector2(self._screen_size[0] // 2, self._screen_size[1] // 2)
         size = Vector2(100, 100)
 
         rect_color = Color(255, 0, 0)
@@ -35,10 +35,11 @@ class SizeReductionStage:
         pure_tone_config = PureToneUnit(frequency=2000, duration=200)
         s_ton_config = PureToneUnit(frequency=0, duration=200)
         pure_tone_generator = PureToneGenerator()
-        self.pure_tone = pure_tone_generator.generate_stimulus_sequence([pure_tone_config, s_ton_config], 100000)
+        self.pure_tone = pure_tone_generator.generate_stimulus_sequence(
+            [pure_tone_config, s_ton_config], 100000
+        )
 
         self._player = AudioPlayer()
-
 
         event_bus.subscribe("touch", self.give_reward)
 
@@ -57,7 +58,9 @@ class SizeReductionStage:
 
     def give_reward(self) -> None:
         self._mxbi.rewarder.give_reward(1000)
-        self.task = self._player.play_puretone_sequence(self.pure_tone, on_done=self.on_finished)
+        self.task = self._player.play_puretone_sequence(
+            self.pure_tone, on_done=self.on_finished
+        )
 
     def handle_event(self, event: Event) -> None:
         if event.type == pygame.KEYDOWN:
