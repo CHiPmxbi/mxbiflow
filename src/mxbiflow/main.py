@@ -1,50 +1,47 @@
-from pymxbi import set_mxbi, MXBI
+from pymxbi import MXBI
 
 
 def main():
-    from .game import Game, SceneManager
     from .config import Configure
-    from .path import SESSION_CONFIG_PATH
-    from .models.session import SessionConfig, Session, SessionState, ScreenSize
-    from .models.animal import Animal, AnimalState, TrainState, Animals
-    from .touch_screen.size_reduction_stage import SizeReductionStage
-    from datetime import datetime
+    from .path import SESSION_CONFIG_PATH, STAGE_PATH
+    from .models.session import SessionConfig, Session
+    from .models.animal import Animal, TrainState
+    from .game import Game
+    from .scene import SceneManager
+    from .default import Habituarion, IDLE
+    from .detector_bridge import DetectorBridge
 
     run_config()
     mxbi = build_mxbi()
-    set_mxbi(mxbi)
-
-    mxbi.rewarder.give_reward(1000)
 
     session_config = Configure(SESSION_CONFIG_PATH, SessionConfig).value
 
-    print(session_config.animals)
-
     animal_dict: dict[str, Animal] = {}
     for animal_config in session_config.animals:
-        train_state = TrainState(stage=animal_config.stage, level=animal_config.level)
-        animal_state = AnimalState(
-            active_stage=animal_config.stage,
-            train_states={animal_config.stage: train_state},
+        train_state = TrainState(name=animal_config.stage, level=animal_config.level)
+        animal_state = Animal(
+            rfid_id=animal_config.rfid_id,
+            name=animal_config.name,
         )
-        animal = Animal(config=animal_config, state=animal_state)
-        animal_dict[animal.name] = animal
+        animal_state.set_stage(train_state)
+        animal_dict[animal_config.name] = animal_state
 
-    animals = Animals(animal_dict)
+    session = Session(
+        experimenter=session_config.experimenter,
+        reward_type=session_config.reward_type,
+        send_email=False,
+        sync_data=False,
+        note="",
+        animals=animal_dict,
+    )
+    session.start()
 
     scene_manager = SceneManager()
-    scenes = {"idle": SizeReductionStage}
-    state = SessionState(
-        session_id=0,
-        start_at=datetime.now().timestamp(),
-        note="",
-        screen_szie=ScreenSize(width=1024, height=600),
-        animals=animals,
-        end_at=datetime.now().timestamp(),
-    )
-    session = Session(config=session_config, state=state)
-
-    game = Game(session, animals, scene_manager, scenes)
+    scene_manager.register(Habituarion)
+    scene_manager.register(IDLE)
+    scene_manager.persist(STAGE_PATH)
+    detector_bridge = DetectorBridge(mxbi.detector)
+    game = Game(session, scene_manager, detector_bridge, mxbi)
     game.play()
 
 
@@ -114,5 +111,5 @@ def build_mxbi() -> MXBI:
     if rewarders == {} or detectors == {}:
         raise ValueError("No rewarders or detectors enabled")
 
-    mxbi = MXBI(rewarders, detectors)
+    mxbi = MXBI((1000, 1000), rewarders, detectors)
     return mxbi
