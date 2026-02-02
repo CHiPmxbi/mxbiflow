@@ -109,5 +109,6 @@ DetectorModel: TypeAlias = Annotated[
 class MXBIModel(BaseModel):
     mxbi_id: int = Field(default=0, ge=0)
     platform: MXBIPlatformEnum = Field(default=MXBIPlatformEnum.RASPBIAN)
+    screen_szie: tuple[int, int] = Field(frozen=True)
     rewarders: list[RewarderModel] = Field(default_factory=list)
     detectors: list[DetectorModel] = Field(default_factory=list)
