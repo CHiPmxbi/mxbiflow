@@ -1,14 +1,14 @@
 from pydantic import BaseModel, Field
 from .mxbi import MXBI
-from .platform import PlatformEnum
-from .rewarder import (
+from ..platform import PlatformEnum
+from ..rewarder import (
     RewarderModel,
     Rewarder,
     RewarderEnum,
     MockRewarder,
     RPIGpioRewarder,
 )
-from .detector import (
+from ..detector import (
     DetectorModel,
     Detector,
     DetectorEnum,
@@ -17,8 +17,8 @@ from .detector import (
     BeambreakContinuousDetector,
     FusionContinuousDetector,
 )
-from .peripheral.rfid import DorsetLID665v42
-from .peripheral.beam_break_sensor import RPIIRBreakBeamSensor
+from ..peripheral.rfid import DorsetLID665v42
+from ..peripheral.beam_break_sensor import RPIIRBreakBeamSensor
 
 
 class MXBIModel(BaseModel):
