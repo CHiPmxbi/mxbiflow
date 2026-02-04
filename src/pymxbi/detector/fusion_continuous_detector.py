@@ -28,7 +28,6 @@ class FusionContinuousDetector(ContinuousDetector):
         self,
         rfid_reader: RFIDReader,
         beam_break_sensor: BeamBreakSensor,
-        detection_frequency: int,  # milliseconds
     ) -> None:
         """Initialize the detector.
 
@@ -44,7 +43,7 @@ class FusionContinuousDetector(ContinuousDetector):
             Polling interval in milliseconds.
         """
         super().__init__()
-        self.detection_frequency = detection_frequency / 1000.0
+        self.detection_frequency = 1000 / 1000.0
 
         self._rfid_reader = rfid_reader
         self._beam_break_sensor = beam_break_sensor

@@ -55,6 +55,13 @@ class MXBI:
     def screen_size(self):
         return self._screen_size
 
+    def register_animal(self, animals: dict[str, str]) -> None:
+        if not self._detector:
+            raise RuntimeError("No detectors found")
+
+        for detector in self._detector.values():
+            detector.register_animal(animals)
+
 
 _current_mxbi: MXBI | None = None
 
