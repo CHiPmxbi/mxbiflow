@@ -3,7 +3,8 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel
 
-from ...models.mxbi import MXBIModel, MXBIPlatformEnum
+from ...models.mxbi import MXBIModel, PlatformEnum
+from pymxbi.screen import get_screen_size
 
 
 class BaseConfig(QGroupBox):
@@ -24,8 +25,17 @@ class BaseConfig(QGroupBox):
 
         self._label_platform = QLabel("platform:")
         self._combo_platform = QComboBox()
-        self._combo_platform.addItems([platform.value for platform in MXBIPlatformEnum])
+        self._combo_platform.addItems([platform.value for platform in PlatformEnum])
         self._layout.addRow(self._label_platform, self._combo_platform)
+
+        self._label_screen = QLabel("screen:")
+        self._combo_screen = QComboBox()
+
+        for screen in get_screen_size():
+            self._combo_screen.addItem(
+                f"{screen.width} * {screen.height}", (screen.width, screen.height)
+            )
+        self._layout.addRow(self._label_screen, self._combo_screen)
 
         self._bind_events()
 
@@ -55,4 +65,4 @@ class BaseConfig(QGroupBox):
         except ValueError:
             model.mxbi_id = 0
 
-        model.platform = MXBIPlatformEnum(self._combo_platform.currentText())
+        model.platform = PlatformEnum(self._combo_platform.currentText())
