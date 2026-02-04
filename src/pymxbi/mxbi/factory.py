@@ -38,49 +38,57 @@ def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
     )
 
 
-def _build_rewarders(configs: list[RewarderModel], logger=None) -> dict[int, Rewarder]:
-    rewarders: dict[int, Rewarder] = {}
-    for config in configs:
-        match config.type:
-            case RewarderEnum.MOCK:
-                rewarder = MockRewarder(logger)
-                rewarders[config.id] = rewarder
-            case RewarderEnum.RPI_GPIO:
-                rewarder = RPIGpioRewarder(config.pin)
-                rewarders[config.id] = rewarder
-            case _:
-                raise ValueError(f"Unknown rewarder type: {config.type}")
+def _build_rewarders(
+    configs: list[RewarderModel],
+    logger=None,
+) -> dict[int, Rewarder]:
 
-    if not rewarders:
+    enabled = [c for c in configs if c.enabled]
+    if not enabled:
         raise ValueError("No rewarders configured")
 
+    rewarders = {c.id: _make_rewarder(c, logger) for c in enabled}
     return rewarders
 
 
-def _build_detectors(configs: list[DetectorModel]) -> dict[int, Detector]:
-    detectors: dict[int, Detector] = {}
-    for config in configs:
-        match config.type:
-            case DetectorEnum.MOCK:
-                detector = MockDetector()
-                detectors[config.id] = detector
-            case DetectorEnum.RFID_CONTINUOUS:
-                rfid_reader = DorsetLID665v42(config.port, config.baudrate)
-                detector = RFIDContinuousDetector(rfid_reader)
-                detectors[config.id] = detector
-            case DetectorEnum.BEAMBREAK_CONTINUOUS:
-                sensor = RPIIRBreakBeamSensor(config.pin)
-                detector = BeambreakContinuousDetector(sensor)
-                detectors[config.id] = detector
-            case DetectorEnum.FUSION_CONTINUOUS:
-                rfid_reader = DorsetLID665v42(config.port, config.baudrate)
-                sensor = RPIIRBreakBeamSensor(config.pin)
-                detector = FusionContinuousDetector(rfid_reader, sensor)
-                detectors[config.id] = detector
-            case _:
-                raise ValueError(f"Unknown detector type: {config.type}")
+def _make_rewarder(config: RewarderModel, logger=None) -> Rewarder:
+    match config.type:
+        case RewarderEnum.MOCK:
+            return MockRewarder(logger)
 
-    if not detectors:
+        case RewarderEnum.RPI_GPIO:
+            return RPIGpioRewarder(config.pin)
+
+        case _:
+            raise ValueError(f"Unknown rewarder type: {config.type}")
+
+
+def _build_detectors(configs: list[DetectorModel]) -> dict[int, Detector]:
+    enabled = [c for c in configs if c.enabled]
+    if not enabled:
         raise ValueError("No detectors configured")
 
+    detectors = {c.id: _make_detector(c) for c in enabled}
     return detectors
+
+
+def _make_detector(config: DetectorModel) -> Detector:
+    match config.type:
+        case DetectorEnum.MOCK:
+            return MockDetector()
+
+        case DetectorEnum.RFID_CONTINUOUS:
+            rfid_reader = DorsetLID665v42(config.port, config.baudrate)
+            return RFIDContinuousDetector(rfid_reader)
+
+        case DetectorEnum.BEAMBREAK_CONTINUOUS:
+            sensor = RPIIRBreakBeamSensor(config.pin)
+            return BeambreakContinuousDetector(sensor)
+
+        case DetectorEnum.FUSION_CONTINUOUS:
+            rfid_reader = DorsetLID665v42(config.port, config.baudrate)
+            sensor = RPIIRBreakBeamSensor(config.pin)
+            return FusionContinuousDetector(rfid_reader, sensor)
+
+        case _:
+            raise ValueError(f"Unknown detector type: {config.type}")
