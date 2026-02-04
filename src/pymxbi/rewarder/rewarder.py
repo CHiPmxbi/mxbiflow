@@ -5,6 +5,12 @@ reward backends should implement (e.g., liquid pumps, solenoids, feeders).
 """
 
 from typing import Protocol
+from enum import StrEnum, auto
+
+class RewarderEnum(StrEnum):
+    MOCK = auto()
+    RPI_GPIO = auto()
+
 
 
 class Rewarder(Protocol):

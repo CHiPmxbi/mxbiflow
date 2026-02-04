@@ -3,7 +3,7 @@ from enum import StrEnum, auto
 from dataclasses import dataclass
 
 
-class DetectorType(StrEnum):
+class DetectorEnum(StrEnum):
     MOCK = auto()
     STANDARD_GATE = auto()
     RFID_CONTINUOUS = auto()
