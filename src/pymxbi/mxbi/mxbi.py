@@ -1,6 +1,7 @@
-from typing import Mapping, Any
-from pymxbi.rewarder.rewarder import Rewarder
+from typing import Any, Mapping
+
 from pymxbi.detector.detector import Detector
+from pymxbi.rewarder.rewarder import Rewarder
 from pymxbi.screen import Screen
 
 
@@ -61,20 +62,3 @@ class MXBI:
 
         for detector in self._detector.values():
             detector.register_animal(animals)
-
-
-_current_mxbi: MXBI | None = None
-
-
-def get_mxbi() -> MXBI:
-    global _current_mxbi
-    if _current_mxbi is None:
-        raise RuntimeError("MXBI not initialized")
-    return _current_mxbi
-
-
-def set_mxbi(mxbi: MXBI) -> None:
-    global _current_mxbi
-    if _current_mxbi is not None:
-        raise RuntimeError("MXBI already initialized")
-    _current_mxbi = mxbi
