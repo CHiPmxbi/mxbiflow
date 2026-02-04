@@ -1,6 +1,8 @@
 from .rewarder import Rewarder, RewarderEnum
 from .mock_rewarder import MockRewarder
 from .rpi_gpio_rewarder import RPIGpioRewarder
+from pydantic import BaseModel, Field
+from typing import Literal, TypeAlias, Annotated, Union
 
 
 rewarders: dict[str, type[Rewarder]] = {
@@ -9,4 +11,43 @@ rewarders: dict[str, type[Rewarder]] = {
 }
 
 
-__all__ = ["Rewarder", "MockRewarder", "RPIGpioRewarder", "RewarderEnum", "rewarders"]
+class MockRewarderModel(BaseModel):
+    type: Literal[RewarderEnum.MOCK] = RewarderEnum.MOCK
+    id: int = Field(default=0, ge=0)
+
+    enabled: bool = False
+
+    @property
+    def device_type(self) -> str:
+        return str(self.type)
+
+
+class GPIORewarderModel(BaseModel):
+    type: Literal[RewarderEnum.RPI_GPIO] = RewarderEnum.RPI_GPIO
+    id: int = Field(default=0, ge=0)
+
+    enabled: bool = False
+
+    pin: int = Field(default=13, ge=0)
+
+    @property
+    def device_type(self) -> str:
+        return str(self.type)
+
+
+RewarderModel: TypeAlias = Annotated[
+    Union[GPIORewarderModel, MockRewarderModel],
+    Field(discriminator="type"),
+]
+
+
+__all__ = [
+    "Rewarder",
+    "MockRewarder",
+    "MockRewarderModel",
+    "RPIGpioRewarder",
+    "GPIORewarderModel",
+    "RewarderEnum",
+    "RewarderModel",
+    "rewarders",
+]
