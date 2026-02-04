@@ -12,32 +12,36 @@ from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
 from ..config import Configure
 from ..models.mxbi import (
     DetectorModel,
-    DetectorTypeEnum,
     MXBIModel,
     RewarderModel,
-    RewarderTypeEnum,
 )
 from ..models.session import Options
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
     MockRewarderCard,
-    GPIOPumpCard,
+    RPIGpioPumpCard,
     MockDetectorCard,
     RFIDDetectorCard,
+    BeambreakDetectorCard,
+    FusionDetectorCard,
 )
 from .components.devices import Devices
+from pymxbi.detector import DetectorEnum
+from pymxbi.rewarder import RewarderEnum
 
 
 class MXBIPanel(QMainWindow):
     accepted = Signal()
 
     _REWARDER_CARD_FACTORIES: dict[str, type[QWidget]] = {
-        RewarderTypeEnum.GPIO_REWARDER: GPIOPumpCard,
-        RewarderTypeEnum.MOCK_REWARDER: MockRewarderCard,
+        RewarderEnum.RPI_GPIO: RPIGpioPumpCard,
+        RewarderEnum.MOCK: MockRewarderCard,
     }
     _DETECTOR_CARD_FACTORIES: dict[str, type[QWidget]] = {
-        DetectorTypeEnum.MOCK_DETECTOR: MockDetectorCard,
-        DetectorTypeEnum.RFID_DETECTOR: RFIDDetectorCard,
+        DetectorEnum.RFID_CONTINUOUS: RFIDDetectorCard,
+        DetectorEnum.BEAMBREAK_CONTINUOUS: BeambreakDetectorCard,
+        DetectorEnum.FUSION_CONTINUOUS: FusionDetectorCard,
+        DetectorEnum.MOCK: MockDetectorCard,
     }
 
     # -----------------------------
@@ -75,10 +79,7 @@ class MXBIPanel(QMainWindow):
             self,
             "Rewarders",
             action_label="Add Rewarder",
-            device_types=[
-                RewarderTypeEnum.GPIO_REWARDER,
-                RewarderTypeEnum.MOCK_REWARDER,
-            ],
+            device_types=list(RewarderEnum),
             dialog_title="Add rewarder",
             label="rewarder type:",
             card_factories=self._REWARDER_CARD_FACTORIES,
@@ -89,10 +90,7 @@ class MXBIPanel(QMainWindow):
             self,
             "Detectors",
             action_label="Add Detector",
-            device_types=[
-                DetectorTypeEnum.MOCK_DETECTOR,
-                DetectorTypeEnum.RFID_DETECTOR,
-            ],
+            device_types=list(DetectorEnum),
             dialog_title="Add detector",
             label="detector type:",
             card_factories=self._DETECTOR_CARD_FACTORIES,
