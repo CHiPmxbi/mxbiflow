@@ -16,63 +16,63 @@
             "extra_response_time": 1000,
             "stimulus_configs": [
                 {
-                    "stimulus_freq_high": 7200,
+                    "stimulus_freq_high": 1060,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 7400,
+                    "stimulus_freq_high": 1240,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 7600,
+                    "stimulus_freq_high": 1420,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 7800,
+                    "stimulus_freq_high": 1600,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 8000,
+                    "stimulus_freq_high": 1780,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 8200,
+                    "stimulus_freq_high": 1960,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 8400,
+                    "stimulus_freq_high": 2000,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 8600,
+                    "stimulus_freq_high": 2140,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 8800,
+                    "stimulus_freq_high": 2320,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 },
                 {
-                    "stimulus_freq_high": 9000,
+                    "stimulus_freq_high": 2500,
                     "stimulus_freq_high_duration": 100,
-                    "stimulus_freq_low": 7000,
+                    "stimulus_freq_low": 880,
                     "stimulus_freq_low_duration": 100
                 }
             ],
