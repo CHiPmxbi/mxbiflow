@@ -1,5 +1,5 @@
-from .device_card import DeviceCard
-from ....models.mxbi import MockDetectorModel
+from ..device_card import DeviceCard
+from .....models.mxbi import MockDetectorModel
 
 
 class MockDetectorCard(DeviceCard[MockDetectorModel]):
