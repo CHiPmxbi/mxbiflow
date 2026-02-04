@@ -1,6 +1,5 @@
 """Mock detector implementation for testing and development."""
 
-from collections.abc import Sequence
 from threading import Lock, Thread
 from time import sleep, time
 
@@ -17,7 +16,6 @@ class MockDetector(ContinuousDetector):
 
     def __init__(
         self,
-        animals: Sequence[str],
         detection_frequency_ms: int = 200,
     ) -> None:
         """Create a mock detector with a list of animal names.
@@ -29,20 +27,20 @@ class MockDetector(ContinuousDetector):
         detection_frequency_ms : int, default=200
             Polling interval in milliseconds for emitting detection results.
         """
-        resolved_animals = list(animals)
-        if not resolved_animals:
-            raise ValueError("MockDetector requires a non-empty animals sequence.")
+        super().__init__()
+        self._animals: list[str] = []
+        self._current_animal: str | None = None
 
-        self.animals = resolved_animals
-        super().__init__({name: name for name in self.animals})
-
-        self.detection_frequency = detection_frequency_ms / 1000.0
+        self._detection_frequency = detection_frequency_ms / 1000.0
 
         self._input_lock = Lock()
-        self._current_animal: str | None = self.animals[0]
 
         self._is_running = False
         self._thread: Thread = Thread(target=self._worker, daemon=True)
+
+    def register_animal(self, animals: dict[str, str]) -> None:
+        super().register_animal(animals)
+        self._animals = list(animals.values())
 
     def _worker(self) -> None:
         while self._is_running:
@@ -56,7 +54,7 @@ class MockDetector(ContinuousDetector):
                     error=False,
                 )
             )
-            sleep(self.detection_frequency)
+            sleep(self._detection_frequency)
 
     def begin(self) -> None:
         """Start emitting detection results in a background thread."""
@@ -84,4 +82,7 @@ class MockDetector(ContinuousDetector):
             self._current_animal = None
 
     def _resolve_animal(self, animal_index: int) -> str:
-        return self.animals[animal_index]
+        try:
+            return self._animals[animal_index]
+        except IndexError:
+            raise ValueError("Invalid animal index") from None

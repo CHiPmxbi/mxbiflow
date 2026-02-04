@@ -33,15 +33,6 @@ class ContinuousDetectorStateMachine:
             case (_, DetectionResult(error=True)):
                 self._handle_error(detection_result)
 
-            # NO_ANIMAL -> ANIMAL_PRESENT
-            case (DetectorState.IDLE, DetectionResult(animal_name=animal_name)) if (
-                animal_name is not None
-            ):
-                if animal_name != self.last_seen_animal:
-                    self._handle_animal_entered(detection_result)
-                else:
-                    self._handle_animal_returned(detection_result)
-
             # NO_ANIMAL -> NO_ANIMAL
             case (DetectorState.IDLE, DetectionResult(animal_name=None)):
                 pass
@@ -49,20 +40,6 @@ class ContinuousDetectorStateMachine:
             # ANIMAL_PRESENT -> NO_ANIMAL
             case (DetectorState.ANIMAL_PRESENT, DetectionResult(animal_name=None)):
                 self._handle_animal_left(detection_result)
-
-            # ANIMAL_PRESENT -> DIFFERENT_ANIMAL
-            case (
-                DetectorState.ANIMAL_PRESENT,
-                DetectionResult(animal_name=animal_name),
-            ) if animal_name is not None and animal_name != self.current_animal:
-                self._handle_animal_changed(detection_result)
-
-            # ANIMAL_PRESENT -> SAME_ANIMAL
-            case (
-                DetectorState.ANIMAL_PRESENT,
-                DetectionResult(animal_name=animal_name),
-            ) if animal_name is not None and animal_name == self.current_animal:
-                self._handle_animal_stayed(detection_result)
 
             # ERROR -> ANY_STATE
             case (DetectorState.FAULT, DetectionResult()):
@@ -93,18 +70,6 @@ class ContinuousDetectorStateMachine:
 
         self.detector._emit_event(DetectorEvent.ANIMAL_ENTERED, detection_result)
 
-    def _handle_animal_returned(self, detection_result: DetectionResult) -> None:
-        """Handle an animal returning after a brief absence."""
-        assert detection_result.animal_name is not None
-        self.current_state = DetectorState.ANIMAL_PRESENT
-
-        self.current_animal = detection_result.animal_name
-        self.last_seen_animal = self.current_animal
-        self.current_detection = detection_result
-        self.last_seen_detection = self.current_detection
-
-        self.detector._emit_event(DetectorEvent.ANIMAL_RETURNED, detection_result)
-
     def _handle_animal_left(self, detection_result: DetectionResult) -> None:
         """Handle the current animal leaving."""
         assert self.current_animal is not None
@@ -118,22 +83,6 @@ class ContinuousDetectorStateMachine:
         self.current_animal = None
         self.current_detection = None
         self.detector._emit_event(DetectorEvent.ANIMAL_LEFT, left_detection)
-
-    def _handle_animal_changed(self, detection_result: DetectionResult) -> None:
-        """Handle a different animal replacing the current one."""
-        assert detection_result.animal_name is not None
-        self.last_seen_animal = self.current_animal
-        self.last_seen_detection = self.current_detection
-        self.current_animal = detection_result.animal_name
-        self.current_detection = detection_result
-
-        self.detector._emit_event(DetectorEvent.ANIMAL_CHANGED, detection_result)
-
-    def _handle_animal_stayed(self, detection_result: DetectionResult) -> None:
-        """Handle the same animal remaining present."""
-        assert detection_result.animal_name is not None
-        self.current_detection = detection_result
-        self.detector._emit_event(DetectorEvent.ANIMAL_REMAINED, detection_result)
 
     def _handle_recovery_from_error(self, detection_result: DetectionResult) -> None:
         """Recover from fault state based on current detection."""
@@ -154,7 +103,7 @@ class ContinuousDetector(ABC):
         Mapping from animal ID to animal name.
     """
 
-    def __init__(self, animal_db: dict[str, str]) -> None:
+    def __init__(self) -> None:
         """Initialize with a mapping from animal ID to animal name."""
         self._callbacks: dict[
             DetectorEvent, list[Callable[[DetectionResult], None]]
@@ -163,7 +112,7 @@ class ContinuousDetector(ABC):
         self._state_lock = Lock()
         self._state_machine = ContinuousDetectorStateMachine(self)
 
-        self._animal_db = animal_db
+        self._animal_db: dict[str, str] = {}
 
     def register_event(
         self, event: DetectorEvent, callback: Callable[[DetectionResult], None]
@@ -180,6 +129,9 @@ class ContinuousDetector(ABC):
         if event not in self._callbacks:
             self._callbacks[event] = []
         self._callbacks[event].append(callback)
+
+    def register_animal(self, animals: dict[str, str]) -> None:
+        self._animal_db.update(animals)
 
     def _emit_event(
         self, event: DetectorEvent, detection_result: DetectionResult

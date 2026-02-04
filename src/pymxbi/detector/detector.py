@@ -49,10 +49,7 @@ class DetectorEvent(StrEnum):
     """
 
     ANIMAL_ENTERED = auto()
-    ANIMAL_RETURNED = auto()
-    ANIMAL_CHANGED = auto()
     ANIMAL_LEFT = auto()
-    ANIMAL_REMAINED = auto()
     FAULT_DETECTED = auto()
 
 
@@ -79,7 +76,7 @@ class Detector(Protocol):
         self, event: DetectorEvent, callback: Callable[[DetectionResult], None]
     ) -> None: ...
 
-    def process_detection(self, detection_result: DetectionResult) -> None: ...
+    def register_animal(self, animals: dict[str, str]) -> None: ...
 
     def begin(self) -> None: ...
 

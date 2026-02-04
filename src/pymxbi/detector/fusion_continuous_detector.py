@@ -26,7 +26,6 @@ class FusionContinuousDetector(ContinuousDetector):
 
     def __init__(
         self,
-        animal_db: dict[str, str],
         rfid_reader: RFIDReader,
         beam_break_sensor: BeamBreakSensor,
         detection_frequency: int,  # milliseconds
@@ -44,7 +43,7 @@ class FusionContinuousDetector(ContinuousDetector):
         detection_frequency : int
             Polling interval in milliseconds.
         """
-        super().__init__(animal_db)
+        super().__init__()
         self.detection_frequency = detection_frequency / 1000.0
 
         self._rfid_reader = rfid_reader

@@ -9,17 +9,20 @@ from .continuous_detector import ContinuousDetector
 class BeambreakContinuousDetector(ContinuousDetector):
     def __init__(
         self,
-        animal_db: dict[str, str],
         beam_break_sensor: BeamBreakSensor,
-        active_animal: str,
     ) -> None:
-        super().__init__(animal_db)
+        super().__init__()
 
         self._beam_break_sensor = beam_break_sensor
-        self._active_animal = active_animal
+        self._active_animal: str | None = None
 
         self._stop_event = Event()
         self._worker_thread: Thread = Thread(target=self._worker)
+
+    def register_animal(self, animals: dict[str, str]) -> None:
+        super().register_animal(animals)
+
+        self._active_animal = next(iter(animals.values()))
 
     def begin(self) -> None:
         if self._worker_thread and self._worker_thread.is_alive():
@@ -38,6 +41,9 @@ class BeambreakContinuousDetector(ContinuousDetector):
                 self._worker_thread.join()
 
     def _worker(self) -> None:
+        if self._active_animal is None:
+            raise ValueError("No animals registered")
+
         active_animal_name: str = self._active_animal
 
         while not self._stop_event.is_set():

@@ -32,18 +32,14 @@ class RFIDContinuousDetector(ContinuousDetector):
 
     def __init__(
         self,
-        animal_db: dict[str, str],
         rfid_reader: RFIDReader,
-        detection_interval: float,
-        poll_interval: float = 0.05,
-        max_tag_age_seconds: float | None = 5.0,
     ) -> None:
-        super().__init__(animal_db)
+        super().__init__()
         self._rfid_reader = rfid_reader
 
-        self.detection_interval = detection_interval
-        self.poll_interval = poll_interval
-        self.max_tag_age_seconds = max_tag_age_seconds
+        self.detection_interval = 1
+        self.poll_interval = 1
+        self.max_tag_age_seconds = 1
 
         self._stop_event = Event()
         self._lock = Lock()

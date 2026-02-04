@@ -202,19 +202,17 @@ class GateStateMachine:
 
 
 class StandardGateDetector:
-    def __init__(self, animal_db: dict[str, str], sensors: GateSensors) -> None:
+    def __init__(self, sensors: GateSensors) -> None:
         self._callbacks: dict[
             DetectorEvent, list[Callable[[DetectionResult], None]]
         ] = {}
 
-        self._animal_db = animal_db
+        self._animal_db: dict[str, str] = {}
         self._sensors = sensors
 
         self._state_machine = GateStateMachine(self)
 
         self._running = False
-
-    def process_detection(self, detection_result: DetectionResult) -> None: ...
 
     def register_event(
         self, event: DetectorEvent, callback: Callable[[DetectionResult], None]
@@ -222,6 +220,9 @@ class StandardGateDetector:
         if event not in self._callbacks:
             self._callbacks[event] = []
         self._callbacks[event].append(callback)
+
+    def register_animal(self, animals: dict[str, str]) -> None:
+        self._animal_db.update(animals)
 
     def begin(self) -> None:
         self._running = True
