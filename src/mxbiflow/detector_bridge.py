@@ -29,13 +29,6 @@ class DetectorBridge:
         self._detector.begin()
         self._detector.register_event(DetectorEvent.ANIMAL_ENTERED, self._emit_entered)
         self._detector.register_event(DetectorEvent.ANIMAL_LEFT, self._emit_left)
-        self._detector.register_event(DetectorEvent.ANIMAL_CHANGED, self._emit_changed)
-        self._detector.register_event(
-            DetectorEvent.ANIMAL_REMAINED, self._emit_remained
-        )
-        self._detector.register_event(
-            DetectorEvent.ANIMAL_RETURNED, self._emit_returned
-        )
         self._detector.register_event(DetectorEvent.FAULT_DETECTED, self._emit_fault)
 
     def _emit(self, kind: DetectorEvent, animal: str | None) -> None:
@@ -50,24 +43,6 @@ class DetectorBridge:
     def _emit_left(self, detection_result: DetectionResult) -> None:
         self._emit(
             DetectorEvent.ANIMAL_LEFT,
-            detection_result.animal_id or detection_result.animal_name,
-        )
-
-    def _emit_changed(self, detection_result: DetectionResult) -> None:
-        self._emit(
-            DetectorEvent.ANIMAL_CHANGED,
-            detection_result.animal_id or detection_result.animal_name,
-        )
-
-    def _emit_remained(self, detection_result: DetectionResult) -> None:
-        self._emit(
-            DetectorEvent.ANIMAL_REMAINED,
-            detection_result.animal_id or detection_result.animal_name,
-        )
-
-    def _emit_returned(self, detection_result: DetectionResult) -> None:
-        self._emit(
-            DetectorEvent.ANIMAL_RETURNED,
             detection_result.animal_id or detection_result.animal_name,
         )
 

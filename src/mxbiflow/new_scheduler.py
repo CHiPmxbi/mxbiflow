@@ -32,7 +32,7 @@ class Scheduler:
     def _remove_active_animal(self) -> None:
         if self._session.active_animal is None:
             return
-        
+
         self._session.remove_active_animal()
         self._need_refresh = True
 
@@ -56,18 +56,11 @@ class Scheduler:
             case DetectorEvent.FAULT_DETECTED:
                 self._set_error_stage()
 
-            case (
-                DetectorEvent.ANIMAL_ENTERED
-                | DetectorEvent.ANIMAL_CHANGED
-                | DetectorEvent.ANIMAL_RETURNED
-            ):
+            case DetectorEvent.ANIMAL_ENTERED:
                 if msg.animal is None:
                     return
                 self._set_active_animal(msg.animal)
                 self._add_animal_session()
-
-            case DetectorEvent.ANIMAL_REMAINED:
-                ...
 
             case _:
                 ...
@@ -102,6 +95,6 @@ class Scheduler:
             animal.set_stage(IDLE.__name__.lower())
             self._scene_manager.switch(self._scenes[IDLE.__name__.lower()])
             return
-        
+
         stage = animal.stage.name
         self._scene_manager.switch(self._scenes[stage])
