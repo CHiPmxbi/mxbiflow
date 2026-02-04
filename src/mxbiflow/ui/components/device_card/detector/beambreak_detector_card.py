@@ -18,13 +18,13 @@ class BeambreakDetectorCard(DeviceCard[FusionContinuousDetectorModel]):
 
     def load_config(self, model: FusionContinuousDetectorModel) -> None:
         self.checkbox_enabled.setChecked(model.enabled)
-        self.line_device_id.setText(str(model.detector_id))
+        self.line_device_id.setText(str(model.id))
         self._line_pin.setText(str(model.pin))
 
     @property
     def result(self) -> FusionContinuousDetectorModel:
         return FusionContinuousDetectorModel(
             enabled=self.checkbox_enabled.isChecked(),
-            detector_id=int(self.line_device_id.text()),
+            id=int(self.line_device_id.text()),
             pin=int(self._line_pin.text()),
         )

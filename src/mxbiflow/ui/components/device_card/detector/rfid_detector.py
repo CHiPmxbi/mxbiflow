@@ -26,7 +26,7 @@ class RFIDDetectorCard(DeviceCard[RFIDContinuousDetectorModel]):
 
     def load_config(self, model: RFIDContinuousDetectorModel) -> None:
         self.checkbox_enabled.setChecked(model.enabled)
-        self.line_device_id.setText(str(model.detector_id))
+        self.line_device_id.setText(str(model.id))
         self.combo_port.setCurrentText(model.port)
         self.combo_baudrate.setCurrentText(str(model.baudrate))
 
@@ -34,7 +34,7 @@ class RFIDDetectorCard(DeviceCard[RFIDContinuousDetectorModel]):
     def result(self) -> RFIDContinuousDetectorModel:
         return RFIDContinuousDetectorModel(
             enabled=self.checkbox_enabled.isChecked(),
-            detector_id=int(self.line_device_id.text()),
+            id=int(self.line_device_id.text()),
             port=self.combo_port.currentText(),
             baudrate=int(self.combo_baudrate.currentText()),
         )

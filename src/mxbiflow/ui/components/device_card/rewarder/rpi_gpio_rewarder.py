@@ -21,13 +21,13 @@ class RPIGpioPumpCard(DeviceCard[GPIORewarderModel]):
 
     def load_config(self, model: GPIORewarderModel) -> None:
         self.checkbox_enabled.setChecked(model.enabled)
-        self.line_device_id.setText(str(model.rewarder_id))
+        self.line_device_id.setText(str(model.id))
         self.line_gpio_pin.setText(str(model.pin))
 
     @property
     def result(self) -> GPIORewarderModel:
         return GPIORewarderModel(
             enabled=self.checkbox_enabled.isChecked(),
-            rewarder_id=int(self.line_device_id.text()),
+            id=int(self.line_device_id.text()),
             pin=int(self.line_gpio_pin.text()),
         )

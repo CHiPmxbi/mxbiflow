@@ -10,11 +10,11 @@ class MockRewarderCard(DeviceCard[MockRewarderModel]):
 
     def load_config(self, model: MockRewarderModel) -> None:
         self.checkbox_enabled.setChecked(model.enabled)
-        self.line_device_id.setText(str(model.rewarder_id))
+        self.line_device_id.setText(str(model.id))
 
     @property
     def result(self) -> MockRewarderModel:
         return MockRewarderModel(
             enabled=self.checkbox_enabled.isChecked(),
-            rewarder_id=int(self.line_device_id.text()),
+            id=int(self.line_device_id.text()),
         )

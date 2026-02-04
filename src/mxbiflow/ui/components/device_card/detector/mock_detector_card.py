@@ -9,11 +9,11 @@ class MockDetectorCard(DeviceCard[MockDetectorModel]):
 
     def load_config(self, model: MockDetectorModel) -> None:
         self.checkbox_enabled.setChecked(model.enabled)
-        self.line_device_id.setText(str(model.detector_id))
+        self.line_device_id.setText(str(model.id))
 
     @property
     def result(self) -> MockDetectorModel:
         return MockDetectorModel(
             enabled=self.checkbox_enabled.isChecked(),
-            detector_id=int(self.line_device_id.text()),
+            id=int(self.line_device_id.text()),
         )

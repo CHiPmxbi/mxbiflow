@@ -1,71 +1,55 @@
-from __future__ import annotations
-
-from enum import StrEnum, auto
-from typing import Annotated, Union, TypeAlias, Literal
+from typing import Annotated, Literal, TypeAlias, Union
 
 from pydantic import BaseModel, Field
-from pymxbi.detector import DetectorType
-
-
-class RewarderTypeEnum(StrEnum):
-    MOCK_REWARDER = auto()
-    GPIO_REWARDER = auto()
-
-
-class MXBIPlatformEnum(StrEnum):
-    RASPBIAN = auto()
-    UBUNTU = auto()
-    WINDOWS = auto()
-    MACOS = auto()
+from pymxbi.detector import DetectorEnum
+from pymxbi.platform import PlatformEnum
+from pymxbi.rewarder import RewarderEnum
 
 
 class MockRewarderModel(BaseModel):
-    rewarder_type: Literal[RewarderTypeEnum.MOCK_REWARDER] = (
-        RewarderTypeEnum.MOCK_REWARDER
-    )
-    rewarder_id: int = Field(default=0, ge=0)
+    type: Literal[RewarderEnum.MOCK] = RewarderEnum.MOCK
+    id: int = Field(default=0, ge=0)
 
     enabled: bool = False
 
     @property
     def device_type(self) -> str:
-        return str(self.rewarder_type)
+        return str(self.type)
 
 
 class GPIORewarderModel(BaseModel):
-    rewarder_type: Literal[RewarderTypeEnum.GPIO_REWARDER] = (
-        RewarderTypeEnum.GPIO_REWARDER
-    )
-    rewarder_id: int = Field(default=0, ge=0)
-    pin: int = Field(default=13, ge=0)
+    type: Literal[RewarderEnum.RPI_GPIO] = RewarderEnum.RPI_GPIO
+    id: int = Field(default=0, ge=0)
 
     enabled: bool = False
 
+    pin: int = Field(default=13, ge=0)
+
     @property
     def device_type(self) -> str:
-        return str(self.rewarder_type)
+        return str(self.type)
 
 
 RewarderModel: TypeAlias = Annotated[
     Union[GPIORewarderModel, MockRewarderModel],
-    Field(discriminator="rewarder_type"),
+    Field(discriminator="type"),
 ]
 
 
 class MockDetectorModel(BaseModel):
-    detector_type: Literal[DetectorType.MOCK] = DetectorType.MOCK
-    detector_id: int = Field(default=0, ge=0)
+    type: Literal[DetectorEnum.MOCK] = DetectorEnum.MOCK
+    id: int = Field(default=0, ge=0)
 
     enabled: bool = False
 
     @property
     def device_type(self) -> str:
-        return str(self.detector_type)
+        return str(self.type)
 
 
 class RFIDContinuousDetectorModel(BaseModel):
-    detector_type: Literal[DetectorType.RFID_CONTINUOUS] = DetectorType.RFID_CONTINUOUS
-    detector_id: int = Field(default=0, ge=0)
+    type: Literal[DetectorEnum.RFID_CONTINUOUS] = DetectorEnum.RFID_CONTINUOUS
+    id: int = Field(default=0, ge=0)
 
     enabled: bool = False
 
@@ -74,14 +58,12 @@ class RFIDContinuousDetectorModel(BaseModel):
 
     @property
     def device_type(self) -> str:
-        return str(self.detector_type)
+        return str(self.type)
 
 
 class BeamBreakContinuousDetectorModel(BaseModel):
-    detector_type: Literal[DetectorType.BEAMBREAK_CONTINUOUS] = (
-        DetectorType.BEAMBREAK_CONTINUOUS
-    )
-    detector_id: int = Field(default=0, ge=0)
+    type: Literal[DetectorEnum.BEAMBREAK_CONTINUOUS] = DetectorEnum.BEAMBREAK_CONTINUOUS
+    id: int = Field(default=0, ge=0)
 
     enabled: bool = False
 
@@ -89,14 +71,12 @@ class BeamBreakContinuousDetectorModel(BaseModel):
 
     @property
     def device_type(self) -> str:
-        return str(self.detector_type)
+        return str(self.type)
 
 
 class FusionContinuousDetectorModel(BaseModel):
-    detector_type: Literal[DetectorType.FUSION_CONTINUOUS] = (
-        DetectorType.FUSION_CONTINUOUS
-    )
-    detector_id: int = Field(default=0, ge=0)
+    type: Literal[DetectorEnum.FUSION_CONTINUOUS] = DetectorEnum.FUSION_CONTINUOUS
+    id: int = Field(default=0, ge=0)
 
     enabled: bool = False
 
@@ -106,7 +86,7 @@ class FusionContinuousDetectorModel(BaseModel):
 
     @property
     def device_type(self) -> str:
-        return str(self.detector_type)
+        return str(self.type)
 
 
 DetectorModel: TypeAlias = Annotated[
@@ -116,13 +96,13 @@ DetectorModel: TypeAlias = Annotated[
         BeamBreakContinuousDetectorModel,
         FusionContinuousDetectorModel,
     ],
-    Field(discriminator="detector_type"),
+    Field(discriminator="type"),
 ]
 
 
 class MXBIModel(BaseModel):
     mxbi_id: int = Field(default=0, ge=0)
-    platform: MXBIPlatformEnum = Field(default=MXBIPlatformEnum.RASPBIAN)
+    platform: PlatformEnum = Field(default=PlatformEnum.RASPBIAN)
     screen_size: tuple[int, int] = Field(default=(1920, 1080))
     rewarders: list[RewarderModel] = Field(default_factory=list)
     detectors: list[DetectorModel] = Field(default_factory=list)
