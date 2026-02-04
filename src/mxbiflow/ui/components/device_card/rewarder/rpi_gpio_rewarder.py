@@ -4,11 +4,11 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtGui import QIntValidator
-from .device_card import DeviceCard
-from ....models.mxbi import GPIORewarderModel
+from ..device_card import DeviceCard
+from .....models.mxbi import GPIORewarderModel
 
 
-class GPIOPumpCard(DeviceCard[GPIORewarderModel]):
+class RPIGpioPumpCard(DeviceCard[GPIORewarderModel]):
     def __init__(self):
         super().__init__()
         self.set_title("GPIO Pump")

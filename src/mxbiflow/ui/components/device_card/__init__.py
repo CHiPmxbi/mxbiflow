@@ -1,6 +1,6 @@
 from .device_card import DeviceCard
-from .mock_rewarder_card import MockRewarderCard
-from .gpio_pump_card import RPIGpioPumpCard
+from .rewarder.mock_rewarder_card import MockRewarderCard
+from .rewarder.rpi_gpio_rewarder import RPIGpioPumpCard
 
 from .detector.mock_detector_card import MockDetectorCard
 from .detector.rfid_detector import RFIDDetectorCard

@@ -1,6 +1,6 @@
-from .device_card import DeviceCard
+from ..device_card import DeviceCard
 
-from ....models.mxbi import MockRewarderModel
+from .....models.mxbi import MockRewarderModel
 
 
 class MockRewarderCard(DeviceCard[MockRewarderModel]):
