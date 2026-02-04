@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..device_card import DeviceCard
-from .....models.mxbi import RFIDContinuousDetectorModel
+from pymxbi.detector import RFIDContinuousDetectorModel
 from .....utils.serial import get_baudrates, get_all_ports
 
 

@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QLabel, QLineEdit
 
 
-from .....models.mxbi import FusionContinuousDetectorModel
+from pymxbi.detector import FusionContinuousDetectorModel
 from ..device_card import DeviceCard
 
 

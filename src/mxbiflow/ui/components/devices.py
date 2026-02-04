@@ -16,7 +16,8 @@ from PySide6.QtWidgets import (
 from .device_card.device_card import DeviceCard
 
 from .dialog.add_devices_dialog import AddDeviceDialog
-from ...models.mxbi import RewarderModel, DetectorModel
+from pymxbi.rewarder import RewarderModel
+from pymxbi.detector import DetectorModel
 
 T = TypeVar("T", RewarderModel, DetectorModel)
 

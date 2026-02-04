@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtGui import QIntValidator
 from ..device_card import DeviceCard
-from .....models.mxbi import GPIORewarderModel
+from pymxbi.rewarder import GPIORewarderModel
 
 
 class RPIGpioPumpCard(DeviceCard[GPIORewarderModel]):

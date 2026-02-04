@@ -10,11 +10,6 @@ from PySide6.QtWidgets import (
 
 from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
 from ..config import Configure
-from ..models.mxbi import (
-    DetectorModel,
-    MXBIModel,
-    RewarderModel,
-)
 from ..models.session import Options
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
@@ -26,8 +21,9 @@ from .components.device_card import (
     FusionDetectorCard,
 )
 from .components.devices import Devices
-from pymxbi.detector import DetectorEnum
-from pymxbi.rewarder import RewarderEnum
+from pymxbi.detector import DetectorEnum, DetectorModel
+from pymxbi.rewarder import RewarderEnum, RewarderModel
+from pymxbi import MXBIModel
 
 
 class MXBIPanel(QMainWindow):
