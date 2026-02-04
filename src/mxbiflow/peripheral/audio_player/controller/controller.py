@@ -1,9 +1,0 @@
-from typing import Protocol
-
-
-class Controller(Protocol):
-    def set_master_volume(self, volume: int) -> None: ...
-
-    def set_digital_volume(self, volume: int) -> None: ...
-
-    def get_amp_value(self, freqency: int, amplitude: float) -> tuple[int, int]: ...
