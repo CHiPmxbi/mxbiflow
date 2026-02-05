@@ -256,10 +256,19 @@ class GNGSiDDiscriminateScene:
         )
         self._trigger_canvas.place(x=x_center, y=y_center, anchor="center")
 
-    def _create_wrong_view(self) -> None:
+    def _create_timeout_view(self) -> None:
         self._trigger_canvas = Canvas(
             self._background,
             bg="grey",
+            width=self._screen_type.width,
+            height=self._screen_type.height,
+        )
+        self._trigger_canvas.place(relx=0.5, rely=0.5, anchor=CENTER)
+
+    def _create_wrong_view(self) -> None:
+        self._trigger_canvas = Canvas(
+            self._background,
+            bg="#2B2B2B",
             width=self._screen_type.width,
             height=self._screen_type.height,
         )
@@ -421,7 +430,7 @@ class GNGSiDDiscriminateScene:
         self._data.correct_rate = self._animal_state.correct_trial / (
             self._animal_state.current_level_trial_id + 1
         )
-        self._create_wrong_view()
+        self._create_timeout_view()
         self._on_inter_trial()
 
     # endregion
