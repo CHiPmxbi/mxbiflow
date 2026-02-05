@@ -21,11 +21,11 @@ class Habituarion:
 
         self._configs = load_configs()
 
-        self._animal = self._mxbiflow.session.active_animal
+        self._animal = self._mxbiflow.session.current_animal
         if self._animal is None:
             raise ValueError("No active animal")
 
-        self._config = self._configs.root["default"][self._animal.stage.level]
+        self._config = self._configs.root["default"][self._animal.current_stage.level]
         self._config.stimulus_interval = randint(
             self._config.min_stimulus_interval, self._config.max_stimulus_interval
         )
