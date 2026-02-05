@@ -1,3 +1,4 @@
+*.jsonl
 data/
 samba_mount/
 services/mount.service
