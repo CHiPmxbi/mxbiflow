@@ -1,10 +1,6 @@
-from datetime import datetime, timezone
+from time import time
 
 from pydantic import BaseModel, Field, PrivateAttr
-
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class AnimalConfig(BaseModel):
@@ -23,19 +19,24 @@ class AnimalBaseInfo(BaseModel):
     animal_session_trial_id: int
 
 
-class TrainState(BaseModel):
-    name: str
+class StageState(BaseModel):
+    stage_name: str
     stage_trial_id: int = Field(default=0, ge=0)
 
     level: int = Field(default=0, ge=0)
-    total_levels: int = Field(default=10, ge=0)
     level_trial_id: int = Field(default=0, ge=0)
+
+    def level_up(self):
+        self.level += 1
+
+    def level_down(self):
+        self.level -= 1
 
 
 class AnimalSessionState(BaseModel):
     session_id: int = Field(ge=0)
-    start_at: datetime = Field(default_factory=utcnow)
-    end_at: datetime | None = None
+    start_at: float = Field(default_factory=lambda: time())
+    end_at: float | None = None
     trial_id: int = Field(default=0, ge=0)
 
 
@@ -45,63 +46,76 @@ class Animal(BaseModel):
 
     trial_id: int = Field(default=0, ge=0)
 
-    _stage: str = PrivateAttr(default="idle")
-    _stages: dict[str, TrainState] = PrivateAttr(default_factory=dict)
-    _animal_session: int | None = PrivateAttr(default=None)
-    _sessions: dict[int, AnimalSessionState] = PrivateAttr(default_factory=dict)
+    _current_stage: str = PrivateAttr(default="idle")
+    _stages: dict[str, StageState] = PrivateAttr(default_factory=dict)
+    _current_animal_session: AnimalSessionState | None = PrivateAttr(default=None)
+    _sessions: list[AnimalSessionState] = PrivateAttr(default_factory=list)
 
     @property
-    def animal_session(self) -> AnimalSessionState | None:
-        sid = self._animal_session
-        if sid is None:
-            return None
+    def current_animal_session(self) -> AnimalSessionState | None:
+        return self._current_animal_session
 
-        session = self._sessions.get(sid)
-        if session is None:
-            self._animal_session = None
+    def start_animal_session(self):
+        session_id = 1
 
-        return session
+        if self._current_animal_session is not None:
+            raise ValueError("Animal session is already started")
 
-    def add_animal_session(self):
-        if self._animal_session is None:
-            animal_session = AnimalSessionState(session_id=1)
-            self._animal_session = animal_session.session_id
-            self._sessions[animal_session.session_id] = animal_session
-        else:
-            self._animal_session += 1
-            animal_session = AnimalSessionState(session_id=self._animal_session)
-            self._sessions[animal_session.session_id] = animal_session
+        if self._sessions:
+            session_id = len(self._sessions) + 1
+
+        session = AnimalSessionState(session_id=session_id)
+        self._current_animal_session = session
+        self._sessions.append(session)
+
+    def end_animal_session(self):
+        if self._current_animal_session is None:
+            raise ValueError("Animal session is not started")
+
+        self._current_animal_session.end_at = time()
+        self._current_animal_session = None
 
     @property
-    def stage(self) -> TrainState:
-        key = self._stage
+    def current_stage(self) -> StageState:
+        key = self._current_stage
 
-        train = self._stages.get(key)
-        if train is None:
+        state = self._stages.get(key)
+        if state is None:
             raise ValueError(f"Unknown stage: {key}")
 
-        return train
+        return state
+
+    def set_current_stage(self, stage: StageState | str) -> None:
+        if isinstance(stage, str):
+            stage = StageState(stage_name=stage)
+
+        self._current_stage = stage.stage_name
+        if stage.stage_name in self._stages:
+            return
+
+        self._stages[stage.stage_name] = stage
+
+    def clear_current_stage(self) -> None:
+        self._current_stage = "idle"
+
+    def level_up(self) -> int:
+        self.current_stage.level_up()
+        return self.current_stage.level
+
+    def level_down(self) -> int:
+        self.current_stage.level_down()
+        return self.current_stage.level
 
     @property
     def base_info(self) -> AnimalBaseInfo:
-        if self.animal_session is None:
+        if self.current_animal_session is None:
             raise ValueError("Animal session is not started")
 
         return AnimalBaseInfo(
             animal=self.name,
             trial_id=self.trial_id,
-            level=self.stage.level,
-            level_trial_id=self.stage.level_trial_id,
-            animal_session_id=self.animal_session.session_id,
-            animal_session_trial_id=self.animal_session.trial_id,
+            level=self.current_stage.level,
+            level_trial_id=self.current_stage.level_trial_id,
+            animal_session_id=self.current_animal_session.session_id,
+            animal_session_trial_id=self.current_animal_session.trial_id,
         )
-
-    def set_stage(self, stage: TrainState | str):
-        if isinstance(stage, str):
-            stage = TrainState(name=stage)
-
-        self._stage = stage.name
-        if stage.name in self._stages:
-            return
-
-        self._stages[stage.name] = stage
