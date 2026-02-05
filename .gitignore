@@ -1,4 +1,6 @@
 *.jsonl
+session_counter.json
+stage.json
 data/
 samba_mount/
 services/mount.service
