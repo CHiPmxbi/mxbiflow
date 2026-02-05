@@ -33,7 +33,7 @@ class MXBIModel(BaseModel):
 def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
     return MXBI(
         config.screen_size,
-        _build_rewarders(config.rewarders),
+        _build_rewarders(config.rewarders, logger),
         _build_detectors(config.detectors),
     )
 

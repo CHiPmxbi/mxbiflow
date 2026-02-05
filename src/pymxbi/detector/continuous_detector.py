@@ -37,6 +37,21 @@ class ContinuousDetectorStateMachine:
             case (DetectorState.IDLE, DetectionResult(animal_name=None)):
                 pass
 
+            case (DetectorState.IDLE, DetectionResult(animal_name=animal_name)):
+                if animal_name is not None:
+                    self._handle_animal_entered(
+                        DetectionResult(animal_name=animal_name)
+                    )
+
+            case (
+                DetectorState.ANIMAL_PRESENT,
+                DetectionResult(animal_name=animal_name),
+            ):
+                if animal_name is None:
+                    self._handle_animal_left(detection_result)
+                elif animal_name != self.current_animal:
+                    self._handle_animal_entered(detection_result)
+
             # ANIMAL_PRESENT -> NO_ANIMAL
             case (DetectorState.ANIMAL_PRESENT, DetectionResult(animal_name=None)):
                 self._handle_animal_left(detection_result)
