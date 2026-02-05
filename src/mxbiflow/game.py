@@ -5,7 +5,7 @@ from .models.session import Session
 
 from .scene import SceneManager
 from .detector_bridge import DetectorBridge
-from .new_scheduler import Scheduler
+from .scheduler import Scheduler
 from pymxbi import MXBI
 from .mxbiflow import set_mxbiflow, MXBIFlow
 
