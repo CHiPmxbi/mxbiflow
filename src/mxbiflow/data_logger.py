@@ -4,13 +4,9 @@ import sys
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from mxbi.path import DATA_DIR_PATH
-from mxbi.utils.logger import logger
+from .utils.logger import logger
 
-if TYPE_CHECKING:
-    from mxbi.models.session import SessionState
 
 now = datetime.now()
 
@@ -18,20 +14,22 @@ now = datetime.now()
 class DataLoggerType(StrEnum):
     JSONL = "jsonl"
     JSON = "json"
+    CSV = "csv"
 
 
 class DataLogger:
     def __init__(
         self,
-        session_config: "SessionState",
+        path: Path,
+        session_id: int,
         monkey: str,
         filename: str,
         type: DataLoggerType = DataLoggerType.JSONL,
     ) -> None:
-        self.__session_state = session_config
+        self._path = path
+        self._session_id = session_id
         self._monkey = monkey
         self._filename = filename
-        self._session_id = self.__session_state.session_id
         self._type = type
 
         self._data_dir = self._ensure_data_dir()
@@ -41,38 +39,18 @@ class DataLogger:
     def path(self) -> Path:
         return self._data_path
 
-    @staticmethod
-    def init_session_id() -> int:
-        now = datetime.now()
-        date_path = Path(f"{now.year}{now.month:02d}{now.day:02d}")
-        base_path = DATA_DIR_PATH / date_path
-
-        if not base_path.exists():
-            return 0
-
-        latest_session_id = max(
-            (
-                int(child.name)
-                for child in base_path.iterdir()
-                if child.is_dir() and child.name.isdigit()
-            ),
-            default=-1,
-        )
-
-        return latest_session_id + 1
-
     def _ensure_data_dir(self) -> Path:
         date_path = Path(f"{now.year}{now.month:02d}{now.day:02d}")
         session_path = Path(f"{self._session_id}")
         monkey_path = Path(f"{self._monkey}")
 
-        base_dir = DATA_DIR_PATH / date_path / session_path / monkey_path
+        base_dir = self._path / date_path / session_path / monkey_path
 
         try:
             base_dir.mkdir(parents=True, exist_ok=True)
             return base_dir
         except Exception as e:
-            logger.error(f"Failed to create data directory: {e}")
+            logger.error(f"failed to create {base_dir}: {e}")
             sys.exit(1)
 
     def _get_path(self, suffix: str) -> Path:
@@ -84,9 +62,8 @@ class DataLogger:
                 self._save_jsonl(data)
             case DataLoggerType.JSON:
                 self._save_json(data)
-
-    def save_jsonl(self, data: dict) -> None:
-        self._save_jsonl(data)
+            case DataLoggerType.CSV:
+                self.save_csv_row(data)
 
     def _save_jsonl(self, data: dict) -> None:
         try:
@@ -136,23 +113,3 @@ class DataLogger:
         except Exception as e:
             logger.error(f"Failed to write CSV row to {csv_path}: {e}")
             raise
-
-
-if __name__ == "__main__":
-    data = {"key": "value"}
-    from datetime import datetime
-
-    from mxbi.config import session_config
-    from mxbi.models.session import SessionState
-
-    state = SessionState(
-        session_id=0,
-        session_config=session_config.value,
-        start_time=datetime.now().timestamp(),
-        end_time=datetime.now().timestamp(),
-    )
-
-    recorder = DataLogger(state, "mock", "mock")
-
-    for i in range(10):
-        recorder.save_jsonl(data)
