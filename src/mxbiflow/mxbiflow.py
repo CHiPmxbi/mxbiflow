@@ -1,5 +1,5 @@
 from .models.session import Session
-from .timer.frame_timer import FrameTimer
+from .timer import FrameTimer
 from pymxbi import MXBI
 
 
