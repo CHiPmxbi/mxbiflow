@@ -56,31 +56,36 @@ def build_mxbi() -> MXBI:
 
 def init_session() -> Session:
     from .config import Configure
-    from .models.animal import Animal, TrainState
-    from .models.session import Session, SessionConfig
-    from .path import SESSION_CONFIG_PATH
+    from .models.animal import Animal, StageState
+    from .models.session import Session, SessionConfig, DailySessionIdStore
+    from .path import SESSION_CONFIG_PATH, SESSION_COUNTER_PATH
 
     session_config = Configure(SESSION_CONFIG_PATH, SessionConfig).value
+    store = DailySessionIdStore(SESSION_COUNTER_PATH)
 
     animal_dict: dict[str, Animal] = {}
     for animal_config in session_config.animals:
-        train_state = TrainState(name=animal_config.stage, level=animal_config.level)
+        train_state = StageState(
+            stage_name=animal_config.stage, level=animal_config.level
+        )
         animal_state = Animal(
             rfid_id=animal_config.rfid_id,
             name=animal_config.name,
         )
-        animal_state.set_stage(train_state)
+        animal_state.set_current_stage(train_state)
         animal_dict[animal_config.name] = animal_state
 
     session = Session(
+        session_id=store.session_id,
         experimenter=session_config.experimenter,
         reward_type=session_config.reward_type,
         send_email=False,
         sync_data=False,
-        note="",
+        note=session_config.note,
         animals=animal_dict,
     )
     session.start()
+    print(session.session_id)
 
     return session
 
