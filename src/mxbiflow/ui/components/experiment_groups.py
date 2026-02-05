@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
 )
-from PySide6.QtGui import QIntValidator
 from PySide6.QtCore import Qt
 
 from .animal import AnimalCard
@@ -23,11 +22,6 @@ class ExperimentConfigGroup(QGroupBox):
 
         layout = QFormLayout(self)
         self.setLayout(layout)
-
-        lable_session_id = QLabel("session id", self)
-        self.line_session_id = QLineEdit(self)
-        self.line_session_id.setValidator(QIntValidator(self))
-        layout.addRow(lable_session_id, self.line_session_id)
 
         lable_experimenter = QLabel("experimenter", self)
         self.combo_experimenter = QComboBox(self)
@@ -52,6 +46,7 @@ class ExperimentConfigGroup(QGroupBox):
         return SessionConfig(
             experimenter=self.combo_experimenter.currentText(),
             reward_type=RewardEnum(self.combo_reward_type.currentText()),
+            note=self.line_notes.text(),
         )
 
 

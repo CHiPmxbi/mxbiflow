@@ -40,7 +40,6 @@ class ExperimentPanel(QMainWindow):
         )
         layout_main.addWidget(self.group_animals)
 
-        self.line_session_id = self.group_config.line_session_id
         self.combo_experimenter = self.group_config.combo_experimenter
         self.combo_reward_type = self.group_config.combo_reward_type
         self.line_notes = self.group_config.line_notes
