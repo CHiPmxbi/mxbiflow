@@ -20,7 +20,7 @@ class SizeReductionStage:
 
         self._screen_size = self._mxbi.screen_size
 
-        pos = Vector2(self._screen_size[0] // 2, self._screen_size[1] // 2)
+        pos = Vector2(self._screen_size.width // 2, self._screen_size.height // 2)
         size = Vector2(100, 100)
 
         rect_color = Color(255, 0, 0)
