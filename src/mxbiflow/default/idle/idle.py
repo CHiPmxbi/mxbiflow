@@ -53,5 +53,3 @@ class IDLE:
 
     def draw(self, screen: Surface) -> None:
         screen.blit(self._asset.image, self._asset.rect)
-
-    def decide(self) -> type[SceneProtocol]: ...
