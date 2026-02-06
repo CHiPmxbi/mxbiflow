@@ -27,9 +27,11 @@ class StageState(BaseModel):
     level_trial_id: int = Field(default=0, ge=0)
 
     def level_up(self):
+        self.level_trial_id = 0
         self.level += 1
 
     def level_down(self):
+        self.level_trial_id = 0
         self.level -= 1
 
 
@@ -50,6 +52,13 @@ class Animal(BaseModel):
     _stages: dict[str, StageState] = PrivateAttr(default_factory=dict)
     _current_animal_session: AnimalSessionState | None = PrivateAttr(default=None)
     _sessions: list[AnimalSessionState] = PrivateAttr(default_factory=list)
+
+    def add_trial(self) -> None:
+        self.trial_id += 1
+        self.current_stage.stage_trial_id += 1
+        self.current_stage.level_trial_id += 1
+        assert self.current_animal_session is not None
+        self.current_animal_session.trial_id += 1
 
     @property
     def current_animal_session(self) -> AnimalSessionState | None:
