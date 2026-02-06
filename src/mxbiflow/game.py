@@ -23,6 +23,7 @@ class Game:
         self._scene_manager = scene_manager
         self._session = session
         self._mxbi = mxbi
+        self._aplayer = self._mxbi.aplayer
 
         self._detector_binder = detector_bridge
         self._detector_binder.start()
@@ -51,7 +52,9 @@ class Game:
                 self._detector_binder.handle_event(event)
 
             self._scene_manager.update(dt)
+            self._aplayer.update()
             self._scheduler.update()
+            self._mxbiflow.update()
 
             self._screen.fill((0, 0, 0))
 
@@ -77,4 +80,6 @@ class Game:
                 self._running = False
 
     def quit(self) -> None:
+        if self._scene_manager.current is not None:
+            self._scene_manager.current.quit()
         pygame.quit()
