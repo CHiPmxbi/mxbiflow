@@ -39,12 +39,12 @@ def build_mxbi() -> MXBI:
     from loguru import logger
     from pymxbi import MXBIModel, build_mxbi
 
-    from .config import Configure
+    from .config_store import ConfigStore
     from .models.session import SessionConfig
     from .path import MXBI_CONFIG_PATH, SESSION_CONFIG_PATH
 
-    mxbi_config = Configure(MXBI_CONFIG_PATH, MXBIModel).value
-    session_config = Configure(SESSION_CONFIG_PATH, SessionConfig).value
+    mxbi_config = ConfigStore(MXBI_CONFIG_PATH, MXBIModel).value
+    session_config = ConfigStore(SESSION_CONFIG_PATH, SessionConfig).value
 
     mxbi = build_mxbi(mxbi_config, logger)
     mxbi.register_animal(
@@ -55,12 +55,12 @@ def build_mxbi() -> MXBI:
 
 
 def init_session() -> Session:
-    from .config import Configure
+    from .config_store import ConfigStore
     from .models.animal import Animal, StageState
     from .models.session import Session, SessionConfig, DailySessionIdStore
     from .path import SESSION_CONFIG_PATH, SESSION_COUNTER_PATH
 
-    session_config = Configure(SESSION_CONFIG_PATH, SessionConfig).value
+    session_config = ConfigStore(SESSION_CONFIG_PATH, SessionConfig).value
     store = DailySessionIdStore(SESSION_COUNTER_PATH)
 
     animal_dict: dict[str, Animal] = {}
@@ -92,6 +92,7 @@ def init_session() -> Session:
 
 def init_mxbiflow(mxbi, session) -> Game:
     from .default import IDLE, Habituarion
+    from .GNGSiD import SizeReduction
     from .detector_bridge import DetectorBridge
     from .path import STAGE_PATH
     from .scene import SceneManager
@@ -99,6 +100,7 @@ def init_mxbiflow(mxbi, session) -> Game:
     scene_manager = SceneManager()
     scene_manager.register(Habituarion)
     scene_manager.register(IDLE)
+    scene_manager.register(SizeReduction)
     scene_manager.persist(STAGE_PATH)
     detector_bridge = DetectorBridge(mxbi.detector)
     return Game(session, scene_manager, detector_bridge, mxbi)
