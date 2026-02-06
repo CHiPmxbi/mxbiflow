@@ -5,7 +5,6 @@ from random import choice
 from pygame import Event, Rect, Surface, image, transform
 
 from mxbiflow import get_mxbiflow
-from mxbiflow.scene.scene_protocol import SceneProtocol
 
 ASSETS_PATH = Path(__file__).parent / "assets"
 
