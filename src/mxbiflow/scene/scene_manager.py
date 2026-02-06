@@ -1,34 +1,39 @@
 from pathlib import Path
 
-from pydantic import RootModel
 from pygame import Event, Surface
 
+from ..config_store import ConfigStore
+from ..models.session import Options
 from .scene_protocol import SceneProtocol
 
 
-class Scenes(RootModel):
-    root: list[str]
-
-
 class SceneManager:
-    scenes: dict[str, type[SceneProtocol]] = {}
+    _scenes: dict[str, type[SceneProtocol]] = {}
 
     def __init__(self) -> None:
         self.current: SceneProtocol | None = None
         self._pending: SceneProtocol | None = None
 
     def persist(self, path: Path) -> None:
-        scenes = Scenes(root=list(self.scenes.keys()))
-        json_data = scenes.model_dump_json()
+        options_store = ConfigStore(path, Options)
 
-        with path.open("w") as f:
-            f.write(json_data)
+        options_store.value.stages = list(self._scenes.keys())
+        options_store.save()
 
-    def register(self, scene: type[SceneProtocol], name: str | None = None) -> None:
-        if name is None:
-            name = scene.__name__.lower()
+    def register(
+        self, scene: dict[str, type[SceneProtocol]] | list[type[SceneProtocol]]
+    ) -> None:
+        if isinstance(scene, dict):
+            self._scenes.update(scene)
+        elif isinstance(scene, list):
+            for s in scene:
+                self._scenes[s.__name__.lower()] = s
+        else:
+            raise ValueError("Invalid scene type")
 
-        self.scenes[name] = scene
+    @property
+    def scenes(self) -> dict[str, type[SceneProtocol]]:
+        return self._scenes
 
     def switch(self, scene: type[SceneProtocol], defer: bool = True) -> None:
         if defer:
