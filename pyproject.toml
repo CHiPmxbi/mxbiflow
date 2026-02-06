@@ -7,6 +7,7 @@ authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "gpiozero>=2.0.1",
+    "inflection>=0.5.1",
     "keyring>=25.6.0",
     "loguru>=0.7.3",
     "matplotlib>=3.10.6",
