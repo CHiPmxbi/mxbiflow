@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, Signal
 from .card import CardFrame
 from ...models.animal import AnimalConfig
 from ...scene import Scenes
-from ...config import Configure
+from ...config_store import ConfigStore
 from ...path import STAGE_PATH
 
 
@@ -36,7 +36,7 @@ class AnimalCard(CardFrame):
         layout.addRow(lable_animal_id, self.line_animal_id)
 
         label_stage = QLabel("stage", self)
-        items = Configure(STAGE_PATH, Scenes).value
+        items = ConfigStore(STAGE_PATH, Scenes).value
         self.combo_stage = QComboBox(self)
         self.combo_stage.addItems([i for i in items.root])
         self.combo_stage.setCurrentText("idle")

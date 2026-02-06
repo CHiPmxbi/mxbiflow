@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
-from ..config import Configure
+from ..config_store import ConfigStore
 from ..models.session import Options
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
@@ -46,8 +46,8 @@ class MXBIPanel(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self._config = Configure(MXBI_CONFIG_PATH, MXBIModel)
-        self._options = Configure(OPTIONS_PATH, Options)
+        self._config = ConfigStore(MXBI_CONFIG_PATH, MXBIModel)
+        self._options = ConfigStore(OPTIONS_PATH, Options)
 
         self._build_ui()
         self._load_from_config()

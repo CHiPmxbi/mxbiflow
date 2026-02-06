@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal
 from ..models.session import SessionConfig, Options
 from .components.experiment_groups import ExperimentAnimalsGroup, ExperimentConfigGroup
-from ..config import Configure
+from ..config_store import ConfigStore
 from ..path import SESSION_CONFIG_PATH, OPTIONS_PATH
 
 
@@ -19,8 +19,8 @@ class ExperimentPanel(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._config = Configure(SESSION_CONFIG_PATH, SessionConfig)
-        self._options = Configure(OPTIONS_PATH, Options)
+        self._config = ConfigStore(SESSION_CONFIG_PATH, SessionConfig)
+        self._options = ConfigStore(OPTIONS_PATH, Options)
 
         self.setWindowTitle("Experiment Panel")
 
