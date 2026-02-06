@@ -102,13 +102,21 @@ class Session(BaseModel):
 
     @property
     def current_animal(self) -> Animal | None:
-        if self._current_animal is None:
+        key = self._current_animal
+        if key is None:
             return None
 
-        if self._current_animal not in self.animals:
-            raise ValueError(f"animal {self._current_animal} not found")
+        return self.animals[key]
 
-        return self.animals[self._current_animal]
+    @property
+    def require_current_animal(self) -> Animal:
+        key = self._current_animal
+        if key is None:
+            raise RuntimeError(
+                f"Animal: {key} is not set. Please call set_current_animal() first"
+            )
+
+        return self.animals[key]
 
     def clear_current_animal(self):
         a = self.current_animal
