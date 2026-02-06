@@ -1,9 +1,9 @@
 from typing import Any, Mapping
 
+from ..audioplayer import AudioPlayer
 from ..detector.detector import Detector
 from ..rewarder.rewarder import Rewarder
 from ..screen import Screen
-from ..audioplayer import AudioPlayer
 
 
 class MXBI:

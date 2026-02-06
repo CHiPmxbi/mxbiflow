@@ -1,5 +1,5 @@
-from .pump_rewarder import PumpRewarder
 from ..peripheral.pumps.RPI_gpio_pump import RPIGpioPump
+from .pump_rewarder import PumpRewarder
 
 
 class RPIGpioRewarder:

@@ -1,4 +1,5 @@
 import pyglet
+
 from .screen import Screen
 
 

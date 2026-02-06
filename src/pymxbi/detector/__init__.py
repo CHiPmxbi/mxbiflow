@@ -1,12 +1,13 @@
-from .detector import Detector, DetectorEnum
-from .mock_detector import MockDetector
-from .standard_gate_detector import StandardGateDetector
-from .rfid_continuous_detector import RFIDContinuousDetector
-from .beambreak_continuous_detector import BeambreakContinuousDetector
-from .fusion_continuous_detector import FusionContinuousDetector
-from pydantic import BaseModel, Field
-from typing import Literal, TypeAlias, Union, Annotated
+from typing import Annotated, Literal, TypeAlias, Union
 
+from pydantic import BaseModel, Field
+
+from .beambreak_continuous_detector import BeambreakContinuousDetector
+from .detector import Detector, DetectorEnum
+from .fusion_continuous_detector import FusionContinuousDetector
+from .mock_detector import MockDetector
+from .rfid_continuous_detector import RFIDContinuousDetector
+from .standard_gate_detector import StandardGateDetector
 
 detectors: dict[str, type[Detector]] = {
     DetectorEnum.MOCK: MockDetector,

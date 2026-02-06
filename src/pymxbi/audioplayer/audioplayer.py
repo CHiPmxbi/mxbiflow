@@ -1,10 +1,10 @@
+import wave
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum, auto
-from collections import deque
 from pathlib import Path
-from threading import Thread, Event, Lock
+from threading import Event, Lock, Thread
 from typing import Callable
-import wave
 
 import numpy as np
 import pyaudio

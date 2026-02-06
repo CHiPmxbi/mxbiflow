@@ -3,8 +3,9 @@
 from threading import Thread
 from time import sleep, time
 
-from pymxbi.peripheral.rfid.rfid import RFIDReader, RFIDTag
 from pymxbi.peripheral.beam_break_sensor.beam_break_sensor import BeamBreakSensor
+from pymxbi.peripheral.rfid.rfid import RFIDReader, RFIDTag
+
 from .continuous_detector import ContinuousDetector
 from .detector import DetectionResult
 

@@ -1,6 +1,6 @@
-from typing import Protocol, Callable
-from enum import StrEnum, auto
 from dataclasses import dataclass
+from enum import StrEnum, auto
+from typing import Callable, Protocol
 
 
 class DetectorEnum(StrEnum):

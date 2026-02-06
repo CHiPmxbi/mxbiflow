@@ -3,8 +3,8 @@
 from threading import Lock, Thread
 from time import sleep, time
 
-from .detector import DetectionResult
 from .continuous_detector import ContinuousDetector
+from .detector import DetectionResult
 
 
 class MockDetector(ContinuousDetector):

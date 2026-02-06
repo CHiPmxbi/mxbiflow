@@ -2,8 +2,8 @@ from threading import Event, Thread
 from time import sleep, time
 
 from ..peripheral.beam_break_sensor.beam_break_sensor import BeamBreakSensor
-from .detector import DetectionResult
 from .continuous_detector import ContinuousDetector
+from .detector import DetectionResult
 
 
 class BeambreakContinuousDetector(ContinuousDetector):

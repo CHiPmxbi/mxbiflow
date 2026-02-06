@@ -1,9 +1,10 @@
-from .rewarder import Rewarder, RewarderEnum
-from .mock_rewarder import MockRewarder
-from .rpi_gpio_rewarder import RPIGpioRewarder
-from pydantic import BaseModel, Field
-from typing import Literal, TypeAlias, Annotated, Union
+from typing import Annotated, Literal, TypeAlias, Union
 
+from pydantic import BaseModel, Field
+
+from .mock_rewarder import MockRewarder
+from .rewarder import Rewarder, RewarderEnum
+from .rpi_gpio_rewarder import RPIGpioRewarder
 
 rewarders: dict[str, type[Rewarder]] = {
     RewarderEnum.MOCK: MockRewarder,

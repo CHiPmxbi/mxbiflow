@@ -4,13 +4,13 @@ This module defines a :class:`~pymxbi.rewarder.rewarder.Rewarder` protocol that
 reward backends should implement (e.g., liquid pumps, solenoids, feeders).
 """
 
-from typing import Protocol
 from enum import StrEnum, auto
+from typing import Protocol
+
 
 class RewarderEnum(StrEnum):
     MOCK = auto()
     RPI_GPIO = auto()
-
 
 
 class Rewarder(Protocol):

@@ -7,9 +7,9 @@ the built-in detector state machine.
 from threading import Event, Lock, Thread, Timer
 from time import sleep, time
 
-from .detector import DetectionResult
-from .continuous_detector import ContinuousDetector
 from ..peripheral.rfid import RFIDReader, RFIDTag
+from .continuous_detector import ContinuousDetector
+from .detector import DetectionResult
 
 
 class RFIDContinuousDetector(ContinuousDetector):

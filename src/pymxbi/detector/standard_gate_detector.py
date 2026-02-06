@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
-from time import time, sleep
+from time import sleep, time
 from typing import Callable
 
 from ..peripheral.beam_break_sensor import BeamBreakSensor
