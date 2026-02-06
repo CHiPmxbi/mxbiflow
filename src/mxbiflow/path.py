@@ -36,3 +36,6 @@ SESSION_CONFIG_PATH = CONFIG_DIR_PATH / "session.json"
 OPTIONS_PATH = CONFIG_DIR_PATH / "options.json"
 STAGE_PATH = CONFIG_DIR_PATH / "stage.json"
 SESSION_COUNTER_PATH = CONFIG_DIR_PATH / "session_counter.json"
+
+ASSETS_DIR_PATH = ROOT_DIR_PATH / "assets"
+ASSET_CLICKER_PATH = ASSETS_DIR_PATH / "clicker.wav"
