@@ -1,6 +1,5 @@
-from pymotego.send_email import EmailAttachment, EmailClient
-
 from mxbi.utils.logger import logger
+from pymotego.send_email import EmailAttachment, EmailClient
 
 
 def send_email(subject: str, body: str, attachments: list[EmailAttachment]) -> None:

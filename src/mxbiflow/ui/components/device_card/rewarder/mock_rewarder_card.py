@@ -1,6 +1,6 @@
-from ..device_card import DeviceCard
-
 from pymxbi.rewarder import MockRewarderModel
+
+from ..device_card import DeviceCard
 
 
 class MockRewarderCard(DeviceCard[MockRewarderModel]):

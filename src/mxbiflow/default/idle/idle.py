@@ -1,9 +1,11 @@
-from pygame import Surface, Event, Rect, transform, image
-from mxbiflow.scene.scene_protocol import SceneProtocol
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from random import choice
+
+from pygame import Event, Rect, Surface, image, transform
+
 from mxbiflow import get_mxbiflow
+from mxbiflow.scene.scene_protocol import SceneProtocol
 
 ASSETS_PATH = Path(__file__).parent / "assets"
 

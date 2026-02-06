@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -9,11 +10,10 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
 )
-from PySide6.QtCore import Qt
 
-from .animal import AnimalCard
-from ...models.session import SessionConfig, RewardEnum
 from ...models.animal import AnimalConfig
+from ...models.session import RewardEnum, SessionConfig
+from .animal import AnimalCard
 
 
 class ExperimentConfigGroup(QGroupBox):

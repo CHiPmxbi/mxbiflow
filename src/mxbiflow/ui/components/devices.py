@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Generic, TypeVar
 
+from pymxbi.detector import DetectorModel
+from pymxbi.rewarder import RewarderModel
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -14,10 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .device_card.device_card import DeviceCard
-
 from .dialog.add_devices_dialog import AddDeviceDialog
-from pymxbi.rewarder import RewarderModel
-from pymxbi.detector import DetectorModel
 
 T = TypeVar("T", RewarderModel, DetectorModel)
 

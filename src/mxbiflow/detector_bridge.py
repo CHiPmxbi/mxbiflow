@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from queue import Empty, SimpleQueue
 
-from pygame import Event, event
 import pygame
-from pymxbi.detector.detector import DetectionResult, Detector, DetectorEvent
+from pygame import Event, event
 from pymxbi.detector import MockDetector
+from pymxbi.detector.detector import DetectionResult, Detector, DetectorEvent
 
 EVT_DETECTOR = pygame.USEREVENT + 1
 

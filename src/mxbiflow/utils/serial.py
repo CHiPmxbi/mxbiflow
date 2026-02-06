@@ -1,5 +1,5 @@
-from serial.tools import list_ports
 from serial import SerialBase
+from serial.tools import list_ports
 
 
 def get_baudrates():

@@ -1,5 +1,6 @@
-from ..device_card import DeviceCard
 from pymxbi.detector import MockDetectorModel
+
+from ..device_card import DeviceCard
 
 
 class MockDetectorCard(DeviceCard[MockDetectorModel]):

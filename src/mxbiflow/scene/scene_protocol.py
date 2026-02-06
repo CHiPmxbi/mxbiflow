@@ -1,6 +1,7 @@
 from typing import Protocol, runtime_checkable
-from pygame.surface import Surface
+
 from pygame.event import Event
+from pygame.surface import Surface
 
 
 @runtime_checkable

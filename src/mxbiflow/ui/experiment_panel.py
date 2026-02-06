@@ -1,17 +1,17 @@
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QMainWindow,
     QApplication,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
+    QMainWindow,
     QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
-from PySide6.QtCore import Signal
-from ..models.session import SessionConfig, Options
-from .components.experiment_groups import ExperimentAnimalsGroup, ExperimentConfigGroup
 from ..config_store import ConfigStore
-from ..path import SESSION_CONFIG_PATH, OPTIONS_PATH
+from ..models.session import Options, SessionConfig
+from ..path import OPTIONS_PATH, SESSION_CONFIG_PATH
+from .components.experiment_groups import ExperimentAnimalsGroup, ExperimentConfigGroup
 
 
 class ExperimentPanel(QMainWindow):

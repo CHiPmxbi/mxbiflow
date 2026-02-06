@@ -2,9 +2,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
 from mxbi.tasks.cross_modal.trial_schema import Trial
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 class BundleValidationError(RuntimeError):
@@ -19,7 +18,9 @@ def assert_safe_internal_path(internal_path: str) -> None:
     if internal_path.startswith(("/", "\\")):
         raise ValueError(f"Absolute paths are not allowed: '{internal_path}'")
     if "\\" in internal_path:
-        raise ValueError(f"Backslashes are not allowed in bundle paths: '{internal_path}'")
+        raise ValueError(
+            f"Backslashes are not allowed in bundle paths: '{internal_path}'"
+        )
     parts = internal_path.split("/")
     for part in parts:
         if not part:
@@ -109,7 +110,9 @@ class CrossModalBundleDir:
         errors: list[str] = []
 
         if not root_dir.exists():
-            raise BundleValidationError([f"Bundle directory does not exist: {root_dir}"])
+            raise BundleValidationError(
+                [f"Bundle directory does not exist: {root_dir}"]
+            )
         if not root_dir.is_dir():
             raise BundleValidationError([f"Bundle path is not a directory: {root_dir}"])
 
@@ -133,7 +136,9 @@ class CrossModalBundleDir:
             errors=errors,
         )
 
-        cls._require_directory(root_dir / "media", errors, "Bundle is missing required directory: 'media/'")
+        cls._require_directory(
+            root_dir / "media", errors, "Bundle is missing required directory: 'media/'"
+        )
         cls._require_directory(
             root_dir / "media" / "images",
             errors,
@@ -153,13 +158,21 @@ class CrossModalBundleDir:
         if dataset_meta is None or manifest is None:
             raise BundleValidationError(errors)
 
-        expected_subjects = [s for s in dataset_meta.subjects if isinstance(s, str) and s.strip()]
+        expected_subjects = [
+            s for s in dataset_meta.subjects if isinstance(s, str) and s.strip()
+        ]
         expected_subjects = [s.strip() for s in expected_subjects]
         if not expected_subjects:
-            errors.append("dataset_meta.json: 'subjects' must be a non-empty list of subject IDs.")
+            errors.append(
+                "dataset_meta.json: 'subjects' must be a non-empty list of subject IDs."
+            )
 
         trial_sets_dir = root_dir / "trial_sets"
-        actual_subject_dirs = sorted([p.name for p in trial_sets_dir.iterdir() if p.is_dir()]) if trial_sets_dir.exists() else []
+        actual_subject_dirs = (
+            sorted([p.name for p in trial_sets_dir.iterdir() if p.is_dir()])
+            if trial_sets_dir.exists()
+            else []
+        )
         expected_sorted = sorted(expected_subjects)
         if actual_subject_dirs != expected_sorted:
             errors.append(
@@ -203,7 +216,9 @@ class CrossModalBundleDir:
         errors: list[str] = []
         for subject_id in subject_ids:
             if subject_id not in self._dataset_meta.subjects:
-                errors.append(f"Selected subject '{subject_id}' is not listed in dataset_meta.json subjects.")
+                errors.append(
+                    f"Selected subject '{subject_id}' is not listed in dataset_meta.json subjects."
+                )
                 continue
             subject_errors = self._validate_subject(
                 self._root_dir,
@@ -248,7 +263,9 @@ class CrossModalBundleDir:
             errors.append(message)
 
     @staticmethod
-    def _build_file_index(root_dir: Path) -> tuple[dict[str, Path], dict[str, str], list[str]]:
+    def _build_file_index(
+        root_dir: Path,
+    ) -> tuple[dict[str, Path], dict[str, str], list[str]]:
         errors: list[str] = []
         file_index: dict[str, Path] = {}
         lower_to_actual: dict[str, str] = {}
@@ -313,7 +330,9 @@ class CrossModalBundleDir:
                     f"expected '{internal_path}' but bundle contains '{actual}'"
                 )
             else:
-                errors.append(f"Bundle is missing required file at root: '{internal_path}'")
+                errors.append(
+                    f"Bundle is missing required file at root: '{internal_path}'"
+                )
             return None
 
         try:
@@ -392,7 +411,9 @@ class CrossModalBundleDir:
                     f"but bundle contains '{actual}'"
                 )
             else:
-                errors.append(f"[{subject_id}] Missing required file: '{trials_json_internal_path}'")
+                errors.append(
+                    f"[{subject_id}] Missing required file: '{trials_json_internal_path}'"
+                )
             return errors
 
         try:
@@ -419,7 +440,9 @@ class CrossModalBundleDir:
 
         raw_trials = raw.get("trials")
         if not isinstance(raw_trials, list) or not raw_trials:
-            errors.append(f"[{subject_id}] trials.json: 'trials' must be a non-empty array.")
+            errors.append(
+                f"[{subject_id}] trials.json: 'trials' must be a non-empty array."
+            )
             return errors
 
         parsed_trials: list[Trial] = []
@@ -427,7 +450,9 @@ class CrossModalBundleDir:
             try:
                 trial = Trial.model_validate(rec)
             except ValidationError as e:
-                errors.append(f"[{subject_id}] trials.json trial #{i} failed schema validation: {e}")
+                errors.append(
+                    f"[{subject_id}] trials.json trial #{i} failed schema validation: {e}"
+                )
                 continue
 
             if trial.subject_id != subject_id:
@@ -471,7 +496,9 @@ class CrossModalBundleDir:
         if errors:
             return errors
 
-        trials_by_subject[subject_id] = sorted(parsed_trials, key=lambda t: t.trial_number)
+        trials_by_subject[subject_id] = sorted(
+            parsed_trials, key=lambda t: t.trial_number
+        )
         return errors
 
     @classmethod
@@ -515,8 +542,12 @@ class CrossModalBundleDir:
             if not resolved.is_file():
                 errors.append(f"{context}: media path is not a file: '{internal_path}'")
             if not resolved.is_relative_to(root_resolved):
-                errors.append(f"{context}: media path escapes bundle root: '{internal_path}'")
+                errors.append(
+                    f"{context}: media path escapes bundle root: '{internal_path}'"
+                )
         except Exception as e:
-            errors.append(f"{context}: failed to resolve media path '{internal_path}': {e}")
+            errors.append(
+                f"{context}: failed to resolve media path '{internal_path}': {e}"
+            )
 
         return errors

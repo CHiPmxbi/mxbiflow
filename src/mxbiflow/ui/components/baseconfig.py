@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+from pymxbi import MXBIModel
+from pymxbi.platform import PlatformEnum
+from pymxbi.screen import get_screen_size
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel
-
-from pymxbi.platform import PlatformEnum
-from pymxbi import MXBIModel
-from pymxbi.screen import get_screen_size
 
 
 class BaseConfig(QGroupBox):

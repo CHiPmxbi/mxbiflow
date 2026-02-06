@@ -3,9 +3,8 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
-from numpy.typing import NDArray
-
 from mxbi.utils.aplayer import SAMPLE_RATE
+from numpy.typing import NDArray
 
 
 def load_wav_as_int16(
@@ -36,7 +35,9 @@ def load_wav_as_int16(
             raise ValueError(
                 f"WAV sample rate mismatch: wav={source_rate}Hz, expected={target_rate}Hz"
             )
-        float_data = _resample_1d(float_data, source_rate=source_rate, target_rate=target_rate)
+        float_data = _resample_1d(
+            float_data, source_rate=source_rate, target_rate=target_rate
+        )
 
     if gain != 1.0:
         float_data = np.clip(float_data * gain, -1.0, 1.0)

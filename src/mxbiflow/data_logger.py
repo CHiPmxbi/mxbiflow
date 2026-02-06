@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .utils.logger import logger
 
-
 now = datetime.now()
 
 

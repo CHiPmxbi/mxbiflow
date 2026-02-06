@@ -1,11 +1,11 @@
-from PySide6.QtWidgets import QLabel, QFormLayout, QComboBox, QLineEdit, QMenu
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QLineEdit, QMenu
 
-from .card import CardFrame
-from ...models.animal import AnimalConfig
-from ...scene import Scenes
 from ...config_store import ConfigStore
+from ...models.animal import AnimalConfig
 from ...path import STAGE_PATH
+from ...scene import Scenes
+from .card import CardFrame
 
 
 class AnimalCard(CardFrame):

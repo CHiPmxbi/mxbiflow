@@ -1,6 +1,6 @@
+from pymxbi.detector import FusionContinuousDetectorModel
 from PySide6.QtWidgets import QComboBox, QLabel, QLineEdit
 
-from pymxbi.detector import FusionContinuousDetectorModel
 from .....utils.serial import get_all_ports, get_baudrates
 from ..device_card import DeviceCard
 

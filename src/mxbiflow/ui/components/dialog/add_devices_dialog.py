@@ -1,13 +1,13 @@
-from PySide6.QtWidgets import (
-    QDialog,
-    QFormLayout,
-    QVBoxLayout,
-    QLabel,
-    QComboBox,
-    QDialogButtonBox,
-)
-
 from collections.abc import Sequence
+
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLabel,
+    QVBoxLayout,
+)
 
 
 class AddDeviceDialog(QDialog):

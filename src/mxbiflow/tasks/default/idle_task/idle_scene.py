@@ -2,9 +2,8 @@ from pathlib import Path
 from tkinter.ttk import Label
 from typing import TYPE_CHECKING
 
-from PIL import Image, ImageTk
-
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
+from PIL import Image, ImageTk
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState, ScheduleCondition

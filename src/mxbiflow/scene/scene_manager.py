@@ -1,7 +1,9 @@
-from .scene_protocol import SceneProtocol
-from pygame import Event, Surface
-from pydantic import RootModel
 from pathlib import Path
+
+from pydantic import RootModel
+from pygame import Event, Surface
+
+from .scene_protocol import SceneProtocol
 
 
 class Scenes(RootModel):

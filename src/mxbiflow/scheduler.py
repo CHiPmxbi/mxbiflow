@@ -1,9 +1,10 @@
-from .scene import SceneManager
-from .detector_bridge import EVT_DETECTOR, DetectorMsg
 from pygame import Event
 from pymxbi.detector.detector import DetectorEvent
-from .models.session import Session
+
 from .default import IDLE
+from .detector_bridge import EVT_DETECTOR, DetectorMsg
+from .models.session import Session
+from .scene import SceneManager
 
 
 class Scheduler:

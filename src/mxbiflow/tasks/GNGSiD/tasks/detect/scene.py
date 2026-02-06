@@ -13,13 +13,12 @@ from mxbi.utils.tkinter.components.showdata_widget import ShowDataWidget
 if TYPE_CHECKING:
     from concurrent.futures import Future
 
-    from numpy import int16
-    from numpy.typing import NDArray
-
     from mxbi.models.animal import AnimalState
     from mxbi.models.session import ScreenConfig, SessionConfig
     from mxbi.tasks.GNGSiD.models import PersistentData
     from mxbi.theater import Theater
+    from numpy import int16
+    from numpy.typing import NDArray
 
 
 class GNGSiDDetectScene:

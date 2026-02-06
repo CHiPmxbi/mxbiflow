@@ -1,13 +1,12 @@
 import pygame
 from pygame import Event
-
-from .models.session import Session
-
-from .scene import SceneManager
-from .detector_bridge import DetectorBridge
-from .scheduler import Scheduler
 from pymxbi import MXBI
-from .mxbiflow import set_mxbiflow, MXBIFlow
+
+from .detector_bridge import DetectorBridge
+from .models.session import Session
+from .mxbiflow import MXBIFlow, set_mxbiflow
+from .scene import SceneManager
+from .scheduler import Scheduler
 
 
 class Game:
@@ -66,11 +65,11 @@ class Game:
         self.quit()
 
     def _handle_event(self, event: Event) -> None:
-            match event.type:
-                case pygame.QUIT:
-                    self._running = False
-                case pygame.KEYDOWN:
-                    self._handle_keyboard_event(event)
+        match event.type:
+            case pygame.QUIT:
+                self._running = False
+            case pygame.KEYDOWN:
+                self._handle_keyboard_event(event)
 
     def _handle_keyboard_event(self, event: Event) -> None:
         match event.key:

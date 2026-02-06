@@ -44,8 +44,14 @@ class Trial(BaseModel):
             return values
 
         audio = values.get("audio") if isinstance(values.get("audio"), dict) else {}
-        left_image = values.get("leftImage") if isinstance(values.get("leftImage"), dict) else {}
-        right_image = values.get("rightImage") if isinstance(values.get("rightImage"), dict) else {}
+        left_image = (
+            values.get("leftImage") if isinstance(values.get("leftImage"), dict) else {}
+        )
+        right_image = (
+            values.get("rightImage")
+            if isinstance(values.get("rightImage"), dict)
+            else {}
+        )
 
         return {
             "trial_id": values.get("trialId"),

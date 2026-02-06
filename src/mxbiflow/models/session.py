@@ -1,11 +1,12 @@
-from pydantic import BaseModel, Field, PrivateAttr, ValidationError
-from .animal import Animal, AnimalConfig
-from datetime import datetime, timezone
-from dataclasses import dataclass
-from pathlib import Path
-import tempfile
 import os
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError
+
+from .animal import Animal, AnimalConfig
 from .reward import RewardEnum
 
 

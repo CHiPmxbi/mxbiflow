@@ -1,6 +1,6 @@
+from datetime import datetime
 from random import choices
 from typing import TYPE_CHECKING, Final
-from datetime import datetime
 
 from mxbi.data_logger import DataLogger, DataLoggerType
 from mxbi.models.animal import ScheduleCondition
@@ -137,9 +137,7 @@ class InitialHabituationTrainingStage:
                     datetime.now().timestamp()
                 )
 
-                self._theater._scheduler._increase_difficulty(
-                    self._animal_state
-                )
+                self._theater._scheduler._increase_difficulty(self._animal_state)
 
         return feedback
 

@@ -4,9 +4,6 @@ from math import ceil
 from tkinter import CENTER, Canvas, Event
 from typing import TYPE_CHECKING, Final
 
-from numpy import int16
-from numpy.typing import NDArray
-
 from mxbi.tasks.two_alternative_choice.assets.starter import Starter
 from mxbi.tasks.two_alternative_choice.models import Result, TouchEvent
 from mxbi.tasks.two_alternative_choice.tasks.touch.touch_models import (
@@ -16,6 +13,8 @@ from mxbi.tasks.two_alternative_choice.tasks.touch.touch_models import (
 from mxbi.utils.aplayer import ToneConfig
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 from mxbi.utils.tkinter.components.showdata_widget import ShowDataWidget
+from numpy import int16
+from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from mxbi.models.animal import AnimalState
@@ -221,7 +220,7 @@ class TwoACTouchScene:
         if future.result():
             self._trigger_canvas.after(
                 self._trial_config.reward_delay,
-                lambda: (self._on_correct()),
+                lambda: self._on_correct(),
             )
 
     def _give_reward(self) -> None:

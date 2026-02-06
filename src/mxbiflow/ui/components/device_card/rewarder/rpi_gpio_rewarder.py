@@ -1,11 +1,11 @@
+from pymxbi.rewarder import GPIORewarderModel
+from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
 )
 
-from PySide6.QtGui import QIntValidator
 from ..device_card import DeviceCard
-from pymxbi.rewarder import GPIORewarderModel
 
 
 class RPIGpioPumpCard(DeviceCard[GPIORewarderModel]):

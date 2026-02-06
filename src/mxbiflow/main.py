@@ -57,7 +57,7 @@ def build_mxbi() -> MXBI:
 def init_session() -> Session:
     from .config_store import ConfigStore
     from .models.animal import Animal, StageState
-    from .models.session import Session, SessionConfig, DailySessionIdStore
+    from .models.session import DailySessionIdStore, Session, SessionConfig
     from .path import SESSION_CONFIG_PATH, SESSION_COUNTER_PATH
 
     session_config = ConfigStore(SESSION_CONFIG_PATH, SessionConfig).value
@@ -92,8 +92,8 @@ def init_session() -> Session:
 
 def init_mxbiflow(mxbi, session) -> Game:
     from .default import IDLE, Habituarion
-    from .GNGSiD import SizeReduction
     from .detector_bridge import DetectorBridge
+    from .GNGSiD import SizeReduction
     from .path import STAGE_PATH
     from .scene import SceneManager
 

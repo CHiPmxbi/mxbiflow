@@ -2,8 +2,6 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from PIL import Image
-
 from mxbi.data_logger import DataLogger
 from mxbi.tasks.cross_modal.bundle_dir import CrossModalBundleDir
 from mxbi.tasks.cross_modal.config import CrossModalConfig, load_cross_modal_config
@@ -12,15 +10,15 @@ from mxbi.tasks.cross_modal.models import CrossModalOutcome, CrossModalResultRec
 from mxbi.tasks.cross_modal.scene import CrossModalResult, CrossModalScene
 from mxbi.tasks.cross_modal.trial_io import TrialCursor
 from mxbi.utils.logger import logger
+from PIL import Image
 
 if TYPE_CHECKING:
     import numpy as np
-    from numpy.typing import NDArray
-
     from mxbi.models.animal import AnimalState
     from mxbi.models.session import SessionState
     from mxbi.models.task import Feedback
     from mxbi.theater import Theater
+    from numpy.typing import NDArray
     from PIL.Image import Image as PILImage
 
 
@@ -38,7 +36,9 @@ class CrossModalTask:
         self._animal_state = animal_state
         self._screen = session_state.session_config.screen_type
 
-        bundle_dir_str = getattr(session_state.session_config, "cross_modal_bundle_dir", None)
+        bundle_dir_str = getattr(
+            session_state.session_config, "cross_modal_bundle_dir", None
+        )
         if not bundle_dir_str:
             raise RuntimeError(
                 "No cross-modal bundle directory configured. "
@@ -51,9 +51,13 @@ class CrossModalTask:
         subject_id = self._animal_state.name
         trials = self._bundle_dir.load_trials(subject_id)
         if not trials:
-            raise RuntimeError(f"Bundle contains zero trials for subject '{subject_id}'.")
+            raise RuntimeError(
+                f"Bundle contains zero trials for subject '{subject_id}'."
+            )
 
-        self._cursor = TrialCursor(bundle_root=self._bundle_dir.root_dir, subject_id=subject_id)
+        self._cursor = TrialCursor(
+            bundle_root=self._bundle_dir.root_dir, subject_id=subject_id
+        )
         self._trial_index = self._cursor.next_index(len(trials))
         self._trial = trials[self._trial_index]
 
@@ -64,8 +68,12 @@ class CrossModalTask:
             * self._cross_modal_config.visual.image_scale
         )
 
-        left_image_path = self._bundle_dir.resolve_media_path(self._trial.left_image_path)
-        right_image_path = self._bundle_dir.resolve_media_path(self._trial.right_image_path)
+        left_image_path = self._bundle_dir.resolve_media_path(
+            self._trial.left_image_path
+        )
+        right_image_path = self._bundle_dir.resolve_media_path(
+            self._trial.right_image_path
+        )
         audio_path = self._bundle_dir.resolve_media_path(self._trial.audio_path)
 
         left_image = self._prepare_image(

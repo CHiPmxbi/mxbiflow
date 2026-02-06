@@ -6,21 +6,19 @@ from tkinter import CENTER, Canvas, Event
 from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
-from PIL import ImageTk
-
 from mxbi.tasks.cross_modal.config import CrossModalConfig
 from mxbi.utils.logger import logger
 from mxbi.utils.tkinter.components.canvas_with_border import CanvasWithInnerBorder
 from mxbi.utils.tkinter.components.showdata_widget import ShowDataWidget
+from numpy.typing import NDArray
+from PIL import ImageTk
 
 if TYPE_CHECKING:
-    from PIL.Image import Image as PILImage
-
     from mxbi.models.animal import AnimalState
     from mxbi.models.session import ScreenConfig, SessionState
     from mxbi.tasks.cross_modal.trial_schema import Trial
     from mxbi.theater import Theater
+    from PIL.Image import Image as PILImage
 
 
 @dataclass
@@ -146,25 +144,41 @@ class CrossModalScene:
         img_size = int(self._left_image_pil.size[0])
 
         self._left_canvas = Canvas(
-            self._background, width=img_size, height=img_size, bg="grey", highlightthickness=0
+            self._background,
+            width=img_size,
+            height=img_size,
+            bg="grey",
+            highlightthickness=0,
         )
         self._left_canvas.place(relx=0.25, rely=0.5, anchor=CENTER)
 
         self._right_canvas = Canvas(
-            self._background, width=img_size, height=img_size, bg="grey", highlightthickness=0
+            self._background,
+            width=img_size,
+            height=img_size,
+            bg="grey",
+            highlightthickness=0,
         )
         self._right_canvas.place(relx=0.75, rely=0.5, anchor=CENTER)
 
         if self._left_canvas is not None:
-            self._left_canvas.bind("<ButtonPress-1>", lambda e: self._on_choice("left", e))
+            self._left_canvas.bind(
+                "<ButtonPress-1>", lambda e: self._on_choice("left", e)
+            )
         if self._right_canvas is not None:
-            self._right_canvas.bind("<ButtonPress-1>", lambda e: self._on_choice("right", e))
+            self._right_canvas.bind(
+                "<ButtonPress-1>", lambda e: self._on_choice("right", e)
+            )
 
         self._left_image = ImageTk.PhotoImage(self._left_image_pil)
-        self._left_canvas.create_image(img_size // 2, img_size // 2, image=self._left_image)
+        self._left_canvas.create_image(
+            img_size // 2, img_size // 2, image=self._left_image
+        )
 
         self._right_image = ImageTk.PhotoImage(self._right_image_pil)
-        self._right_canvas.create_image(img_size // 2, img_size // 2, image=self._right_image)
+        self._right_canvas.create_image(
+            img_size // 2, img_size // 2, image=self._right_image
+        )
 
         self._background.create_text(
             self._screen.width * 0.25,

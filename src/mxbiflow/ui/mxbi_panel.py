@@ -1,3 +1,6 @@
+from pymxbi import MXBIModel
+from pymxbi.detector import DetectorEnum, DetectorModel
+from pymxbi.rewarder import RewarderEnum, RewarderModel
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QApplication,
@@ -8,22 +11,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
 from ..config_store import ConfigStore
 from ..models.session import Options
+from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
-    MockRewarderCard,
-    RPIGpioPumpCard,
-    MockDetectorCard,
-    RFIDDetectorCard,
     BeambreakDetectorCard,
     FusionDetectorCard,
+    MockDetectorCard,
+    MockRewarderCard,
+    RFIDDetectorCard,
+    RPIGpioPumpCard,
 )
 from .components.devices import Devices
-from pymxbi.detector import DetectorEnum, DetectorModel
-from pymxbi.rewarder import RewarderEnum, RewarderModel
-from pymxbi import MXBIModel
 
 
 class MXBIPanel(QMainWindow):

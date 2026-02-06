@@ -2,9 +2,8 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
-
 from mxbi.path import CROSS_MODAL_CONFIG_PATH
+from pydantic import BaseModel, Field
 
 
 class CrossModalVisualConfig(BaseModel):
