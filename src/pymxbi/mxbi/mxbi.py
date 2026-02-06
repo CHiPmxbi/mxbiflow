@@ -1,8 +1,9 @@
 from typing import Any, Mapping
 
-from pymxbi.detector.detector import Detector
-from pymxbi.rewarder.rewarder import Rewarder
-from pymxbi.screen import Screen
+from ..detector.detector import Detector
+from ..rewarder.rewarder import Rewarder
+from ..screen import Screen
+from ..audioplayer import AudioPlayer
 
 
 class MXBI:
@@ -17,6 +18,7 @@ class MXBI:
         self._screen_size = screen_size
         self._rewarder = self._normalize(rewarder, "rewarder")
         self._detector = self._normalize(detector, "detector")
+        self._aplayer = AudioPlayer()
 
     @staticmethod
     def _normalize(obj, name: str) -> dict[int, Any]:
@@ -62,3 +64,7 @@ class MXBI:
 
         for detector in self._detector.values():
             detector.register_animal(animals)
+
+    @property
+    def aplayer(self) -> AudioPlayer:
+        return self._aplayer
