@@ -6,6 +6,7 @@ from threading import Thread, Event, Lock
 from typing import Callable
 import wave
 
+import numpy as np
 import pyaudio
 from pyaudio import PyAudio
 
@@ -27,6 +28,16 @@ class PlayResult:
 
 
 DoneCallback = Callable[[PlayResult], None]
+
+
+@dataclass(frozen=True)
+class _WavCacheEntry:
+    pcm_bytes: bytes
+    sample_rate: int
+    channels: int
+    sample_width_bytes: int
+    mtime_ns: int
+    size: int
 
 
 # --- Task handle (main-thread callbacks) ---
@@ -65,15 +76,42 @@ class PlayTask:
 class AudioPlayer:
     def __init__(self):
         self._pa = PyAudio()
+        self._active_lock = Lock()
+        self._active_tasks: set[PlayTask] = set()
+        self._wav_cache_lock = Lock()
+        self._wav_cache: dict[Path, _WavCacheEntry] = {}
         self._done_lock = Lock()
         self._done_deque: deque[tuple[PlayTask, PlayResult]] = deque()
 
     def close(self) -> None:
+        self.cancel_all()
         self._pa.terminate()
+
+    def cancel_all(self) -> int:
+        """
+        Request cancellation for all currently playing tasks.
+
+        Cancellation is cooperative: tasks stop between audio chunk writes.
+        Returns the number of tasks that were asked to cancel.
+        """
+        with self._active_lock:
+            tasks = list(self._active_tasks)
+        for task in tasks:
+            task.cancel()
+        return len(tasks)
+
+    def _register_task(self, task: PlayTask) -> None:
+        with self._active_lock:
+            self._active_tasks.add(task)
 
     def _enqueue_done(self, task: PlayTask, result: PlayResult) -> None:
         with self._done_lock:
             self._done_deque.append((task, result))
+
+    def _finish_task(self, task: PlayTask, result: PlayResult) -> None:
+        with self._active_lock:
+            self._active_tasks.discard(task)
+        self._enqueue_done(task, result)
 
     def update(self) -> None:
         # Drain completion queue and dispatch callbacks on the main thread.
@@ -89,19 +127,59 @@ class AudioPlayer:
         self, file_path: Path, *, on_done: DoneCallback | None = None
     ) -> PlayTask:
         task = PlayTask()
+        self._register_task(task)
         if on_done:
             task.on_finish(on_done)
 
+        wav_path = Path(file_path).expanduser().resolve()
         try:
-            with wave.open(str(file_path), "rb") as wf:
+            st = wav_path.stat()
+        except OSError:
+            st = None
+
+        if st is not None:
+            with self._wav_cache_lock:
+                cached = self._wav_cache.get(wav_path)
+            if (
+                cached is not None
+                and cached.mtime_ns == st.st_mtime_ns
+                and cached.size == st.st_size
+            ):
+                self._play_pcm_async(
+                    task,
+                    cached.pcm_bytes,
+                    cached.sample_rate,
+                    cached.channels,
+                    cached.sample_width_bytes,
+                )
+                return task
+
+        try:
+            with wave.open(str(wav_path), "rb") as wf:
                 channels = wf.getnchannels()
                 sample_rate = wf.getframerate()
                 sample_width_bytes = wf.getsampwidth()
                 frame_count = wf.getnframes()
                 pcm_bytes = wf.readframes(frame_count)
         except BaseException as e:
-            self._enqueue_done(task, PlayResult(PlayStatus.ERROR, error=e))
+            self._finish_task(task, PlayResult(PlayStatus.ERROR, error=e))
             return task
+
+        if st is None:
+            try:
+                st = wav_path.stat()
+            except OSError:
+                st = None
+        if st is not None:
+            with self._wav_cache_lock:
+                self._wav_cache[wav_path] = _WavCacheEntry(
+                    pcm_bytes=pcm_bytes,
+                    sample_rate=sample_rate,
+                    channels=channels,
+                    sample_width_bytes=sample_width_bytes,
+                    mtime_ns=st.st_mtime_ns,
+                    size=st.st_size,
+                )
 
         self._play_pcm_async(task, pcm_bytes, sample_rate, channels, sample_width_bytes)
         return task
@@ -116,6 +194,7 @@ class AudioPlayer:
         sample_width_bytes: int = 2,
     ) -> PlayTask:
         task = PlayTask()
+        self._register_task(task)
         if on_done:
             task.on_finish(on_done)
 
@@ -130,11 +209,12 @@ class AudioPlayer:
         on_done: DoneCallback | None = None,
     ) -> PlayTask:
         task = PlayTask()
+        self._register_task(task)
         if on_done:
             task.on_finish(on_done)
 
         if not units:
-            self._enqueue_done(task, PlayResult(PlayStatus.FINISHED))
+            self._finish_task(task, PlayResult(PlayStatus.FINISHED))
             return task
 
         self._play_puretone_sequence_async(task, units, sample_rate)
@@ -153,19 +233,27 @@ class AudioPlayer:
                 if sample_rate <= 0:
                     raise ValueError(f"sample_rate must be positive, got {sample_rate}")
 
+                for u in units:
+                    if u.stimulus is None:
+                        raise ValueError(
+                            "PureToneUnit.stimulus is None; generate stimulus via PureToneGenerator before playback"
+                        )
+                    if u.stimulus.dtype != np.dtype(np.int32):
+                        raise ValueError(
+                            f"PureToneUnit.stimulus must be int32, got {u.stimulus.dtype}"
+                        )
+
                 stream = self._pa.open(
-                    format=pyaudio.paInt16,
+                    format=pyaudio.paInt32,
                     channels=1,
                     rate=sample_rate,
                     output=True,
                 )
 
-                print("test")
-
                 chunk = 4096
                 for unit in units:
                     if task._cancel.is_set():
-                        self._enqueue_done(task, PlayResult(PlayStatus.CANCELED))
+                        self._finish_task(task, PlayResult(PlayStatus.CANCELED))
                         return
 
                     # Apply per-unit volume overrides before playback.
@@ -178,15 +266,15 @@ class AudioPlayer:
 
                     for i in range(0, len(data), chunk):
                         if task._cancel.is_set():
-                            self._enqueue_done(task, PlayResult(PlayStatus.CANCELED))
+                            self._finish_task(task, PlayResult(PlayStatus.CANCELED))
                             return
                         # Write in chunks so cancel() can interrupt between writes.
                         stream.write(data[i : i + chunk])
 
-                self._enqueue_done(task, PlayResult(PlayStatus.FINISHED))
+                self._finish_task(task, PlayResult(PlayStatus.FINISHED))
 
             except BaseException as e:
-                self._enqueue_done(task, PlayResult(PlayStatus.ERROR, error=e))
+                self._finish_task(task, PlayResult(PlayStatus.ERROR, error=e))
 
             finally:
                 try:
@@ -231,18 +319,17 @@ class AudioPlayer:
                 )
 
                 chunk = 4096
-                mv = memoryview(pcm_bytes)
-                for i in range(0, len(mv), chunk):
+                for i in range(0, len(pcm_bytes), chunk):
                     if task._cancel.is_set():
-                        self._enqueue_done(task, PlayResult(PlayStatus.CANCELED))
+                        self._finish_task(task, PlayResult(PlayStatus.CANCELED))
                         return
                     # Blocking write happens on a background thread.
-                    stream.write(mv[i : i + chunk])
+                    stream.write(pcm_bytes[i : i + chunk])
 
-                self._enqueue_done(task, PlayResult(PlayStatus.FINISHED))
+                self._finish_task(task, PlayResult(PlayStatus.FINISHED))
 
             except BaseException as e:
-                self._enqueue_done(task, PlayResult(PlayStatus.ERROR, error=e))
+                self._finish_task(task, PlayResult(PlayStatus.ERROR, error=e))
 
             finally:
                 try:
