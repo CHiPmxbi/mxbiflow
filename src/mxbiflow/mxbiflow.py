@@ -21,6 +21,9 @@ class MXBIFlow:
     def mxbi(self) -> MXBI:
         return self._mxbi
 
+    def update(self) -> None:
+        self._timer.update()
+
 
 _current_mxbiflow: MXBIFlow | None = None
 
