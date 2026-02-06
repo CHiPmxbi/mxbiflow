@@ -1,6 +1,7 @@
+from pathlib import Path
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
@@ -10,17 +11,16 @@ from PySide6.QtWidgets import (
 
 from ..config_store import ConfigStore
 from ..models.session import Options, SessionConfig
-from ..path import OPTIONS_PATH, SESSION_CONFIG_PATH
 from .components.experiment_groups import ExperimentAnimalsGroup, ExperimentConfigGroup
 
 
 class ExperimentPanel(QMainWindow):
     accepted = Signal()
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._config = ConfigStore(SESSION_CONFIG_PATH, SessionConfig)
-        self._options = ConfigStore(OPTIONS_PATH, Options)
+    def __init__(self, session_config_path: Path, options_path: Path):
+        super().__init__()
+        self._config = ConfigStore(session_config_path, SessionConfig)
+        self._options = ConfigStore(options_path, Options)
 
         self.setWindowTitle("Experiment Panel")
 
@@ -36,7 +36,7 @@ class ExperimentPanel(QMainWindow):
         layout_main.addWidget(self.group_config)
 
         self.group_animals = ExperimentAnimalsGroup(
-            self, animals=self._options.value.animals
+            self, animals=self._options.value.animals, options=self._options.value
         )
         layout_main.addWidget(self.group_animals)
 
@@ -80,12 +80,3 @@ class ExperimentPanel(QMainWindow):
         self._on_save()
         self.close()
         self.accepted.emit()
-
-
-if __name__ == "__main__":
-    import sys
-
-    app = QApplication(sys.argv)
-    experiment_panel = ExperimentPanel()
-    experiment_panel.show()
-    sys.exit(app.exec())

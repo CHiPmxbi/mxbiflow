@@ -1,9 +1,10 @@
+from pathlib import Path
+
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
@@ -13,7 +14,6 @@ from PySide6.QtWidgets import (
 
 from ..config_store import ConfigStore
 from ..models.session import Options
-from ..path import MXBI_CONFIG_PATH, OPTIONS_PATH
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
     BeambreakDetectorCard,
@@ -44,10 +44,10 @@ class MXBIPanel(QMainWindow):
     # Lifecycle / Init
     # -----------------------------
 
-    def __init__(self):
+    def __init__(self, mxbi_config_path: Path, options_path: Path):
         super().__init__()
-        self._config = ConfigStore(MXBI_CONFIG_PATH, MXBIModel)
-        self._options = ConfigStore(OPTIONS_PATH, Options)
+        self._config = ConfigStore(mxbi_config_path, MXBIModel)
+        self._options = ConfigStore(options_path, Options)
 
         self._build_ui()
         self._load_from_config()
@@ -141,12 +141,3 @@ class MXBIPanel(QMainWindow):
 
     def _on_cancel(self) -> None:
         self.close()
-
-
-if __name__ == "__main__":
-    import sys
-
-    app = QApplication(sys.argv)
-    window = MXBIPanel()
-    window.show()
-    sys.exit(app.exec())

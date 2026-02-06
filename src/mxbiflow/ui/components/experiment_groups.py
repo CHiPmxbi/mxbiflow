@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -12,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...models.animal import AnimalConfig
-from ...models.session import RewardEnum, SessionConfig
+from ...models.session import Options, RewardEnum, SessionConfig
 from .animal import AnimalCard
 
 
@@ -51,10 +49,11 @@ class ExperimentConfigGroup(QGroupBox):
 
 
 class ExperimentAnimalsGroup(QGroupBox):
-    def __init__(self, parent=None, *, animals: dict[str, str]):
+    def __init__(self, parent=None, *, animals: dict[str, str], options: Options):
         super().__init__("Animals", parent)
 
         self._animals = animals
+        self._options = options
         self.layout_animals = QGridLayout(self)
         self.setLayout(self.layout_animals)
 
@@ -68,7 +67,7 @@ class ExperimentAnimalsGroup(QGroupBox):
         menu.exec(self.mapToGlobal(pos))
 
     def _on_add_animal(self):
-        animal_card = AnimalCard(self, self._animals)
+        animal_card = AnimalCard(self, self._animals, self._options)
         animal_card.remove_requested.connect(
             lambda _card=animal_card: self._on_remove_animal(_card)
         )
@@ -103,7 +102,7 @@ class ExperimentAnimalsGroup(QGroupBox):
 
     def load_config(self, config: SessionConfig):
         for animal_configs in config.animals:
-            animal_card = AnimalCard(self, self._animals)
+            animal_card = AnimalCard(self, self._animals, self._options)
             animal_card.load_config(animal_configs)
             animal_card.remove_requested.connect(
                 lambda _card=animal_card: self._on_remove_animal(_card)

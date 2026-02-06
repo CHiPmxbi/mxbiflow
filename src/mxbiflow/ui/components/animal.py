@@ -1,17 +1,15 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QLineEdit, QMenu
 
-from ...config_store import ConfigStore
 from ...models.animal import AnimalConfig
-from ...path import STAGE_PATH
-from ...scene import Scenes
+from ...models.session import Options
 from .card import CardFrame
 
 
 class AnimalCard(CardFrame):
     remove_requested = Signal()
 
-    def __init__(self, parent, animals: dict[str, str]):
+    def __init__(self, parent, animals: dict[str, str], options: Options):
         super().__init__(parent=parent, object_name="card")
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
@@ -36,9 +34,9 @@ class AnimalCard(CardFrame):
         layout.addRow(lable_animal_id, self.line_animal_id)
 
         label_stage = QLabel("stage", self)
-        items = ConfigStore(STAGE_PATH, Scenes).value
+        items = options.stages
         self.combo_stage = QComboBox(self)
-        self.combo_stage.addItems([i for i in items.root])
+        self.combo_stage.addItems(items)
         self.combo_stage.setCurrentText("idle")
         layout.addRow(label_stage, self.combo_stage)
 
