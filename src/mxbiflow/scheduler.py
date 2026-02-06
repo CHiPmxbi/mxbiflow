@@ -12,11 +12,14 @@ class Scheduler:
         session: Session,
         scene_manager: SceneManager,
     ) -> None:
+        self._session = session
         self._scene_manager = scene_manager
         self._scenes = self._scene_manager.scenes
-        self._session = session
 
         self._need_refresh = False
+
+    def _mark_refresh(self) -> None:
+        self._need_refresh = True
 
     def _set_current_animal(self, animal: str) -> None:
         self._session.set_current_animal(animal)
@@ -27,7 +30,7 @@ class Scheduler:
             return
 
         self._session.clear_current_animal()
-        self._need_refresh = True
+        self._mark_refresh()
 
     def _set_next_stage(self, stage: str) -> None:
         if self._session.current_animal is None:
@@ -56,17 +59,17 @@ class Scheduler:
             case DetectorEvent.ANIMAL_LEFT:
                 self._clear_current_animal()
 
-    def update(self) -> None:
+    def _shoud_refresh(self) -> bool:
         current = self._scene_manager.current
-
-        if (
+        return (
             current is not None
             and not isinstance(current, IDLE)
             and not current.running
-        ):
-            next_stage = current.decide()
-            if next_stage is not None:
-                self._set_next_stage(next_stage.__name__.lower())
+        )
+
+    def update(self) -> None:
+        if self._shoud_refresh():
+            self._mark_refresh()
 
         if not self._need_refresh:
             return
@@ -80,11 +83,6 @@ class Scheduler:
         if animal is None:
             if not isinstance(self._scene_manager.current, IDLE):
                 self._scene_manager.switch(self._scenes[IDLE.__name__.lower()])
-            return
-
-        if animal.current_stage is None:
-            animal.set_current_stage(IDLE.__name__.lower())
-            self._scene_manager.switch(self._scenes[IDLE.__name__.lower()])
             return
 
         stage = animal.current_stage.stage_name
