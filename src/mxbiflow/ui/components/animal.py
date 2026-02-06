@@ -44,7 +44,7 @@ class AnimalCard(CardFrame):
 
         label_level = QLabel("level", self)
         self.combo_level = QComboBox(self)
-        self.combo_level.addItems(["0"])
+        self.combo_level.addItems(["0", "1"])
         self.combo_level.setCurrentText("0")
         layout.addRow(label_level, self.combo_level)
 
