@@ -12,6 +12,9 @@ class _Task:
     next_fire_ms: int
     cancelled: bool = False
 
+    def cancel(self) -> None:
+        self.cancelled = True
+
 
 class FrameTimer:
     def __init__(self) -> None:
@@ -30,7 +33,12 @@ class FrameTimer:
         return task
 
     def cancel(self, task: _Task) -> None:
-        task.cancelled = True
+        task.cancel()
+
+    def cancel_all(self) -> None:
+        for task in self._tasks:
+            task.cancel()
+        self._tasks.clear()
 
     def update(self) -> None:
         now = time.get_ticks()
@@ -42,6 +50,6 @@ class FrameTimer:
                 if task.repeat and not task.cancelled:
                     task.next_fire_ms += task.interval_ms
                 else:
-                    task.cancelled = True
+                    task.cancel()
 
         self._tasks = [task for task in self._tasks if not task.cancelled]
