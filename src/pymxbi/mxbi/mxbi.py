@@ -16,8 +16,8 @@ class MXBI:
         if not isinstance(screen_size, Screen):
             screen_size = Screen(width=screen_size[0], height=screen_size[1])
         self._screen_size = screen_size
-        self._rewarder = self._normalize(rewarder, "rewarder")
-        self._detector = self._normalize(detector, "detector")
+        self._rewarder: dict[int, Rewarder] = self._normalize(rewarder, "rewarder")
+        self._detector: dict[int, Detector] = self._normalize(detector, "detector")
         self._aplayer = AudioPlayer()
 
     @staticmethod
@@ -57,13 +57,6 @@ class MXBI:
     @property
     def screen_size(self):
         return self._screen_size
-
-    def register_animal(self, animals: dict[str, str]) -> None:
-        if not self._detector:
-            raise RuntimeError("No detectors found")
-
-        for detector in self._detector.values():
-            detector.register_animal(animals)
 
     @property
     def aplayer(self) -> AudioPlayer:
