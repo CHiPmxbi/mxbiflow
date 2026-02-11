@@ -38,6 +38,9 @@ class RFIDContinuousDetectorModel(BaseModel):
     port: str = Field(default="/dev/ttyUSB0")
     baudrate: int = Field(default=9600, ge=1)
 
+    poll_interval: float = 1.0
+    max_tag_age_seconds: float = 1.0
+
     @property
     def device_type(self) -> str:
         return str(self.type)
@@ -49,7 +52,9 @@ class BeamBreakContinuousDetectorModel(BaseModel):
 
     enabled: bool = False
 
-    pin: int = Field(default=17, ge=0)
+    pin: int = Field(default=11, ge=0)
+    animal_id: str = "unknown"
+    poll_interval: float = 1.0
 
     @property
     def device_type(self) -> str:
@@ -62,9 +67,13 @@ class FusionContinuousDetectorModel(BaseModel):
 
     enabled: bool = False
 
-    pin: int = Field(default=17, ge=0)
+    pin: int = Field(default=11, ge=0)
+
     port: str = Field(default="/dev/ttyUSB0")
-    baudrate: int = Field(default=9600, ge=1)
+    baudrate: int = Field(default=57600, ge=1)
+
+    poll_interval: float = 10.0
+    rfid_timeout: float = 0.05
 
     @property
     def device_type(self) -> str:

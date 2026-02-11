@@ -92,7 +92,7 @@ class MockDetector:
             (_State.IDLE, _Event.ARRIVED):  _Transition(_State.PRESENT, self._on_animal_entered),
             (_State.IDLE, _Event.DEPARTED): _Transition(_State.IDLE, noop),
             # -- PRESENT -------------------------------------------------------
-            (_State.PRESENT, _Event.ARRIVED):  _Transition(_State.PRESENT, noop),
+            (_State.PRESENT, _Event.ARRIVED):  _Transition(_State.PRESENT, self._on_animal_entered),
             (_State.PRESENT, _Event.DEPARTED): _Transition(_State.IDLE, self._on_animal_left),
         }
         # fmt: on
@@ -190,11 +190,15 @@ class MockDetector:
         prev: str | None, current: str | None
     ) -> _Event | None:
         """Derive an internal event from a change in animal ID."""
-        if prev is None and current is not None:
-            return _Event.ARRIVED
-        if prev is not None and current is None:
-            return _Event.DEPARTED
-        return None
+        match (prev, current):
+            case (None, str()):
+                return _Event.ARRIVED
+            case (str(), None):
+                return _Event.DEPARTED
+            case (str() as p, str() as c) if p != c:
+                return _Event.ARRIVED
+            case _:
+                return None
 
     # ---- internal: state-machine dispatch --------------------------------
 
