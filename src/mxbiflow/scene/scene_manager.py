@@ -3,6 +3,7 @@ from pathlib import Path
 from pygame import Event, Surface
 
 from ..config_store import ConfigStore
+from ..default.idle.idle import IDLE
 from ..models.session import Options
 from .scene_protocol import SceneProtocol
 
@@ -13,6 +14,12 @@ class SceneManager:
     def __init__(self) -> None:
         self.current: SceneProtocol | None = None
         self._pending: SceneProtocol | None = None
+        self._default_scene: type[SceneProtocol] = IDLE
+        self._unknown_animal_fallback: type[SceneProtocol] = IDLE
+        self._fault_fallback: type[SceneProtocol] = IDLE
+
+    def init(self) -> None:
+        self.switch(self._default_scene, defer=False)
 
     def persist(self, path: Path) -> None:
         options_store = ConfigStore(path, Options)
@@ -34,6 +41,30 @@ class SceneManager:
     @property
     def scenes(self) -> dict[str, type[SceneProtocol]]:
         return self._scenes
+
+    @property
+    def default_scene(self) -> type[SceneProtocol]:
+        return self._default_scene
+
+    @default_scene.setter
+    def default_scene(self, scene: type[SceneProtocol]) -> None:
+        self._default_scene = scene
+
+    @property
+    def unknown_animal_fallback(self) -> type[SceneProtocol]:
+        return self._unknown_animal_fallback
+
+    @unknown_animal_fallback.setter
+    def unknown_animal_fallback(self, scene: type[SceneProtocol]) -> None:
+        self._unknown_animal_fallback = scene
+
+    @property
+    def fault_fallback(self) -> type[SceneProtocol]:
+        return self._fault_fallback
+
+    @fault_fallback.setter
+    def fault_fallback(self, scene: type[SceneProtocol]) -> None:
+        self._fault_fallback = scene
 
     def switch(self, scene: type[SceneProtocol], defer: bool = True) -> None:
         if defer:

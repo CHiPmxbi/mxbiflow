@@ -30,6 +30,7 @@ class Game:
         self._scheduler = Scheduler(self._session, self._scene_manager)
 
         self._mxbiflow = MXBIFlow(self._session, self._mxbi)
+
         set_mxbiflow(self._mxbiflow)
 
         self._screen = pygame.display.set_mode(
@@ -37,6 +38,8 @@ class Game:
         )
         self._clock = pygame.time.Clock()
         self._running = True
+
+        self._scene_manager.init()
 
     def play(self) -> None:
         while self._running:
