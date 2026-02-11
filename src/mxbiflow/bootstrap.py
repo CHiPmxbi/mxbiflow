@@ -2,19 +2,17 @@ import pymxbi
 from loguru import logger
 from pymxbi import MXBI, MXBIModel
 
-from .config_store import ConfigStore
-from .detector_bridge import DetectorBridge
-from .game import Game
-from .models.animal import Animal, StageState
-from .models.session import DailySessionIdStore, Session, SessionConfig
-from .path import (
+from .core.config_store import ConfigStore
+from .core.path import (
     get_config_session_path,
     get_mxbi_config_path,
     get_session_counter_path,
 )
+from .gameloop.detector_bridge import DetectorBridge
+from .gameloop.game import Game
+from .models.animal import Animal, StageState
+from .models.session import DailySessionIdStore, Session, SessionConfig
 from .scene import SceneManager
-from .ui.experiment_panel import ExperimentPanel
-from .ui.mxbi_panel import MXBIPanel
 
 
 def init_gameloop(scene_manager: SceneManager) -> Game:
@@ -110,36 +108,3 @@ def init_session() -> Session:
     session.start()
 
     return session
-
-
-def config_wizard(scene_manager: SceneManager):
-    """
-    Launch the configuration wizard dialog for MXBI setup.
-
-    Parameters
-    ----------
-    scene_manager : SceneManager
-        The scene manager instance providing stage and level information.
-
-    Notes
-    -----
-    This function creates a Qt application with a two-panel wizard:
-    MXBIPanel for MXBI configuration followed by ExperimentPanel for
-    experiment settings. The application exits when the wizard completes.
-    """
-    import sys
-
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication(sys.argv)
-
-    mxbi_panel = MXBIPanel()
-    experiment_panel = ExperimentPanel(scene_manager)
-    mxbi_panel.accepted.connect(experiment_panel.show)
-    mxbi_panel.rejected.connect(lambda: sys.exit(0))
-    experiment_panel.accepted.connect(app.quit)
-    experiment_panel.rejected.connect(lambda: sys.exit(0))
-
-    mxbi_panel.show()
-
-    app.exec()

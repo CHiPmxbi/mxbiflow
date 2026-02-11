@@ -1,6 +1,6 @@
 from pygame import Event, Surface
 
-from ..default.idle.idle import IDLE
+from .idle.idle import IDLE
 from .scene_protocol import SceneProtocol
 
 

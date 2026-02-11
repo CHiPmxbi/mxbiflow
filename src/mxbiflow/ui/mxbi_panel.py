@@ -10,9 +10,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config_store import ConfigStore
+from ..core.config_store import ConfigStore
 from ..models.session import Options
-from ..path import get_mxbi_config_path, get_options_session_path
+from ..core.path import get_mxbi_config_path, get_options_session_path
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
     BeambreakDetectorCard,

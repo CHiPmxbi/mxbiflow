@@ -1,5 +1,5 @@
-from .mxbiflow import MXBIFlow, get_mxbiflow
-from .path import get_base_path, set_base_path
+from .core.context import MXBIFlow, get_mxbiflow
+from .core.path import get_base_path, set_base_path
 
 __all__ = [
     "MXBIFlow",

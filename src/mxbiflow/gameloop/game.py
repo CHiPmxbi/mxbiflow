@@ -2,10 +2,10 @@ import pygame
 from pygame import Event
 from pymxbi import MXBI
 
+from ..core.context import MXBIFlow, set_mxbiflow
+from ..models.session import Session
+from ..scene import SceneManager
 from .detector_bridge import DetectorBridge
-from .models.session import Session
-from .mxbiflow import MXBIFlow, set_mxbiflow
-from .scene import SceneManager
 from .scheduler import Scheduler
 
 

@@ -7,9 +7,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config_store import ConfigStore
+from ..core.config_store import ConfigStore
 from ..models.session import Options, SessionConfig
-from ..path import get_config_session_path, get_options_session_path
+from ..core.path import get_config_session_path, get_options_session_path
 from ..scene import SceneManager
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,

@@ -2,7 +2,7 @@ import sys
 
 from loguru import logger
 
-from ..path import get_log_path
+from ..core.path import get_log_path
 
 logger.remove()
 

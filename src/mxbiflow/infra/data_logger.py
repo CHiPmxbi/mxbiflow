@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 
-from .utils.logger import logger
+from ..utils.logger import logger
 
 now = datetime.now()
 
