@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from ..config_store import ConfigStore
 from ..models.session import Options, SessionConfig
 from ..path import get_config_session_path, get_options_session_path
+from ..scene import SceneManager
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,
     ExperimentConfigGroup,
@@ -21,11 +22,12 @@ class ExperimentPanel(QMainWindow):
     accepted = Signal()
     rejected = Signal()
 
-    def __init__(self):
+    def __init__(self, scene_manager: SceneManager):
         super().__init__()
         self._accepted = False
         self._config = ConfigStore(get_config_session_path(), SessionConfig)
         self._options = ConfigStore(get_options_session_path(), Options)
+        self._stage_level_tables = scene_manager.stage_level_tables
 
         self.setWindowTitle("Experiment Panel")
 
@@ -40,11 +42,15 @@ class ExperimentPanel(QMainWindow):
         )
         layout_main.addWidget(self.group_config)
 
-        self.group_scene = ExperimentSceneGroup(self, stages=self._options.value.stages)
+        self.group_scene = ExperimentSceneGroup(
+            self, stages=list(self._stage_level_tables.keys())
+        )
         layout_main.addWidget(self.group_scene)
 
         self.group_animals = ExperimentAnimalsGroup(
-            self, animals=self._options.value.animals, options=self._options.value
+            self,
+            animals=self._options.value.animals,
+            stage_level_tables=self._stage_level_tables,
         )
         layout_main.addWidget(self.group_animals)
 

@@ -1,10 +1,6 @@
-from pathlib import Path
-
 from pygame import Event, Surface
 
-from ..config_store import ConfigStore
 from ..default.idle.idle import IDLE
-from ..models.session import Options
 from .scene_protocol import SceneProtocol
 
 
@@ -21,12 +17,6 @@ class SceneManager:
     def init(self) -> None:
         self.switch(self._default_scene, defer=False)
 
-    def persist(self, path: Path) -> None:
-        options_store = ConfigStore(path, Options)
-
-        options_store.value.stages = list(self._scenes.keys())
-        options_store.save()
-
     def register(
         self, scene: dict[str, type[SceneProtocol]] | list[type[SceneProtocol]]
     ) -> None:
@@ -41,6 +31,10 @@ class SceneManager:
     @property
     def scenes(self) -> dict[str, type[SceneProtocol]]:
         return self._scenes
+
+    @property
+    def stage_level_tables(self) -> dict[str, dict[str, list[int]]]:
+        return {name: scene.level_table for name, scene in self._scenes.items()}
 
     @property
     def default_scene(self) -> type[SceneProtocol]:

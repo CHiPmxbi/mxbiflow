@@ -112,9 +112,14 @@ def init_session() -> Session:
     return session
 
 
-def config_wizard():
+def config_wizard(scene_manager: SceneManager):
     """
     Launch the configuration wizard dialog for MXBI setup.
+
+    Parameters
+    ----------
+    scene_manager : SceneManager
+        The scene manager instance providing stage and level information.
 
     Notes
     -----
@@ -129,7 +134,7 @@ def config_wizard():
     app = QApplication(sys.argv)
 
     mxbi_panel = MXBIPanel()
-    experiment_panel = ExperimentPanel()
+    experiment_panel = ExperimentPanel(scene_manager)
     mxbi_panel.accepted.connect(experiment_panel.show)
     mxbi_panel.rejected.connect(lambda: sys.exit(0))
     experiment_panel.accepted.connect(app.quit)

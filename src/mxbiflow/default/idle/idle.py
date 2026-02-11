@@ -17,6 +17,7 @@ class Asset:
 
 class IDLE:
     _running: bool
+    level_table: dict[str, list[int]] = {}
 
     def __init__(self) -> None:
         self._mxbiflow = get_mxbiflow()

@@ -7,6 +7,7 @@ from pygame.surface import Surface
 @runtime_checkable
 class SceneProtocol(Protocol):
     _running: bool
+    level_table: dict[str, list[int]]
 
     def start(self) -> None: ...
 

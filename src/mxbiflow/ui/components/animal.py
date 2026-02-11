@@ -2,17 +2,23 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QLineEdit, QMenu
 
 from ...models.animal import AnimalConfig
-from ...models.session import Options
 from .card import CardFrame
+
+# stage_name -> {animal_name -> [level_ids]}
+StageLevelTables = dict[str, dict[str, list[int]]]
 
 
 class AnimalCard(CardFrame):
     remove_requested = Signal()
 
-    def __init__(self, parent, animals: dict[str, str], options: Options):
+    def __init__(
+        self, parent, animals: dict[str, str], stage_level_tables: StageLevelTables
+    ):
         super().__init__(parent=parent, object_name="card")
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
+
+        self._stage_level_tables = stage_level_tables
 
         items = list(animals.items())
         self._animal_ids = [animal_id for animal_id, _name in items]
@@ -34,22 +40,40 @@ class AnimalCard(CardFrame):
         layout.addRow(lable_animal_id, self.line_animal_id)
 
         label_stage = QLabel("stage", self)
-        items = options.stages
         self.combo_stage = QComboBox(self)
-        self.combo_stage.addItems(items)
+        self.combo_stage.addItems(list(stage_level_tables.keys()))
         self.combo_stage.setCurrentText("idle")
+        self.combo_stage.currentTextChanged.connect(self._on_stage_changed)
         layout.addRow(label_stage, self.combo_stage)
 
         label_level = QLabel("level", self)
         self.combo_level = QComboBox(self)
-        self.combo_level.addItems(["0", "1"])
-        self.combo_level.setCurrentText("0")
         layout.addRow(label_level, self.combo_level)
 
         self._sync_animal_id()
+        self._sync_levels()
 
     def _on_animal_changed(self, _index: int) -> None:
         self._sync_animal_id()
+        self._sync_levels()
+
+    def _on_stage_changed(self, _text: str) -> None:
+        self._sync_levels()
+
+    def _sync_levels(self) -> None:
+        stage = self.combo_stage.currentText()
+        animal_name = self.combo_animal_name.currentText()
+
+        level_table = self._stage_level_tables.get(stage, {})
+        levels = level_table.get(animal_name) or level_table.get("default", [])
+
+        self.combo_level.clear()
+        if levels:
+            self.combo_level.addItems([str(lv) for lv in levels])
+            self.combo_level.setCurrentIndex(0)
+            self.combo_level.setEnabled(True)
+        else:
+            self.combo_level.setEnabled(False)
 
     def _sync_animal_id(self) -> None:
         index = self.combo_animal_name.currentIndex()
@@ -81,5 +105,5 @@ class AnimalCard(CardFrame):
             rfid_id=self.animal_id(),
             name=self.animal_name(),
             stage=self.combo_stage.currentText(),
-            level=int(self.combo_level.currentText()),
+            level=int(self.combo_level.currentText()) if self.combo_level.currentText() else 0,
         )
