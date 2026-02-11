@@ -2,6 +2,7 @@ from pymxbi.detector import RFIDContinuousDetectorModel
 from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
+    QLineEdit,
 )
 
 from .....utils.serial import get_all_ports, get_baudrates
@@ -24,11 +25,23 @@ class RFIDDetectorCard(DeviceCard[RFIDContinuousDetectorModel]):
             self.combo_baudrate.addItem(text, value)
         self.layout_config.addRow(lable_baudrate, self.combo_baudrate)
 
+        label_poll_interval = QLabel("Poll Interval:")
+        self._line_poll_interval = QLineEdit()
+        self._line_poll_interval.setPlaceholderText("Poll Interval (s)")
+        self.layout_config.addRow(label_poll_interval, self._line_poll_interval)
+
+        label_max_tag_age = QLabel("Max Tag Age:")
+        self._line_max_tag_age = QLineEdit()
+        self._line_max_tag_age.setPlaceholderText("Max Tag Age (s)")
+        self.layout_config.addRow(label_max_tag_age, self._line_max_tag_age)
+
     def load_config(self, model: RFIDContinuousDetectorModel) -> None:
         self.checkbox_enabled.setChecked(model.enabled)
         self.line_device_id.setText(str(model.id))
         self.combo_port.setCurrentText(model.port)
         self.combo_baudrate.setCurrentText(str(model.baudrate))
+        self._line_poll_interval.setText(str(model.poll_interval))
+        self._line_max_tag_age.setText(str(model.max_tag_age_seconds))
 
     @property
     def result(self) -> RFIDContinuousDetectorModel:
@@ -37,4 +50,6 @@ class RFIDDetectorCard(DeviceCard[RFIDContinuousDetectorModel]):
             id=int(self.line_device_id.text()),
             port=self.combo_port.currentText(),
             baudrate=int(self.combo_baudrate.currentText()),
+            poll_interval=float(self._line_poll_interval.text()),
+            max_tag_age_seconds=float(self._line_max_tag_age.text()),
         )
