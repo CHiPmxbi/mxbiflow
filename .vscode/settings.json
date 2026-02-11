@@ -1,6 +1,7 @@
 {
     "Codegeex.RepoIndex": true,
     "conventionalCommits.scopes": [
-        "scene"
+        "scene",
+        "models"
     ]
 }

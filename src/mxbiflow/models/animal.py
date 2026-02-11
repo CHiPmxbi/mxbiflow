@@ -1,6 +1,10 @@
 from time import time
+from typing import TypeVar
+
 
 from pydantic import BaseModel, Field, PrivateAttr
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class AnimalConfig(BaseModel):
@@ -25,6 +29,20 @@ class StageState(BaseModel):
 
     level: int = Field(default=0, ge=0)
     level_trial_id: int = Field(default=0, ge=0)
+
+    _context: BaseModel | None = PrivateAttr(default=None)
+
+    def get_context(self, context_type: type[T]) -> T | None:
+        if self._context is None:
+            return None
+        if not isinstance(self._context, context_type):
+            raise TypeError(
+                f"Expected {context_type.__name__}, got {type(self._context).__name__}"
+            )
+        return self._context
+
+    def set_context(self, context: BaseModel) -> None:
+        self._context = context
 
     def level_up(self):
         self.level_trial_id = 0
