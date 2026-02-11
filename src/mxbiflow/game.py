@@ -20,6 +20,15 @@ class Game:
         pygame.init()
 
         self._scene_manager = scene_manager
+        if session.default_scene:
+            self._scene_manager.default_scene = session.default_scene
+        if session.unknown_animal_fallback:
+            self._scene_manager.unknown_animal_fallback = (
+                session.unknown_animal_fallback
+            )
+        if session.fault_fallback:
+            self._scene_manager.fault_fallback = session.fault_fallback
+
         self._session = session
         self._mxbi = mxbi
         self._aplayer = self._mxbi.aplayer

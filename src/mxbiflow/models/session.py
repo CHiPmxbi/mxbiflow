@@ -91,6 +91,10 @@ class Session(BaseModel):
     send_email: bool = Field(default=False, frozen=True)
     sync_data: bool = Field(default=False, frozen=True)
 
+    default_scene: str = Field(default="", frozen=True)
+    unknown_animal_fallback: str = Field(default="", frozen=True)
+    fault_fallback: str = Field(default="", frozen=True)
+
     session_id: int = Field(default=0, ge=0)
     start_at: float = Field(default=0, ge=0)
     end_at: float = Field(default=0, ge=0)

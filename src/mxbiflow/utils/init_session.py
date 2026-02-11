@@ -28,6 +28,9 @@ def init_session(session_config_path: Path, session_counter_path: Path) -> Sessi
         send_email=False,
         sync_data=False,
         note=session_config.note,
+        default_scene=session_config.default_scene,
+        unknown_animal_fallback=session_config.unknown_animal_fallback,
+        fault_fallback=session_config.fault_fallback,
         animals=animal_dict,
     )
     session.start()
