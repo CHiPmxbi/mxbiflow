@@ -19,9 +19,11 @@ from .components.experiment_groups import (
 
 class ExperimentPanel(QMainWindow):
     accepted = Signal()
+    rejected = Signal()
 
     def __init__(self):
         super().__init__()
+        self._accepted = False
         self._config = ConfigStore(get_config_session_path(), SessionConfig)
         self._options = ConfigStore(get_options_session_path(), Options)
 
@@ -89,5 +91,11 @@ class ExperimentPanel(QMainWindow):
 
     def _on_continue(self):
         self._on_save()
+        self._accepted = True
         self.close()
         self.accepted.emit()
+
+    def closeEvent(self, event) -> None:
+        super().closeEvent(event)
+        if event.isAccepted() and not self._accepted:
+            self.rejected.emit()

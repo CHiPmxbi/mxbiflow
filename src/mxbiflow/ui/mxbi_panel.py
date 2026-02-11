@@ -27,6 +27,7 @@ from .components.devices import Devices
 
 class MXBIPanel(QMainWindow):
     accepted = Signal()
+    rejected = Signal()
 
     _REWARDER_CARD_FACTORIES: dict[str, type[QWidget]] = {
         RewarderEnum.RPI_GPIO: RPIGpioPumpCard,
@@ -45,6 +46,7 @@ class MXBIPanel(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self._accepted = False
         self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
         self._options = ConfigStore(get_options_session_path(), Options)
 
@@ -126,6 +128,7 @@ class MXBIPanel(QMainWindow):
     def _on_continue(self) -> None:
         self._collect_result()
         self._config.save()
+        self._accepted = True
         self.close()
         self.accepted.emit()
 
@@ -140,3 +143,8 @@ class MXBIPanel(QMainWindow):
 
     def _on_cancel(self) -> None:
         self.close()
+
+    def closeEvent(self, event) -> None:
+        super().closeEvent(event)
+        if event.isAccepted() and not self._accepted:
+            self.rejected.emit()
