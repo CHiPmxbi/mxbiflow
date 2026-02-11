@@ -6,13 +6,34 @@ def main() -> None:
 
     assert pymxbi.__name__ == "pymxbi"
 
-    from pymxbi.detector.detector import (  # noqa: F401
-        DetectionResult,
+    from pymxbi.mxbi import MXBI, MXBIModel, build_mxbi, get_mxbi, set_mxbi # noqa: F401
+
+    from pymxbi.detector import (  # noqa: F401
         Detector,
-        DetectorEvent,
-        DetectorState,
+        DetectorEnum,
+        DetectorModel,
+        MockDetector,
+        MockDetectorModel,
+        StandardGateDetector,
+        RFIDContinuousDetector,
+        RFIDContinuousDetectorModel,
+        BeambreakContinuousDetector,
+        BeamBreakContinuousDetectorModel,
+        FusionContinuousDetector,
+        FusionContinuousDetectorModel,
+        detectors,
     )
-    from pymxbi.rewarder.rewarder import Rewarder  # noqa: F401
+
+    from pymxbi.rewarder import (  # noqa: F401
+        Rewarder,
+        RewarderEnum,
+        RewarderModel,
+        MockRewarder,
+        MockRewarderModel,
+        RPIGpioRewarder,
+        GPIORewarderModel,
+        rewarders,
+    )
 
     subprocess.run(["pymxbi", "--help"], check=True, capture_output=True, text=True)
 
