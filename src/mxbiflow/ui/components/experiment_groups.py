@@ -1,3 +1,5 @@
+from typing import NamedTuple
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -45,6 +47,52 @@ class ExperimentConfigGroup(QGroupBox):
             experimenter=self.combo_experimenter.currentText(),
             reward_type=RewardEnum(self.combo_reward_type.currentText()),
             note=self.line_notes.text(),
+        )
+
+
+class SceneSelection(NamedTuple):
+    default_scene: str
+    unknown_animal_fallback: str
+    fault_fallback: str
+
+
+class ExperimentSceneGroup(QGroupBox):
+    def __init__(self, parent=None, *, stages: list[str]):
+        super().__init__("Scene", parent)
+
+        layout = QFormLayout(self)
+        self.setLayout(layout)
+
+        label_default = QLabel("default scene", self)
+        self.combo_default_scene = QComboBox(self)
+        self.combo_default_scene.addItems(stages)
+        layout.addRow(label_default, self.combo_default_scene)
+
+        label_unknown = QLabel("unknown animal fallback", self)
+        self.combo_unknown_animal_fallback = QComboBox(self)
+        self.combo_unknown_animal_fallback.addItems(stages)
+        layout.addRow(label_unknown, self.combo_unknown_animal_fallback)
+
+        label_fault = QLabel("fault fallback", self)
+        self.combo_fault_fallback = QComboBox(self)
+        self.combo_fault_fallback.addItems(stages)
+        layout.addRow(label_fault, self.combo_fault_fallback)
+
+    def load_config(self, config: SessionConfig):
+        if config.default_scene:
+            self.combo_default_scene.setCurrentText(config.default_scene)
+        if config.unknown_animal_fallback:
+            self.combo_unknown_animal_fallback.setCurrentText(
+                config.unknown_animal_fallback
+            )
+        if config.fault_fallback:
+            self.combo_fault_fallback.setCurrentText(config.fault_fallback)
+
+    def result(self) -> SceneSelection:
+        return SceneSelection(
+            default_scene=self.combo_default_scene.currentText(),
+            unknown_animal_fallback=self.combo_unknown_animal_fallback.currentText(),
+            fault_fallback=self.combo_fault_fallback.currentText(),
         )
 
 

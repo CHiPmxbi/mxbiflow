@@ -11,7 +11,11 @@ from PySide6.QtWidgets import (
 
 from ..config_store import ConfigStore
 from ..models.session import Options, SessionConfig
-from .components.experiment_groups import ExperimentAnimalsGroup, ExperimentConfigGroup
+from .components.experiment_groups import (
+    ExperimentAnimalsGroup,
+    ExperimentConfigGroup,
+    ExperimentSceneGroup,
+)
 
 
 class ExperimentPanel(QMainWindow):
@@ -34,6 +38,11 @@ class ExperimentPanel(QMainWindow):
             self, self._options.value.experimenter
         )
         layout_main.addWidget(self.group_config)
+
+        self.group_scene = ExperimentSceneGroup(
+            self, stages=self._options.value.stages
+        )
+        layout_main.addWidget(self.group_scene)
 
         self.group_animals = ExperimentAnimalsGroup(
             self, animals=self._options.value.animals, options=self._options.value
@@ -63,10 +72,15 @@ class ExperimentPanel(QMainWindow):
 
     def load_config(self):
         self.group_config.load_config(self._config.value)
+        self.group_scene.load_config(self._config.value)
         self.group_animals.load_config(self._config.value)
 
     def result(self) -> SessionConfig:
         session_config = self.group_config.result()
+        scene_result = self.group_scene.result()
+        session_config.default_scene = scene_result.default_scene
+        session_config.unknown_animal_fallback = scene_result.unknown_animal_fallback
+        session_config.fault_fallback = scene_result.fault_fallback
         session_config.animals = self.group_animals.result()
         return session_config
 

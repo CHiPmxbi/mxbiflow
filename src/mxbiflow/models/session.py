@@ -17,6 +17,10 @@ class SessionConfig(BaseModel):
     sync_data: bool = Field(default=False, frozen=True)
     note: str = Field(default="", max_length=1000)
 
+    default_scene: str = Field(default="")
+    unknown_animal_fallback: str = Field(default="")
+    fault_fallback: str = Field(default="")
+
     animals: list[AnimalConfig] = Field(default_factory=list)
 
 

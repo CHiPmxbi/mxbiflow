@@ -47,24 +47,24 @@ class SceneManager:
         return self._default_scene
 
     @default_scene.setter
-    def default_scene(self, scene: type[SceneProtocol]) -> None:
-        self._default_scene = scene
+    def default_scene(self, name: str) -> None:
+        self._default_scene = self._scenes[name]
 
     @property
     def unknown_animal_fallback(self) -> type[SceneProtocol]:
         return self._unknown_animal_fallback
 
     @unknown_animal_fallback.setter
-    def unknown_animal_fallback(self, scene: type[SceneProtocol]) -> None:
-        self._unknown_animal_fallback = scene
+    def unknown_animal_fallback(self, name: str) -> None:
+        self._unknown_animal_fallback = self._scenes[name]
 
     @property
     def fault_fallback(self) -> type[SceneProtocol]:
         return self._fault_fallback
 
     @fault_fallback.setter
-    def fault_fallback(self, scene: type[SceneProtocol]) -> None:
-        self._fault_fallback = scene
+    def fault_fallback(self, name: str) -> None:
+        self._fault_fallback = self._scenes[name]
 
     def switch(self, scene: type[SceneProtocol], defer: bool = True) -> None:
         if defer:
