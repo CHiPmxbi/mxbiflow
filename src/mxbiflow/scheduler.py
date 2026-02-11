@@ -42,6 +42,8 @@ class Scheduler:
 
     def _handle_fault_event(self) -> None: ...
 
+    def _handle_unknown_animal(self) -> None: ...
+
     def handle_event(self, event: Event) -> None:
         if event.type != EVT_DETECTOR:
             return
@@ -56,6 +58,9 @@ class Scheduler:
                 if msg.animal is None:
                     return
                 self._set_current_animal(msg.animal)
+
+            case DetectorEvent.UNKNOWN_ANIMAL_ENTERED:
+                self._handle_unknown_animal()
 
             case DetectorEvent.ANIMAL_LEFT:
                 self._clear_current_animal()
