@@ -151,4 +151,3 @@ class Options(BaseModel):
     mxbis: list[str] = Field(default_factory=list, frozen=True)
     experimenter: list[str] = Field(default_factory=list, frozen=True)
     animals: dict[str, str] = Field(default_factory=dict, frozen=True)
-    stages: list[str] = Field(default_factory=list)
