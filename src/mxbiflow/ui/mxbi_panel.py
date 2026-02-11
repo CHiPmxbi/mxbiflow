@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
@@ -14,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from ..config_store import ConfigStore
 from ..models.session import Options
+from ..path import get_mxbi_config_path, get_options_session_path
 from .components.baseconfig import BaseConfig
 from .components.device_card import (
     BeambreakDetectorCard,
@@ -44,10 +43,10 @@ class MXBIPanel(QMainWindow):
     # Lifecycle / Init
     # -----------------------------
 
-    def __init__(self, mxbi_config_path: Path, options_path: Path):
+    def __init__(self):
         super().__init__()
-        self._config = ConfigStore(mxbi_config_path, MXBIModel)
-        self._options = ConfigStore(options_path, Options)
+        self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
+        self._options = ConfigStore(get_options_session_path(), Options)
 
         self._build_ui()
         self._load_from_config()

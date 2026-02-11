@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -11,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from ..config_store import ConfigStore
 from ..models.session import Options, SessionConfig
+from ..path import get_config_session_path, get_options_session_path
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,
     ExperimentConfigGroup,
@@ -21,10 +20,10 @@ from .components.experiment_groups import (
 class ExperimentPanel(QMainWindow):
     accepted = Signal()
 
-    def __init__(self, session_config_path: Path, options_path: Path):
+    def __init__(self):
         super().__init__()
-        self._config = ConfigStore(session_config_path, SessionConfig)
-        self._options = ConfigStore(options_path, Options)
+        self._config = ConfigStore(get_config_session_path(), SessionConfig)
+        self._options = ConfigStore(get_options_session_path(), Options)
 
         self.setWindowTitle("Experiment Panel")
 
@@ -39,9 +38,7 @@ class ExperimentPanel(QMainWindow):
         )
         layout_main.addWidget(self.group_config)
 
-        self.group_scene = ExperimentSceneGroup(
-            self, stages=self._options.value.stages
-        )
+        self.group_scene = ExperimentSceneGroup(self, stages=self._options.value.stages)
         layout_main.addWidget(self.group_scene)
 
         self.group_animals = ExperimentAnimalsGroup(

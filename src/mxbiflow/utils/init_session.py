@@ -1,13 +1,12 @@
-from pathlib import Path
-
 from ..config_store import ConfigStore
 from ..models.animal import Animal, StageState
 from ..models.session import DailySessionIdStore, Session, SessionConfig
+from ..path import get_config_session_path, get_session_counter_path
 
 
-def init_session(session_config_path: Path, session_counter_path: Path) -> Session:
-    session_config = ConfigStore(session_config_path, SessionConfig).value
-    store = DailySessionIdStore(session_counter_path)
+def init_session() -> Session:
+    session_config = ConfigStore(get_config_session_path(), SessionConfig).value
+    store = DailySessionIdStore(get_session_counter_path())
 
     animal_dict: dict[str, Animal] = {}
     for animal_config in session_config.animals:

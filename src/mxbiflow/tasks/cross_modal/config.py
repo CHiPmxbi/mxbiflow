@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from mxbi.path import CROSS_MODAL_CONFIG_PATH
 from pydantic import BaseModel, Field
+
+from ...path import get_cross_modal_config_path
 
 
 class CrossModalVisualConfig(BaseModel):
@@ -28,14 +29,16 @@ class CrossModalConfig(BaseModel):
     timing: CrossModalTimingConfig = Field(default_factory=CrossModalTimingConfig)
 
 
-def load_cross_modal_config(path: Path = CROSS_MODAL_CONFIG_PATH) -> CrossModalConfig:
+def load_cross_modal_config(path: Path | None = None) -> CrossModalConfig:
+    if path is None:
+        path = get_cross_modal_config_path()
     if not path.exists():
         raise FileNotFoundError(f"Cross-modal config not found: {path}")
     return CrossModalConfig.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-def save_cross_modal_config(
-    config: CrossModalConfig, path: Path = CROSS_MODAL_CONFIG_PATH
-) -> None:
+def save_cross_modal_config(config: CrossModalConfig, path: Path | None = None) -> None:
+    if path is None:
+        path = get_cross_modal_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(config.model_dump(), indent=4), encoding="utf-8")

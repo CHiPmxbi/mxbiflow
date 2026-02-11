@@ -1,37 +1,79 @@
 from pathlib import Path
 
-# TODO: XDG Base Directory Specification
-ROOT_DIR_PATH = Path(__file__).parents[2]
+_base_path: Path | None = None
 
-CONFIG_DIR_PATH = ROOT_DIR_PATH / "config"
-CONFIG_SESSION_FILENAME = "config_session.json"
-CONFIG_SESSION_PATH = CONFIG_DIR_PATH / CONFIG_SESSION_FILENAME
-
-OPTIONS_SESSION_FILENAME = "options_session.json"
-OPTIONS_SESSION_PATH = CONFIG_DIR_PATH / OPTIONS_SESSION_FILENAME
-
-ANIMAL_DB_FILENAME = "animal_db.json"
-ANIMAL_DB_PATH = CONFIG_DIR_PATH / ANIMAL_DB_FILENAME
-
+CONFIG_SESSION_FILENAME = "session.json"
+OPTIONS_SESSION_FILENAME = "options.json"
+MXBI_CONFIG_FILENAME = "mxbi.json"
 CROSS_MODAL_CONFIG_FILENAME = "config_cross_modal.json"
-CROSS_MODAL_CONFIG_PATH = CONFIG_DIR_PATH / CROSS_MODAL_CONFIG_FILENAME
-
-DATA_DIR_PATH = ROOT_DIR_PATH / "data"
-
-LOG_PATH = ROOT_DIR_PATH / "log"
-
-SAMBA_MOUNT_PATH = ROOT_DIR_PATH / "samba_mount"
 SAMBA_BACKUP_DIR_NAME = "backup"
-SAMBA_BACKUP_DIR_PATH = SAMBA_MOUNT_PATH / SAMBA_BACKUP_DIR_NAME
-
 SERVICE_DIR_NAME = "services"
-SERVICE_DIR_PATH = ROOT_DIR_PATH / SERVICE_DIR_NAME
 MOUNT_SERVICE_NAME = "mount.service"
-MOUNT_SERVICE_PATH = SERVICE_DIR_PATH / MOUNT_SERVICE_NAME
 SYNC_SERVICE_NAME = "sync.service"
-SYNC_SERVICE_PATH = SERVICE_DIR_PATH / SYNC_SERVICE_NAME
 
-SESSION_COUNTER_PATH = CONFIG_DIR_PATH / "session_counter.json"
 
-ASSETS_DIR_PATH = ROOT_DIR_PATH / "assets"
-ASSET_CLICKER_PATH = ASSETS_DIR_PATH / "clicker.wav"
+def set_base_path(path: Path | str) -> None:
+    global _base_path
+    _base_path = Path(path)
+
+
+def get_base_path() -> Path:
+    if _base_path is None:
+        raise RuntimeError("Base path not set. Call set_base_path() first.")
+    return _base_path
+
+
+def get_config_dir_path() -> Path:
+    return get_base_path() / "config"
+
+
+def get_mxbi_config_path() -> Path:
+    return get_config_dir_path() / MXBI_CONFIG_FILENAME
+
+
+def get_config_session_path() -> Path:
+    return get_config_dir_path() / CONFIG_SESSION_FILENAME
+
+
+def get_options_session_path() -> Path:
+    return get_config_dir_path() / OPTIONS_SESSION_FILENAME
+
+
+def get_cross_modal_config_path() -> Path:
+    return get_config_dir_path() / CROSS_MODAL_CONFIG_FILENAME
+
+
+def get_data_dir_path() -> Path:
+    return get_base_path() / "data"
+
+
+def get_log_path() -> Path:
+    return get_base_path() / "log"
+
+
+def get_samba_mount_path() -> Path:
+    return get_base_path() / "samba_mount"
+
+
+def get_samba_backup_dir_path() -> Path:
+    return get_samba_mount_path() / SAMBA_BACKUP_DIR_NAME
+
+
+def get_service_dir_path() -> Path:
+    return get_base_path() / SERVICE_DIR_NAME
+
+
+def get_mount_service_path() -> Path:
+    return get_service_dir_path() / MOUNT_SERVICE_NAME
+
+
+def get_sync_service_path() -> Path:
+    return get_service_dir_path() / SYNC_SERVICE_NAME
+
+
+def get_internal_state_path() -> Path:
+    return get_base_path() / ".mxbiflow" / "state"
+
+
+def get_session_counter_path() -> Path:
+    return get_internal_state_path() / "session_counter.json"
