@@ -1,7 +1,7 @@
 from pymxbi import MXBI
 
-from ..models.session import Session
 from ..infra.timer import FrameTimer
+from ..models.session import Session
 
 
 class MXBIFlow:

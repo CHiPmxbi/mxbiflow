@@ -1,7 +1,6 @@
 from time import time
 from typing import TypeVar
 
-
 from pydantic import BaseModel, Field, PrivateAttr
 
 T = TypeVar("T", bound=BaseModel)

@@ -105,5 +105,7 @@ class AnimalCard(CardFrame):
             rfid_id=self.animal_id(),
             name=self.animal_name(),
             stage=self.combo_stage.currentText(),
-            level=int(self.combo_level.currentText()) if self.combo_level.currentText() else 0,
+            level=int(self.combo_level.currentText())
+            if self.combo_level.currentText()
+            else 0,
         )

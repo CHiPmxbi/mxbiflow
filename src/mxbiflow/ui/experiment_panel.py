@@ -8,8 +8,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.config_store import ConfigStore
-from ..models.session import Options, SessionConfig
 from ..core.path import get_config_session_path, get_options_session_path
+from ..models.session import Options, SessionConfig
 from ..scene import SceneManager
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,

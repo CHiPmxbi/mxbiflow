@@ -1,4 +1,4 @@
-from .detector_bridge import DetectorBridge, DetectorMsg, EVT_DETECTOR
+from .detector_bridge import EVT_DETECTOR, DetectorBridge, DetectorMsg
 from .game import Game
 from .scheduler import Scheduler
 
