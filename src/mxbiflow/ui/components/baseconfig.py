@@ -45,6 +45,7 @@ class BaseConfig(QGroupBox):
     def _bind_events(self) -> None:
         self._combo_mxbi.currentTextChanged.connect(self._emit_changed)
         self._combo_platform.currentTextChanged.connect(self._emit_changed)
+        self._combo_screen.currentTextChanged.connect(self._emit_changed)
 
     @property
     def mxbi_id(self) -> str:
@@ -54,9 +55,16 @@ class BaseConfig(QGroupBox):
     def platform(self) -> str:
         return self._combo_platform.currentText()
 
+    @property
+    def screen_size(self) -> tuple[int, int]:
+        return self._combo_screen.currentData()
+
     def load_from_model(self, model: MXBIModel) -> None:
         self._combo_mxbi.setCurrentText(str(model.mxbi_id))
         self._combo_platform.setCurrentText(str(model.platform))
+        idx = self._combo_screen.findData(model.screen_size)
+        if idx != -1:
+            self._combo_screen.setCurrentIndex(idx)
 
     def apply_to_model(self, model: MXBIModel) -> None:
         mxbi_id_text = self._combo_mxbi.currentText().strip()
@@ -66,3 +74,4 @@ class BaseConfig(QGroupBox):
             model.mxbi_id = 0
 
         model.platform = PlatformEnum(self._combo_platform.currentText())
+        model.screen_size = self._combo_screen.currentData()
