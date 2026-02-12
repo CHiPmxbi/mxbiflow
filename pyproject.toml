@@ -1,6 +1,6 @@
 [project]
 name = "mxbiflow"
-version = "0.1.6"
+version = "0.1.7"
 description = "mxbiflow is a toolkit based on pygame and pymxbi"
 readme = "README.md"
 authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
