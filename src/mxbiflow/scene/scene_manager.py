@@ -14,6 +14,8 @@ class SceneManager:
         self._unknown_animal_fallback: type[SceneProtocol] = IDLE
         self._fault_fallback: type[SceneProtocol] = IDLE
 
+        self.register([IDLE])
+
     def init(self) -> None:
         self.switch(self._default_scene, defer=False)
 
