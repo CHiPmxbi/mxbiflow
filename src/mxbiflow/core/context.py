@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from pymxbi import MXBI
 
 from ..infra.timer import FrameTimer
 from ..models.session import Session
+from .path import get_data_dir_path
 
 
 class MXBIFlow:
@@ -21,6 +24,10 @@ class MXBIFlow:
     @property
     def mxbi(self) -> MXBI:
         return self._mxbi
+
+    @property
+    def data_dir(self) -> Path:
+        return get_data_dir_path()
 
     def update(self) -> None:
         self._timer.update()
