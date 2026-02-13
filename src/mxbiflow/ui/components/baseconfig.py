@@ -62,9 +62,10 @@ class BaseConfig(QGroupBox):
     def load_from_model(self, model: MXBIModel) -> None:
         self._combo_mxbi.setCurrentText(str(model.mxbi_id))
         self._combo_platform.setCurrentText(str(model.platform))
-        idx = self._combo_screen.findData(model.screen_size)
-        if idx != -1:
-            self._combo_screen.setCurrentIndex(idx)
+        for i in range(self._combo_screen.count()):
+            if self._combo_screen.itemData(i) == tuple(model.screen_size):
+                self._combo_screen.setCurrentIndex(i)
+                break
 
     def apply_to_model(self, model: MXBIModel) -> None:
         mxbi_id_text = self._combo_mxbi.currentText().strip()
