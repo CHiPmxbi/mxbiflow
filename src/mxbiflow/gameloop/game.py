@@ -48,6 +48,7 @@ class Game:
         self._clock = pygame.time.Clock()
         self._running = True
 
+        self._mxbi.begin()
         self._scene_manager.init()
 
     def play(self) -> None:
@@ -93,4 +94,5 @@ class Game:
     def quit(self) -> None:
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
+        self._mxbi.quit()
         pygame.quit()
