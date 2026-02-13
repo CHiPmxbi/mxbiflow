@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/CHiPmxbi/mxbiflow/compare/v0.2.0...v0.3.0) (2026-02-13)
+
+
+### Features
+
+* **ui:** 🎨 add fullscreen and hide cursor options to session config ([19df3c2](https://github.com/CHiPmxbi/mxbiflow/commit/19df3c2d5b845c4431c90c451603abcfe132b081))
+
+
+### Bug Fixes
+
+* **ui:** optimize column stretch in devices layout ([2731637](https://github.com/CHiPmxbi/mxbiflow/commit/27316370707096983cce12e538c1b2791030691d))
+
 ## [0.2.0](https://github.com/CHiPmxbi/mxbiflow/compare/v0.1.10...v0.2.0) (2026-02-13)
 
 
