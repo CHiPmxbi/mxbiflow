@@ -80,6 +80,7 @@ class MXBIPanel(QMainWindow):
             dialog_title="Add rewarder",
             label="rewarder type:",
             card_factories=self._REWARDER_CARD_FACTORIES,
+            columns=4,
         )
         self._layout_main.addWidget(self.rewarders_group)
 
@@ -91,6 +92,7 @@ class MXBIPanel(QMainWindow):
             dialog_title="Add detector",
             label="detector type:",
             card_factories=self._DETECTOR_CARD_FACTORIES,
+            columns=4,
         )
         self._layout_main.addWidget(self.detectors_group)
 
