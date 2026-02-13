@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.0...v0.4.0) (2026-02-13)
+
+
+### Features
+
+* 🎨 add gitmoji support in renovate config ([8998c99](https://github.com/CHiPmxbi/mxbiflow/commit/8998c999aa419957d9fbeb667c843251917ecc9d))
+
 ## [0.3.0](https://github.com/CHiPmxbi/mxbiflow/compare/v0.2.0...v0.3.0) (2026-02-13)
 
 
