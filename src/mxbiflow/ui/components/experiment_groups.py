@@ -2,6 +2,7 @@ from typing import NamedTuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QGridLayout,
@@ -20,33 +21,50 @@ class ExperimentConfigGroup(QGroupBox):
     def __init__(self, parent, experimenters: list[str]):
         super().__init__("Config", parent)
 
-        layout = QFormLayout(self)
+        layout = QGridLayout(self)
         self.setLayout(layout)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(3, 1)
 
-        lable_experimenter = QLabel("experimenter", self)
+        # Row 0: experimenter | hide cursor
+        layout.addWidget(QLabel("experimenter", self), 0, 0)
         self.combo_experimenter = QComboBox(self)
         self.combo_experimenter.addItems(experimenters)
-        layout.addRow(lable_experimenter, self.combo_experimenter)
+        layout.addWidget(self.combo_experimenter, 0, 1)
 
-        lable_reward_type = QLabel("reward type", self)
+        layout.addWidget(QLabel("hide cursor", self), 0, 2)
+        self.check_hide_cursor = QCheckBox(self)
+        layout.addWidget(self.check_hide_cursor, 0, 3)
+
+        # Row 1: reward type | fullscreen
+        layout.addWidget(QLabel("reward type", self), 1, 0)
         self.combo_reward_type = QComboBox(self)
         self.combo_reward_type.addItems(list(RewardEnum))
-        layout.addRow(lable_reward_type, self.combo_reward_type)
+        layout.addWidget(self.combo_reward_type, 1, 1)
 
-        lable_notes = QLabel("notes", self)
+        layout.addWidget(QLabel("fullscreen", self), 1, 2)
+        self.check_fullscreen = QCheckBox(self)
+        layout.addWidget(self.check_fullscreen, 1, 3)
+
+        # Row 2: notes (span all columns)
+        layout.addWidget(QLabel("notes", self), 2, 0)
         self.line_notes = QLineEdit(self)
         self.line_notes.setPlaceholderText("Notes")
-        layout.addRow(lable_notes, self.line_notes)
+        layout.addWidget(self.line_notes, 2, 1, 1, 3)
 
     def load_config(self, config: SessionConfig):
         self.combo_experimenter.setEditText(config.experimenter)
         self.combo_reward_type.setEditText(config.reward_type)
+        self.check_hide_cursor.setChecked(config.hide_cursor)
+        self.check_fullscreen.setChecked(config.fullscreen)
 
     def result(self) -> SessionConfig:
         return SessionConfig(
             experimenter=self.combo_experimenter.currentText(),
             reward_type=RewardEnum(self.combo_reward_type.currentText()),
             note=self.line_notes.text(),
+            hide_cursor=self.check_hide_cursor.isChecked(),
+            fullscreen=self.check_fullscreen.isChecked(),
         )
 
 

@@ -21,6 +21,9 @@ class SessionConfig(BaseModel):
     unknown_animal_fallback: str = Field(default="")
     fault_fallback: str = Field(default="")
 
+    hide_cursor: bool = Field(default=False)
+    fullscreen: bool = Field(default=False)
+
     animals: list[AnimalConfig] = Field(default_factory=list)
 
 
@@ -94,6 +97,9 @@ class Session(BaseModel):
     default_scene: str = Field(default="", frozen=True)
     unknown_animal_fallback: str = Field(default="", frozen=True)
     fault_fallback: str = Field(default="", frozen=True)
+
+    hide_cursor: bool = Field(default=False, frozen=True)
+    fullscreen: bool = Field(default=False, frozen=True)
 
     session_id: int = Field(default=0, ge=0)
     start_at: float = Field(default=0, ge=0)
