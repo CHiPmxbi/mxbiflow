@@ -42,9 +42,18 @@ class Game:
 
         set_mxbiflow(self._mxbiflow)
 
+        flags = 0
+        if session.fullscreen:
+            flags |= pygame.FULLSCREEN
+
         self._screen = pygame.display.set_mode(
-            (self._mxbi.screen_size.width, self._mxbi.screen_size.height)
+            (self._mxbi.screen_size.width, self._mxbi.screen_size.height),
+            flags,
         )
+
+        if session.hide_cursor:
+            pygame.mouse.set_visible(False)
+
         self._clock = pygame.time.Clock()
         self._running = True
 
