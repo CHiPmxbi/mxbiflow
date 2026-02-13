@@ -150,7 +150,7 @@ name = "cryptography"
 version = "46.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "platform_python_implementation != 'PyPy'" },
+    { name = "cffi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/60/04/ee2a9e8542e4fa2773b81771ff8349ff19cdd56b7258a0cc442639052edb/cryptography-46.0.5.tar.gz", hash = "sha256:abace499247268e3757271b2f1e244b36b06f8515cf27c4d49468fc9eb16e93d", size = 750064, upload-time = "2026-02-10T19:18:38.255Z" }
 wheels = [
@@ -555,7 +555,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pygame-ce", specifier = ">=2.5.6" },
     { name = "pymotego", specifier = ">=0.1.3" },
-    { name = "pymxbi", editable = "../pymxbi" },
+    { name = "pymxbi", specifier = ">=0.1.2" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyside6", specifier = ">=6.10.1" },
     { name = "qtawesome", specifier = ">=1.4.1" },
@@ -794,7 +794,7 @@ wheels = [
 [[package]]
 name = "pymxbi"
 version = "0.1.3"
-source = { editable = "../pymxbi" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gpiozero" },
     { name = "loguru" },
@@ -808,20 +808,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "gpiozero", specifier = ">=2.0.1" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "numpy", specifier = ">=2.4.1" },
-    { name = "prompt-toolkit", specifier = ">=3.0.52" },
-    { name = "pyaudio", specifier = ">=0.2.14" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pyglet", specifier = ">=2.1.13" },
-    { name = "pymotego", specifier = ">=0.1.3" },
-    { name = "pyserial", specifier = ">=3.5" },
-    { name = "rich", specifier = ">=14.2.0" },
-    { name = "typer", specifier = ">=0.21.1" },
+sdist = { url = "https://files.pythonhosted.org/packages/e1/69/99b66abcbc747547477070411d2e9f371a0aada1e099d2bc1e4aa36b84e5/pymxbi-0.1.3.tar.gz", hash = "sha256:d5d954fcb33c4069c4ba1c102abb0fcc83f04573872c47ba3f1713c1ef9bccdb", size = 28588, upload-time = "2026-02-11T19:22:10.918Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/18/3aa20b6310b13a98452d3cfd429ec80c225a429f6d1766cc509bb8c41bb6/pymxbi-0.1.3-py3-none-any.whl", hash = "sha256:8de572c1d48a6a5917dd17f66f86d9e50116e9fd06fc5cd16bc69641a8a89ea0", size = 48475, upload-time = "2026-02-11T19:22:11.729Z" },
 ]
 
 [[package]]
@@ -984,8 +973,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography" },
-    { name = "jeepney" },
+    { name = "cryptography", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "jeepney", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
