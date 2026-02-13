@@ -27,6 +27,8 @@ class DeviceCard(CardFrame, Generic[TModel]):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._open_menu)
 
+        self.setMinimumWidth(260)
+
         self.layout_main = QVBoxLayout()
         self.setLayout(self.layout_main)
         self.layout_main.setContentsMargins(8, 8, 8, 8)
