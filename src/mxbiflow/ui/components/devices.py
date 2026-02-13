@@ -86,8 +86,6 @@ class Devices(QGroupBox, Generic[T]):
     def _build_ui(self) -> None:
         layout = QGridLayout()
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        for col in range(self._columns):
-            layout.setColumnStretch(col, 1)
         self.setLayout(layout)
 
     def _bind_events(self) -> None:
@@ -169,6 +167,8 @@ class Devices(QGroupBox, Generic[T]):
             row, col = divmod(index, self._columns)
             layout.addWidget(widget, row, col)
 
+        self._update_column_stretch(layout)
+
     def _mount(self, widget: QWidget) -> None:
         layout = self.layout()
         if layout is None:
@@ -178,6 +178,12 @@ class Devices(QGroupBox, Generic[T]):
             index = layout.count()
             row, col = divmod(index, self._columns)
             layout.addWidget(widget, row, col)
+            self._update_column_stretch(layout)
             return
 
         layout.addWidget(widget)
+
+    def _update_column_stretch(self, layout: QGridLayout) -> None:
+        used_cols = min(len(self._cards), self._columns)
+        for col in range(self._columns):
+            layout.setColumnStretch(col, 1 if col < used_cols else 0)
