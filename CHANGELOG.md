@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.5](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.4...v0.3.5) (2026-02-17)
+
+
+### Features
+
+* **session:** :sparkles: add session configuration persistence ([#49](https://github.com/CHiPmxbi/mxbiflow/issues/49)) ([97c5723](https://github.com/CHiPmxbi/mxbiflow/commit/97c5723de69b2c7adfd0124dcd8217f6dda510c5))
+
 ## [0.3.4](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.3...v0.3.4) (2026-02-17)
 
 
