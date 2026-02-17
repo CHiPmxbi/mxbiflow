@@ -1,9 +1,9 @@
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
-    QHBoxLayout,
+    QGridLayout,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
@@ -11,9 +11,15 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.config_store import ConfigStore
-from ..core.path import get_mxbi_config_path, get_options_session_path
+from ..core.path import (
+    get_mxbi_config_path,
+    get_mxbi_panel_config_path,
+    get_options_session_path,
+)
+from ..models.panel import MXBIPanelConfig
 from ..models.session import Options
 from .components.baseconfig import BaseConfig
+from .components.countdown import AutoAcceptCountdown
 from .components.device_card import (
     BeambreakDetectorCard,
     FusionDetectorCard,
@@ -40,23 +46,17 @@ class MXBIPanel(QMainWindow):
         DetectorEnum.MOCK: MockDetectorCard,
     }
 
-    # -----------------------------
-    # Lifecycle / Init
-    # -----------------------------
-
     def __init__(self):
         super().__init__()
         self._accepted = False
         self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
         self._options = ConfigStore(get_options_session_path(), Options)
+        self._panel_config = ConfigStore(get_mxbi_panel_config_path(), MXBIPanelConfig)
 
         self._build_ui()
         self._load_from_config()
         self._bind_events()
-
-    # -----------------------------
-    # UI Construction
-    # -----------------------------
+        self._start_auto_accept_countdown()
 
     def _build_ui(self) -> None:
         self.setWindowTitle("MXBI Configuration Panel")
@@ -69,7 +69,7 @@ class MXBIPanel(QMainWindow):
         self.base_config = BaseConfig(self, self._options.value.mxbis)
         self._layout_main.addWidget(self.base_config)
         self._build_device_groups()
-        self._layout_main.addLayout(self._build_buttons_row())
+        self._layout_main.addLayout(self._build_buttons_layout())
 
     def _build_device_groups(self) -> None:
         self.rewarders_group = Devices[RewarderModel](
@@ -96,22 +96,26 @@ class MXBIPanel(QMainWindow):
         )
         self._layout_main.addWidget(self.detectors_group)
 
-    def _build_buttons_row(self) -> QHBoxLayout:
-        layout_buttons = QHBoxLayout()
-        self.save_button = QPushButton("Save")
-        self.cancel_button = QPushButton("Cancel")
-        self.continue_button = QPushButton("Continue")
-        layout_buttons.addWidget(self.cancel_button)
-        layout_buttons.addWidget(self.save_button)
-        layout_buttons.addWidget(self.continue_button)
-        return layout_buttons
+    def _build_buttons_layout(self) -> QGridLayout:
+        layout = QGridLayout()
 
-    # -----------------------------
-    # Load / Save
-    # -----------------------------
+        self._countdown = AutoAcceptCountdown(self)
+        self.cancel_button = QPushButton("Cancel")
+        self.save_button = QPushButton("Save")
+        self.continue_button = QPushButton("Continue")
+
+        layout.addWidget(self._countdown, 0, 2, alignment=Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.cancel_button, 1, 0)
+        layout.addWidget(self.save_button, 1, 1)
+        layout.addWidget(self.continue_button, 1, 2)
+
+        return layout
 
     def _load_from_config(self) -> None:
         self.base_config.load_from_model(self._config.value)
+        self.base_config.load_auto_accept_timeout(
+            self._panel_config.value.auto_accept_timeout_seconds
+        )
 
         self.rewarders_group.load_models(self._config.value.rewarders)
         self.detectors_group.load_models(self._config.value.detectors)
@@ -119,29 +123,54 @@ class MXBIPanel(QMainWindow):
     def _collect_result(self) -> None:
         self.base_config.apply_to_model(self._config.value)
 
-        # Replace instead of append so repeated Save/Continue doesn't duplicate entries.
         self._config.value.rewarders = self.rewarders_group.results()
         self._config.value.detectors = self.detectors_group.results()
 
     def _on_save(self) -> None:
         self._collect_result()
         self._config.save()
+        self._save_panel_config()
 
     def _on_continue(self) -> None:
         self._collect_result()
         self._config.save()
+        self._save_panel_config()
         self._accepted = True
         self.close()
         self.accepted.emit()
 
-    # -----------------------------
-    # Events / Menus
-    # -----------------------------
+    def _save_panel_config(self) -> None:
+        self._panel_config.value.auto_accept_timeout_seconds = (
+            self.base_config.auto_accept_timeout
+        )
+        self._panel_config.save()
+
+    def _start_auto_accept_countdown(self) -> None:
+        timeout = self._panel_config.value.auto_accept_timeout_seconds
+        if timeout > 0:
+            self._countdown.start(timeout)
+            self._countdown.timeout.connect(self._on_continue)
 
     def _bind_events(self) -> None:
         self.cancel_button.clicked.connect(self._on_cancel)
         self.save_button.clicked.connect(self._on_save)
         self.continue_button.clicked.connect(self._on_continue)
+
+        self.base_config.changed.connect(self._on_user_interaction)
+
+        self.cancel_button.clicked.connect(self._countdown.stop)
+        self.save_button.clicked.connect(self._countdown.stop)
+        self.continue_button.clicked.connect(self._countdown.stop)
+
+        self._widget_main.installEventFilter(self)
+
+    def _on_user_interaction(self, _msg: str = "") -> None:
+        self._countdown.pause()
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            self._countdown.pause()
+        return super().eventFilter(obj, event)
 
     def _on_cancel(self) -> None:
         self.close()

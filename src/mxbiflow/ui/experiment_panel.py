@@ -1,6 +1,6 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
-    QHBoxLayout,
+    QGridLayout,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
@@ -11,6 +11,7 @@ from ..core.config_store import ConfigStore
 from ..core.path import get_config_session_path, get_options_session_path
 from ..models.session import Options, SessionConfig
 from ..scene import SceneManager
+from .components.countdown import AutoAcceptCountdown
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,
     ExperimentConfigGroup,
@@ -58,22 +59,43 @@ class ExperimentPanel(QMainWindow):
         self.combo_reward_type = self.group_config.combo_reward_type
         self.line_notes = self.group_config.line_notes
 
-        layout_buttons = QHBoxLayout(self)
+        layout_buttons = QGridLayout(self)
         layout_main.addLayout(layout_buttons)
-        self._button_cancle = QPushButton("Cancel", self)
+
+        self._countdown = AutoAcceptCountdown(self)
+        self._button_cancel = QPushButton("Cancel", self)
         self._button_save = QPushButton("Save", self)
         self._button_continue = QPushButton("Continue", self)
-        layout_buttons.addWidget(self._button_cancle)
-        layout_buttons.addWidget(self._button_save)
-        layout_buttons.addWidget(self._button_continue)
+
+        layout_buttons.addWidget(
+            self._countdown, 0, 2, alignment=Qt.AlignmentFlag.AlignRight
+        )
+        layout_buttons.addWidget(self._button_cancel, 1, 0)
+        layout_buttons.addWidget(self._button_save, 1, 1)
+        layout_buttons.addWidget(self._button_continue, 1, 2)
 
         self._bind_signals()
         self.load_config()
+        self._start_auto_accept_countdown()
 
     def _bind_signals(self):
-        self._button_cancle.clicked.connect(self._on_cancle)
+        self._button_cancel.clicked.connect(self._on_cancel)
         self._button_save.clicked.connect(self._on_save)
         self._button_continue.clicked.connect(self._on_continue)
+
+        self._button_cancel.clicked.connect(self._countdown.stop)
+        self._button_save.clicked.connect(self._countdown.stop)
+        self._button_continue.clicked.connect(self._countdown.stop)
+
+        self.centralWidget().installEventFilter(self)
+
+    def _on_user_interaction(self, _=None) -> None:
+        self._countdown.pause()
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            self._countdown.pause()
+        return super().eventFilter(obj, event)
 
     def load_config(self):
         self.group_config.load_config(self._config.value)
@@ -92,7 +114,7 @@ class ExperimentPanel(QMainWindow):
     def _on_save(self):
         self._config.save(self.result())
 
-    def _on_cancle(self):
+    def _on_cancel(self):
         self.close()
 
     def _on_continue(self):
@@ -100,6 +122,12 @@ class ExperimentPanel(QMainWindow):
         self._accepted = True
         self.close()
         self.accepted.emit()
+
+    def _start_auto_accept_countdown(self) -> None:
+        timeout = self._config.value.auto_accept_timeout_seconds
+        if timeout > 0:
+            self._countdown.start(timeout)
+            self._countdown.timeout.connect(self._on_continue)
 
     def closeEvent(self, event) -> None:
         super().closeEvent(event)

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMenu,
+    QSpinBox,
 )
 
 from ...models.animal import AnimalConfig
@@ -26,7 +27,6 @@ class ExperimentConfigGroup(QGroupBox):
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(3, 1)
 
-        # Row 0: experimenter | hide cursor
         layout.addWidget(QLabel("experimenter", self), 0, 0)
         self.combo_experimenter = QComboBox(self)
         self.combo_experimenter.addItems(experimenters)
@@ -36,7 +36,6 @@ class ExperimentConfigGroup(QGroupBox):
         self.check_hide_cursor = QCheckBox(self)
         layout.addWidget(self.check_hide_cursor, 0, 3)
 
-        # Row 1: reward type | fullscreen
         layout.addWidget(QLabel("reward type", self), 1, 0)
         self.combo_reward_type = QComboBox(self)
         self.combo_reward_type.addItems(list(RewardEnum))
@@ -46,17 +45,23 @@ class ExperimentConfigGroup(QGroupBox):
         self.check_fullscreen = QCheckBox(self)
         layout.addWidget(self.check_fullscreen, 1, 3)
 
-        # Row 2: notes (span all columns)
         layout.addWidget(QLabel("notes", self), 2, 0)
         self.line_notes = QLineEdit(self)
         self.line_notes.setPlaceholderText("Notes")
         layout.addWidget(self.line_notes, 2, 1, 1, 3)
+
+        layout.addWidget(QLabel("auto accept (s)", self), 3, 0)
+        self.spin_auto_accept = QSpinBox(self)
+        self.spin_auto_accept.setRange(0, 3600)
+        self.spin_auto_accept.setSpecialValueText("Disabled")
+        layout.addWidget(self.spin_auto_accept, 3, 1)
 
     def load_config(self, config: SessionConfig):
         self.combo_experimenter.setEditText(config.experimenter)
         self.combo_reward_type.setEditText(config.reward_type)
         self.check_hide_cursor.setChecked(config.hide_cursor)
         self.check_fullscreen.setChecked(config.fullscreen)
+        self.spin_auto_accept.setValue(config.auto_accept_timeout_seconds)
 
     def result(self) -> SessionConfig:
         return SessionConfig(
@@ -65,6 +70,7 @@ class ExperimentConfigGroup(QGroupBox):
             note=self.line_notes.text(),
             hide_cursor=self.check_hide_cursor.isChecked(),
             fullscreen=self.check_fullscreen.isChecked(),
+            auto_accept_timeout_seconds=self.spin_auto_accept.value(),
         )
 
 
