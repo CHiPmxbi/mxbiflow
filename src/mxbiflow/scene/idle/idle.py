@@ -28,9 +28,12 @@ class IDLE:
 
         self._assets = [
             Asset(
-                asset_image := transform.scale(
-                    image.load(path).convert_alpha(),
-                    (self._vstimulus_size, self._vstimulus_size),
+                asset_image := transform.rotate(
+                    transform.scale(
+                        image.load(path).convert_alpha(),
+                        (self._vstimulus_size, self._vstimulus_size),
+                    ),
+                    -90,
                 ),
                 asset_image.get_rect(center=self._pos),
             )
