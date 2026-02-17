@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.1](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.0...v0.3.1) (2026-02-17)
+
+
+### Features
+
+* 🎨 add gitmoji support in renovate config ([8998c99](https://github.com/CHiPmxbi/mxbiflow/commit/8998c999aa419957d9fbeb667c843251917ecc9d))
+
+
+### Bug Fixes
+
+* **ci:** use config-file instead of release-type for release-please ([#28](https://github.com/CHiPmxbi/mxbiflow/issues/28)) ([abcf545](https://github.com/CHiPmxbi/mxbiflow/commit/abcf54520d7d9b93351fd3be9e66417bcab2a3b3))
+
 ## [0.3.0](https://github.com/CHiPmxbi/mxbiflow/compare/v0.2.0...v0.3.0) (2026-02-13)
 
 
