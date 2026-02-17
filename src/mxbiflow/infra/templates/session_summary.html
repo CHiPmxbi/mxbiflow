@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ session_date }} Session #{{ session_id }}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #F8FAFC;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #1E40AF;
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            color: #FFFFFF;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .section {
+            padding: 24px;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .card-header h2 {
+            margin: 0;
+            color: #1E3A8A;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .card-body {
+            padding: 16px 24px;
+        }
+        .stat-grid {
+            width: 100%;
+        }
+        .stat-item-blue {
+            background-color: #EFF6FF;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-item-orange {
+            background-color: #FFF7ED;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-item-green {
+            background-color: #ECFDF5;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-label {
+            color: #64748B;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            color: #1E40AF;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .stat-value-lg {
+            color: #047857;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .stat-value-orange {
+            color: #C2410C;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .animal-row {
+            padding: 16px 24px;
+        }
+        .animal-row-border {
+            border-bottom: 1px solid #F1F5F9;
+        }
+        .animal-name {
+            background-color: #1E40AF;
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 6px;
+        }
+        .animal-rfid {
+            padding-left: 8px;
+            color: #94A3B8;
+            font-size: 11px;
+            font-family: monospace;
+        }
+        .animal-stat {
+            text-align: center;
+        }
+        .animal-stat-label {
+            color: #64748B;
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        .animal-stat-value {
+            color: #1E293B;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .animal-stat-divider {
+            border-left: 1px solid #E2E8F0;
+            border-right: 1px solid #E2E8F0;
+        }
+        .stage-box {
+            margin-top: 12px;
+            background-color: #F8FAFC;
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .stage-title {
+            color: #64748B;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .stage-row {
+            margin-bottom: 6px;
+            background-color: #FFFFFF;
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .stage-name {
+            color: #334155;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .stage-stats {
+            color: #64748B;
+            font-size: 12px;
+            text-align: right;
+        }
+        .level-up {
+            color: #16A34A;
+            font-weight: 600;
+        }
+        .level-down {
+            color: #DC2626;
+            font-weight: 600;
+        }
+        .level-same {
+            color: #64748B;
+        }
+        .footer {
+            padding: 24px;
+            text-align: center;
+        }
+        .footer p {
+            margin: 0;
+            color: #94A3B8;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="container">
+        <tr>
+            <td class="header">
+                <h1>{{ session_date }} Session #{{ session_id }}</h1>
+            </td>
+        </tr>
+        
+        <tr>
+            <td class="section">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card">
+                    <tr>
+                        <td class="card-header">
+                            <h2>Session Overview</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="card-body">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="stat-grid">
+                                <tr>
+                                    <td width="33%" style="padding: 8px;">
+                                        <div class="stat-item-blue">
+                                            <div class="stat-label">Start Time</div>
+                                            <div class="stat-value">{{ start_time }}</div>
+                                        </div>
+                                    </td>
+                                    <td width="33%" style="padding: 8px;">
+                                        <div class="stat-item-blue">
+                                            <div class="stat-label">End Time</div>
+                                            <div class="stat-value">{{ end_time }}</div>
+                                        </div>
+                                    </td>
+                                    <td width="33%" style="padding: 8px;">
+                                        <div class="stat-item-blue">
+                                            <div class="stat-label">Duration</div>
+                                            <div class="stat-value">{{ duration }}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td width="50%" style="padding: 8px;">
+                                        <div class="stat-item-orange">
+                                            <div class="stat-label">Reward Type</div>
+                                            <div class="stat-value-orange">{{ reward_type }}</div>
+                                        </div>
+                                    </td>
+                                    <td width="50%" style="padding: 8px;">
+                                        <div class="stat-item-green">
+                                            <div class="stat-label">Total Animals</div>
+                                            <div class="stat-value-lg">{{ total_animals }}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        
+        <tr>
+            <td style="padding: 0 24px 24px 24px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card">
+                    <tr>
+                        <td class="card-header">
+                            <h2>Animal Details</h2>
+                        </td>
+                    </tr>
+                    {% for animal in animals %}
+                    <tr>
+                        <td class="animal-row{% if not loop.last %} animal-row-border{% endif %}">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding-bottom: 12px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td class="animal-name">{{ animal.name }}</td>
+                                                <td class="animal-rfid">{{ animal.rfid_id }}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td width="33%" style="padding: 4px;" class="animal-stat">
+                                        <div class="animal-stat-label">Trials</div>
+                                        <div class="animal-stat-value">{{ animal.total_trials }}</div>
+                                    </td>
+                                    <td width="33%" style="padding: 4px;" class="animal-stat animal-stat-divider">
+                                        <div class="animal-stat-label">Sessions</div>
+                                        <div class="animal-stat-value">{{ animal.animal_sessions }}</div>
+                                    </td>
+                                    <td width="33%" style="padding: 4px;" class="animal-stat">
+                                        <div class="animal-stat-label">Duration</div>
+                                        <div class="animal-stat-value">{{ animal.duration }}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            {% if animal.stages %}
+                            <div class="stage-box">
+                                <div class="stage-title">Stage Progress</div>
+                                {% for stage in animal.stages %}
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="stage-row">
+                                    <tr>
+                                        <td class="stage-name">{{ stage.name }}</td>
+                                        <td class="stage-stats">
+                                            <span style="margin-right: 12px;">Trials: {{ stage.trials }}</span>
+                                            {%- if stage.final_level > stage.initial_level %}
+                                            <span class="level-up">
+                                                Level: {{ stage.initial_level }} → {{ stage.final_level }} (+{{ stage.final_level - stage.initial_level }})
+                                            </span>
+                                            {%- elif stage.final_level < stage.initial_level %}
+                                            <span class="level-down">
+                                                Level: {{ stage.initial_level }} → {{ stage.final_level }} ({{ stage.final_level - stage.initial_level }})
+                                            </span>
+                                            {%- else %}
+                                            <span class="level-same">
+                                                Level: {{ stage.initial_level }} (no change)
+                                            </span>
+                                            {%- endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </td>
+        </tr>
+        
+        <tr>
+            <td class="footer">
+                <p>Generated by MXBIFlow Training System</p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

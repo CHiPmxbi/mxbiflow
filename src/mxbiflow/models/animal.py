@@ -26,6 +26,7 @@ class StageState(BaseModel):
     stage_name: str
     stage_trial_id: int = Field(default=0, ge=0)
 
+    initial_level: int = Field(default=0, ge=0)
     level: int = Field(default=0, ge=0)
     level_trial_id: int = Field(default=0, ge=0)
 

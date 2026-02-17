@@ -56,7 +56,9 @@ def init_session(session_config: SessionConfig) -> Session:
     animal_dict: dict[str, Animal] = {}
     for animal_config in session_config.animals:
         train_state = StageState(
-            stage_name=animal_config.stage, level=animal_config.level
+            stage_name=animal_config.stage,
+            initial_level=animal_config.level,
+            level=animal_config.level,
         )
         animal_state = Animal(
             rfid_id=animal_config.rfid_id,
