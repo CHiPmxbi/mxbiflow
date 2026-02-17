@@ -5,6 +5,7 @@ from random import choice
 from pygame import Event, Rect, Surface, image, transform
 
 from mxbiflow import get_mxbiflow
+from mxbiflow.assets import create_background
 
 ASSETS_PATH = Path(__file__).parent / "assets"
 
@@ -23,6 +24,9 @@ class IDLE:
         self._mxbiflow = get_mxbiflow()
 
         self._screen_size = self._mxbiflow.mxbi.screen_size
+        self._background = create_background(
+            (self._screen_size.width, self._screen_size.height),
+        )
         self._pos = ((self._screen_size.width // 4) * 3, self._screen_size.height // 2)
         self._vstimulus_size = self._screen_size.width // 2 * 0.75
 
@@ -57,4 +61,5 @@ class IDLE:
     def update(self, dt_s: float) -> None: ...
 
     def draw(self, screen: Surface) -> None:
+        screen.blit(self._background, (0, 0))
         screen.blit(self._asset.image, self._asset.rect)
