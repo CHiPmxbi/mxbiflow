@@ -21,8 +21,8 @@ class DataLogger:
         self,
         path: Path,
         session_id: int,
-        monkey: str,
         filename: str,
+        monkey: str | None = None,
         type: DataLoggerType = DataLoggerType.JSONL,
     ) -> None:
         self._path = path
@@ -41,9 +41,11 @@ class DataLogger:
     def _ensure_data_dir(self) -> Path:
         date_path = Path(f"{now.year}{now.month:02d}{now.day:02d}")
         session_path = Path(f"{self._session_id}")
-        monkey_path = Path(f"{self._monkey}")
 
-        base_dir = self._path / date_path / session_path / monkey_path
+        if self._monkey:
+            base_dir = self._path / date_path / session_path / Path(self._monkey)
+        else:
+            base_dir = self._path / date_path / session_path
 
         try:
             base_dir.mkdir(parents=True, exist_ok=True)
