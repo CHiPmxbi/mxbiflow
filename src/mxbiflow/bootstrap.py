@@ -79,6 +79,5 @@ def init_session(session_config: SessionConfig) -> Session:
         fullscreen=session_config.fullscreen,
         animals=animal_dict,
     )
-    session.start()
 
     return session

@@ -3,6 +3,8 @@ from pygame import Event
 from pymxbi import MXBI
 
 from ..core.context import MXBIFlow, set_mxbiflow
+from ..core.path import get_data_dir_path
+from ..infra.data_logger import DataLogger, DataLoggerType
 from ..models.session import Session
 from ..scene import SceneManager
 from .detector_bridge import DetectorBridge
@@ -60,6 +62,15 @@ class Game:
         self._mxbi.begin()
         self._scene_manager.init()
 
+        self._session.start()
+        self._session_logger = DataLogger(
+            path=get_data_dir_path(),
+            session_id=self._session.session_id,
+            filename="session",
+            type=DataLoggerType.JSON,
+        )
+        self._session_logger.save(self._session.model_dump())
+
     def play(self) -> None:
         while self._running:
             dt = self._clock.tick(60) / 1000.0
@@ -101,6 +112,9 @@ class Game:
                 self._running = False
 
     def quit(self) -> None:
+        self._session.end()
+        self._session_logger.save(self._session.model_dump())
+
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
         self._mxbi.quit()
