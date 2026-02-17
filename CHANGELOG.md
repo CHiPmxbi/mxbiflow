@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.2...v0.3.3) (2026-02-17)
+
+
+### Bug Fixes
+
+* **deps:** ⬆️ update dependency pymxbi to &gt;=0.3.1 ([#32](https://github.com/CHiPmxbi/mxbiflow/issues/32)) ([f41aa2e](https://github.com/CHiPmxbi/mxbiflow/commit/f41aa2e6453b56e9a58837fa8e32a2474c9e5491))
+* **deps:** ⬆️ update dependency pymxbi to &gt;=0.3.2 ([#34](https://github.com/CHiPmxbi/mxbiflow/issues/34)) ([9cd3f7f](https://github.com/CHiPmxbi/mxbiflow/commit/9cd3f7fbe82799947d31164117d2eb0667499d00))
+
 ## [0.3.2](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.1...v0.3.2) (2026-02-17)
 
 
