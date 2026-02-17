@@ -3,7 +3,7 @@ from __future__ import annotations
 from pymxbi import MXBIModel
 from pymxbi.screen import get_screen_size
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel
+from PySide6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel, QSpinBox
 
 
 class BaseConfig(QGroupBox):
@@ -31,6 +31,12 @@ class BaseConfig(QGroupBox):
             )
         self._layout.addRow(self._label_screen, self._combo_screen)
 
+        self._label_auto_accept = QLabel("auto accept (s):")
+        self._spin_auto_accept = QSpinBox()
+        self._spin_auto_accept.setRange(0, 3600)
+        self._spin_auto_accept.setSpecialValueText("Disabled")
+        self._layout.addRow(self._label_auto_accept, self._spin_auto_accept)
+
         self._bind_events()
 
     def _emit_changed(self, msg: str) -> None:
@@ -39,6 +45,9 @@ class BaseConfig(QGroupBox):
     def _bind_events(self) -> None:
         self._combo_mxbi.currentTextChanged.connect(self._emit_changed)
         self._combo_screen.currentTextChanged.connect(self._emit_changed)
+        self._spin_auto_accept.valueChanged.connect(
+            lambda v: self._emit_changed(f"auto_accept:{v}")
+        )
 
     @property
     def mxbi_id(self) -> str:
@@ -48,6 +57,10 @@ class BaseConfig(QGroupBox):
     def screen_size(self) -> tuple[int, int]:
         return self._combo_screen.currentData()
 
+    @property
+    def auto_accept_timeout(self) -> int:
+        return self._spin_auto_accept.value()
+
     def load_from_model(self, model: MXBIModel) -> None:
         self._combo_mxbi.setCurrentText(model.mxbi_id)
         for i in range(self._combo_screen.count()):
@@ -55,11 +68,9 @@ class BaseConfig(QGroupBox):
                 self._combo_screen.setCurrentIndex(i)
                 break
 
-    def apply_to_model(self, model: MXBIModel) -> None:
-        mxbi_id_text = self._combo_mxbi.currentText().strip()
-        try:
-            model.mxbi_id = int(mxbi_id_text) if mxbi_id_text else 0
-        except ValueError:
-            model.mxbi_id = 0
+    def load_auto_accept_timeout(self, timeout_seconds: int) -> None:
+        self._spin_auto_accept.setValue(timeout_seconds)
 
+    def apply_to_model(self, model: MXBIModel) -> None:
+        model.mxbi_id = self.mxbi_id
         model.screen_size = self._combo_screen.currentData()

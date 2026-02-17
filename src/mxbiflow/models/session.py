@@ -24,6 +24,8 @@ class SessionConfig(BaseModel):
     hide_cursor: bool = Field(default=False)
     fullscreen: bool = Field(default=False)
 
+    auto_accept_timeout_seconds: int = Field(default=60, ge=0)
+
     animals: list[AnimalConfig] = Field(default_factory=list)
 
 
