@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.3...v0.3.4) (2026-02-17)
+
+
+### Bug Fixes
+
+* **scene:** :art: rotate apple assets 90 degrees clockwise in idle scene ([#44](https://github.com/CHiPmxbi/mxbiflow/issues/44)) ([14f5eeb](https://github.com/CHiPmxbi/mxbiflow/commit/14f5eeb4fd4be30308f2b1bb81c66945baac8f75))
+
 ## [0.3.3](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.2...v0.3.3) (2026-02-17)
 
 
