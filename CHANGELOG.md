@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.1...v0.3.2) (2026-02-17)
+
+
+### Bug Fixes
+
+* **renovate:** add bump rangeStrategy for pymxbi ([#30](https://github.com/CHiPmxbi/mxbiflow/issues/30)) ([5745e04](https://github.com/CHiPmxbi/mxbiflow/commit/5745e0419c57925ca904b736545a379af5981bf5))
+
 ## [0.3.1](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.0...v0.3.1) (2026-02-17)
 
 
