@@ -49,7 +49,7 @@ class BaseConfig(QGroupBox):
         return self._combo_screen.currentData()
 
     def load_from_model(self, model: MXBIModel) -> None:
-        self._combo_mxbi.setCurrentText(str(model.mxbi_id))
+        self._combo_mxbi.setCurrentText(model.mxbi_id)
         for i in range(self._combo_screen.count()):
             if self._combo_screen.itemData(i) == tuple(model.screen_size):
                 self._combo_screen.setCurrentIndex(i)
