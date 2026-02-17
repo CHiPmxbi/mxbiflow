@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.5...v0.3.6) (2026-02-17)
+
+
+### Features
+
+* **infra:** :sparkles: add post-processing module for session summary ([#51](https://github.com/CHiPmxbi/mxbiflow/issues/51)) ([a91b78d](https://github.com/CHiPmxbi/mxbiflow/commit/a91b78d92fc459945ee23a33d2ccb951d2344960))
+
 ## [0.3.5](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.4...v0.3.5) (2026-02-17)
 
 
