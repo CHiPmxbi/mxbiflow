@@ -557,7 +557,7 @@ wheels = [
 
 [[package]]
 name = "mxbiflow"
-version = "0.3.5"
+version = "0.3.7"
 source = { editable = "." }
 dependencies = [
     { name = "gpiozero" },
@@ -599,7 +599,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pygame-ce", specifier = ">=2.5.6" },
     { name = "pymotego", specifier = ">=0.1.3" },
-    { name = "pymxbi", specifier = ">=0.3.3" },
+    { name = "pymxbi", specifier = ">=0.3.4" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyside6", specifier = ">=6.10.1" },
     { name = "qtawesome", specifier = ">=1.4.1" },
@@ -824,20 +824,20 @@ wheels = [
 
 [[package]]
 name = "pymotego"
-version = "0.1.4"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx", extra = ["http2"] },
     { name = "pyzmq" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/b0/21465c9443e0ef0b2dd1af57971514948e28760759a3c99070343cecb9fb/pymotego-0.1.4.tar.gz", hash = "sha256:b755ab20f7270573c1e8efe24007e2bb587b64bf07af2239ca6953234dfccdb2", size = 3088, upload-time = "2026-02-16T23:49:07.836Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/3a/2fe1145d41d8b16a3f479e18831e6ca60326f4cd3fc777ac8993450fc779/pymotego-0.1.5.tar.gz", hash = "sha256:62c0e109a282ec121188cf8cf5d14fd07a5e62d35b7f858d1367732e83a4a330", size = 3561, upload-time = "2026-02-18T01:44:30.808Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/3d/acb817ffa342ab252eb8836012585462eceaac3c9afd27449dbaaf28e504/pymotego-0.1.4-py3-none-any.whl", hash = "sha256:4bf51e5b823a103273f095f977e40a0c28e0b0ea20c243a08212dbba50e4a998", size = 4556, upload-time = "2026-02-16T23:49:08.54Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/f0/20a08f52378a1d682de9f26f5ad0d2117c1f4d8410f56b6293b1de4a3df4/pymotego-0.1.5-py3-none-any.whl", hash = "sha256:977cf44012c538db1e9a66e7cad66d9a0063e1b8a4f185823778339b19cba662", size = 5095, upload-time = "2026-02-18T01:44:29.658Z" },
 ]
 
 [[package]]
 name = "pymxbi"
-version = "0.3.3"
+version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gpiozero" },
@@ -852,9 +852,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/81/c7/97acad4a5ff4457ee17fac9d5575a1ba4695d62a6bad000107d035e2a068/pymxbi-0.3.3.tar.gz", hash = "sha256:28760650c21e4862eccf7511b5e44494af5d014d9d5ff5b8bdb24c19031529da", size = 29391, upload-time = "2026-02-17T15:19:29.139Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/84/6c/08425a4352b419b12284a5dfaf922dbc7ac22ea1c6e663d157118ffbfb94/pymxbi-0.3.4.tar.gz", hash = "sha256:5d40a05014b1dd98c38c2883aad40b60cac6781e627f1ad869dd07413de139d6", size = 29374, upload-time = "2026-02-18T03:48:43.804Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f5/1e/abc1dfa04e0d092293d7e8f53d8610b7f819f060cf45ce29e7821642c9b9/pymxbi-0.3.3-py3-none-any.whl", hash = "sha256:84014064b82c222054ef90cdbef03a50cb8b5079e01a2d3c9dc036361bc64aee", size = 49709, upload-time = "2026-02-17T15:19:30.391Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/17/55980b3e176478f8a4715f5272e1ac752bb8d317fb3e04fac4571a955ef0/pymxbi-0.3.4-py3-none-any.whl", hash = "sha256:eb90ed4a2ddc4d2fe4871cb345c8cb729a355856342359a9a4036c68b032d94c", size = 49707, upload-time = "2026-02-18T03:48:42.443Z" },
 ]
 
 [[package]]
