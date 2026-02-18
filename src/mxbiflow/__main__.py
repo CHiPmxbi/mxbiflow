@@ -2,10 +2,17 @@ from pathlib import Path
 
 from mxbiflow import set_base_path
 from mxbiflow.bootstrap import init_gameloop
-from mxbiflow.infra.post_processing import PostProcessor
+from mxbiflow.core.path import get_email_state_path, get_mxbi_config_path
+from datetime import datetime, timezone
+
+from mxbiflow.infra.post_processing import HtmlComposer, session_overview, summarize
+from mxbiflow.models.session import EmailSendStateStore
 from mxbiflow.scene import SceneManager
 from mxbiflow.scene.idle.idle import IDLE
 from mxbiflow.ui.wizard import config_wizard
+from pymotego.email import EmailClient
+from mxbiflow.core.config_store import ConfigStore
+from pymxbi.mxbi.factory import MXBIModel
 
 
 def main() -> None:
@@ -19,7 +26,32 @@ def main() -> None:
     game = init_gameloop(scene_manager)
     game.play()
 
-    PostProcessor()
+    summary = summarize()
+
+    date_str = (
+        datetime.fromtimestamp(summary.start_at, tz=timezone.utc).strftime("%Y-%m-%d")
+        if summary.start_at
+        else "N/A"
+    )
+    composer = HtmlComposer(
+        title=f"Session #{summary.session_id}",
+        date=date_str,
+    )
+    composer.add_section(session_overview())
+
+    html = composer.html
+
+    mxbi_config = ConfigStore(get_mxbi_config_path(), MXBIModel).value
+    email_store = EmailSendStateStore(get_email_state_path())
+    prev_state = email_store.load()
+
+    with EmailClient() as client:
+        result = client.send(
+            subject=f"{mxbi_config.mxbi_id} Daily Report",
+            html_body=html,
+            in_reply_to=prev_state.message_id if prev_state.message_id else None,
+        )
+        email_store.save(result.message_id)
 
 
 if __name__ == "__main__":
