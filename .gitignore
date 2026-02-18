@@ -1,5 +1,5 @@
 *.jsonl
-session_counter.json
+.mxbiflow/
 stage.json
 data/
 samba_mount/
