@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.7](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.6...v0.3.7) (2026-02-18)
+
+
+### Features
+
+* **session:** :sparkles: add email send state storage ([2cfadf9](https://github.com/CHiPmxbi/mxbiflow/commit/2cfadf9cef81736f191d56760f9f3c7eaa2cc39f))
+
 ## [0.3.6](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.5...v0.3.6) (2026-02-17)
 
 
