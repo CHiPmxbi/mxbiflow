@@ -36,6 +36,11 @@ class DailySessionCounter(BaseModel):
     last_session_id: int = Field(default=0, ge=0)
 
 
+class EmailSendState(BaseModel):
+    sent_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    message_id: str = Field(default="")
+
+
 @dataclass
 class DailySessionIdStore:
     path: Path
@@ -88,6 +93,50 @@ class DailySessionIdStore:
         self._atomic_write(data)
 
         return data.last_session_id
+
+
+@dataclass
+class EmailSendStateStore:
+    path: Path
+
+    def _load(self) -> EmailSendState:
+        if not self.path.exists():
+            return EmailSendState()
+
+        text = self.path.read_text()
+
+        try:
+            return EmailSendState.model_validate_json(text)
+        except ValueError, ValidationError:
+            return EmailSendState()
+
+    def _atomic_write(self, data: EmailSendState) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(
+            dir=str(self.path.parent),
+            prefix=self.path.name,
+            suffix=".tmp",
+        )
+
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(data.model_dump_json())
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(tmp, self.path)
+        finally:
+            try:
+                os.remove(tmp)
+            except FileNotFoundError:
+                pass
+
+    def load(self) -> EmailSendState:
+        return self._load()
+
+    def save(self, message_id: str) -> None:
+        data = EmailSendState(message_id=message_id)
+        self._atomic_write(data)
 
 
 class Session(BaseModel):
