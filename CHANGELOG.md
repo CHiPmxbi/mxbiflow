@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.8](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.7...v0.3.8) (2026-02-19)
+
+
+### Features
+
+* **ui:** :sparkles: add send_email and sync_data checkboxes ([#64](https://github.com/CHiPmxbi/mxbiflow/issues/64)) ([f47fc60](https://github.com/CHiPmxbi/mxbiflow/commit/f47fc603fc39095a3f2fe9798bc9fcce450124da))
+
+
+### Bug Fixes
+
+* **deps:** ⬆️ update dependency pymxbi to &gt;=0.3.4 ([#55](https://github.com/CHiPmxbi/mxbiflow/issues/55)) ([b158ad0](https://github.com/CHiPmxbi/mxbiflow/commit/b158ad0094c3dc77fd840ad22bad8dbec73e40cf))
+* **session:** :bug: allocate session_id only when session starts ([#65](https://github.com/CHiPmxbi/mxbiflow/issues/65)) ([7f90e72](https://github.com/CHiPmxbi/mxbiflow/commit/7f90e7297f49a99a760ec94a5e3844771d4b5544))
+* **ui:** :bug: fix experimenter persistence in non-editable combobox ([#61](https://github.com/CHiPmxbi/mxbiflow/issues/61)) ([4d3cc78](https://github.com/CHiPmxbi/mxbiflow/commit/4d3cc7802e222b9d7d71ac7dc69f9f6642e52048))
+
 ## [0.3.7](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.6...v0.3.7) (2026-02-18)
 
 
