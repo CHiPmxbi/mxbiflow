@@ -22,6 +22,9 @@ class ExperimentConfigGroup(QGroupBox):
     def __init__(self, parent, experimenters: list[str]):
         super().__init__("Config", parent)
 
+        self._experimenters = experimenters
+        self._reward_types = list(RewardEnum)
+
         layout = QGridLayout(self)
         self.setLayout(layout)
         layout.setColumnStretch(1, 1)
@@ -57,8 +60,16 @@ class ExperimentConfigGroup(QGroupBox):
         layout.addWidget(self.spin_auto_accept, 3, 1)
 
     def load_config(self, config: SessionConfig):
-        self.combo_experimenter.setEditText(config.experimenter)
-        self.combo_reward_type.setEditText(config.reward_type)
+        if config.experimenter in self._experimenters:
+            self.combo_experimenter.setCurrentText(config.experimenter)
+        else:
+            self.combo_experimenter.setCurrentIndex(0)
+
+        if config.reward_type in self._reward_types:
+            self.combo_reward_type.setCurrentText(config.reward_type.value)
+        else:
+            self.combo_reward_type.setCurrentIndex(0)
+
         self.check_hide_cursor.setChecked(config.hide_cursor)
         self.check_fullscreen.setChecked(config.fullscreen)
         self.spin_auto_accept.setValue(config.auto_accept_timeout_seconds)
