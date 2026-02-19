@@ -158,9 +158,15 @@ class Session(BaseModel):
     note: str = Field(frozen=True)
 
     _current_animal: str | None = PrivateAttr(default=None)
+    _session_store: DailySessionIdStore | None = PrivateAttr(default=None)
     animals: dict[str, Animal] = Field(default_factory=dict, frozen=True)
 
+    def set_session_store(self, store: DailySessionIdStore) -> None:
+        self._session_store = store
+
     def start(self):
+        if self._session_store and self.session_id == 0:
+            self.session_id = self._session_store.session_id
         self.start_at = datetime.now(timezone.utc).timestamp()
 
     def end(self):
