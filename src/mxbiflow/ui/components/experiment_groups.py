@@ -35,29 +35,37 @@ class ExperimentConfigGroup(QGroupBox):
         self.combo_experimenter.addItems(experimenters)
         layout.addWidget(self.combo_experimenter, 0, 1)
 
-        layout.addWidget(QLabel("hide cursor", self), 0, 2)
-        self.check_hide_cursor = QCheckBox(self)
-        layout.addWidget(self.check_hide_cursor, 0, 3)
-
-        layout.addWidget(QLabel("reward type", self), 1, 0)
+        layout.addWidget(QLabel("reward type", self), 0, 2)
         self.combo_reward_type = QComboBox(self)
         self.combo_reward_type.addItems(list(RewardEnum))
-        layout.addWidget(self.combo_reward_type, 1, 1)
+        layout.addWidget(self.combo_reward_type, 0, 3)
+
+        layout.addWidget(QLabel("hide cursor", self), 1, 0)
+        self.check_hide_cursor = QCheckBox(self)
+        layout.addWidget(self.check_hide_cursor, 1, 1)
 
         layout.addWidget(QLabel("fullscreen", self), 1, 2)
         self.check_fullscreen = QCheckBox(self)
         layout.addWidget(self.check_fullscreen, 1, 3)
 
-        layout.addWidget(QLabel("notes", self), 2, 0)
+        layout.addWidget(QLabel("send email", self), 2, 0)
+        self.check_send_email = QCheckBox(self)
+        layout.addWidget(self.check_send_email, 2, 1)
+
+        layout.addWidget(QLabel("sync data", self), 2, 2)
+        self.check_sync_data = QCheckBox(self)
+        layout.addWidget(self.check_sync_data, 2, 3)
+
+        layout.addWidget(QLabel("notes", self), 3, 0)
         self.line_notes = QLineEdit(self)
         self.line_notes.setPlaceholderText("Notes")
-        layout.addWidget(self.line_notes, 2, 1, 1, 3)
+        layout.addWidget(self.line_notes, 3, 1, 1, 3)
 
-        layout.addWidget(QLabel("auto accept (s)", self), 3, 0)
+        layout.addWidget(QLabel("auto accept (s)", self), 4, 0)
         self.spin_auto_accept = QSpinBox(self)
         self.spin_auto_accept.setRange(0, 3600)
         self.spin_auto_accept.setSpecialValueText("Disabled")
-        layout.addWidget(self.spin_auto_accept, 3, 1)
+        layout.addWidget(self.spin_auto_accept, 4, 1)
 
     def load_config(self, config: SessionConfig):
         if config.experimenter in self._experimenters:
@@ -73,6 +81,8 @@ class ExperimentConfigGroup(QGroupBox):
         self.check_hide_cursor.setChecked(config.hide_cursor)
         self.check_fullscreen.setChecked(config.fullscreen)
         self.spin_auto_accept.setValue(config.auto_accept_timeout_seconds)
+        self.check_send_email.setChecked(config.send_email)
+        self.check_sync_data.setChecked(config.sync_data)
 
     def result(self) -> SessionConfig:
         return SessionConfig(
@@ -82,6 +92,8 @@ class ExperimentConfigGroup(QGroupBox):
             hide_cursor=self.check_hide_cursor.isChecked(),
             fullscreen=self.check_fullscreen.isChecked(),
             auto_accept_timeout_seconds=self.spin_auto_accept.value(),
+            send_email=self.check_send_email.isChecked(),
+            sync_data=self.check_sync_data.isChecked(),
         )
 
 
