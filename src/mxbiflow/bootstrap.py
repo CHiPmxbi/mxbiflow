@@ -68,7 +68,7 @@ def init_session(session_config: SessionConfig) -> Session:
         animal_dict[animal_config.name] = animal_state
 
     session = Session(
-        session_id=store.session_id,
+        session_id=0,
         experimenter=session_config.experimenter,
         reward_type=session_config.reward_type,
         send_email=False,
@@ -81,5 +81,6 @@ def init_session(session_config: SessionConfig) -> Session:
         fullscreen=session_config.fullscreen,
         animals=animal_dict,
     )
+    session.set_session_store(store)
 
     return session
