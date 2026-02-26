@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pygame
 from pygame import Event
 from pymxbi import MXBI
@@ -7,6 +9,7 @@ from ..core.path import get_data_dir_path
 from ..infra.data_logger import DataLogger, DataLoggerType
 from ..models.session import Session
 from ..scene import SceneManager
+from ..utils.logger import logger
 from .detector_bridge import DetectorBridge
 from .scheduler import Scheduler
 
@@ -110,6 +113,18 @@ class Game:
                 self._running = False
             case pygame.K_q:
                 self._running = False
+            case pygame.K_c:
+                self._capture_screen()
+
+    def _capture_screen(self) -> None:
+        screenshot_dir = self._session_logger.path.parent / "screenshots"
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        screenshot_path = screenshot_dir / f"screen_{timestamp}.png"
+
+        pygame.image.save(self._screen, screenshot_path)
+        logger.info(f"screen captured: {screenshot_path}")
 
     def quit(self) -> None:
         self._session.end()
