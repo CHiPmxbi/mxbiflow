@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.9](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.8...v0.3.9) (2026-02-26)
+
+
+### Features
+
+* **gameloop:** :sparkles: add screenshot capture hotkey ([#66](https://github.com/CHiPmxbi/mxbiflow/issues/66)) ([e88a820](https://github.com/CHiPmxbi/mxbiflow/commit/e88a820295c5c28d8b3e2a0adf7bb4dd0d36807e))
+
 ## [0.3.8](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.7...v0.3.8) (2026-02-19)
 
 
