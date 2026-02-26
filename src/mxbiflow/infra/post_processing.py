@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Self
+from typing import Self, TypedDict
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel
@@ -32,6 +32,11 @@ class SessionSummary(BaseModel):
     reward_type: str
     total_animals: int
     animals: list[AnimalSummary]
+
+
+class ReportImage(TypedDict):
+    cid: str
+    alt: str
 
 
 def _format_timestamp(ts: float) -> str:
@@ -134,6 +139,12 @@ def session_overview() -> str:
     }
 
     return template.render(**context)
+
+
+def render_image_section_report(section_title: str, images: list[ReportImage]) -> str:
+    env = _get_jinja_env()
+    template = env.get_template("section_report.html")
+    return template.render(section_title=section_title, images=images)
 
 
 class HtmlComposer:
