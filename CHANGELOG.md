@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.11](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.10...v0.3.11) (2026-02-26)
+
+
+### Features
+
+* **report:** :sparkles: add shared image section renderer ([e26d834](https://github.com/CHiPmxbi/mxbiflow/commit/e26d83410f1a97dc3dc691b09368ffdb3eee4ce5))
+
 ## [0.3.10](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.9...v0.3.10) (2026-02-26)
 
 
