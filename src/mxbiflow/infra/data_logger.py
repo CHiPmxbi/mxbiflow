@@ -48,7 +48,12 @@ class DataLogger:
             base_dir = self._path / date_path / session_path
 
         try:
+            already_exists = base_dir.exists()
             base_dir.mkdir(parents=True, exist_ok=True)
+            if already_exists:
+                logger.info(f"Data directory exists: {base_dir}")
+            else:
+                logger.info(f"Data directory created: {base_dir}")
             return base_dir
         except Exception as e:
             logger.error(f"failed to create {base_dir}: {e}")
