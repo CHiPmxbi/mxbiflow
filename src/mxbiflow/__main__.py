@@ -1,9 +1,9 @@
 from pathlib import Path
+from datetime import timezone
 
 from mxbiflow import set_base_path
 from mxbiflow.bootstrap import init_gameloop
 from mxbiflow.core.path import get_email_state_path, get_mxbi_config_path
-from datetime import datetime, timezone
 
 from mxbiflow.infra.post_processing import HtmlComposer, session_overview, summarize
 from mxbiflow.models.session import EmailSendStateStore
@@ -29,7 +29,7 @@ def main() -> None:
     summary = summarize()
 
     date_str = (
-        datetime.fromtimestamp(summary.start_at, tz=timezone.utc).strftime("%Y-%m-%d")
+        summary.start_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
         if summary.start_at
         else "N/A"
     )

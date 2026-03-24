@@ -1,7 +1,7 @@
-from time import time
+from datetime import datetime, timezone
 from typing import TypeVar
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -55,9 +55,16 @@ class StageState(BaseModel):
 
 class AnimalSessionState(BaseModel):
     session_id: int = Field(ge=0)
-    start_at: float = Field(default_factory=lambda: time())
-    end_at: float | None = None
+    start_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    end_at: datetime | None = None
     trial_id: int = Field(default=0, ge=0)
+
+    @field_serializer("start_at", "end_at", when_used="json")
+    def _serialize_timestamp(self, value: datetime | None) -> str | None:
+        if value is None:
+            return None
+
+        return value.astimezone().isoformat(timespec="microseconds")
 
 
 class Animal(BaseModel):
@@ -99,7 +106,7 @@ class Animal(BaseModel):
         if self._current_animal_session is None:
             raise ValueError("Animal session is not started")
 
-        self._current_animal_session.end_at = time()
+        self._current_animal_session.end_at = datetime.now(timezone.utc)
         self._current_animal_session = None
 
     @property

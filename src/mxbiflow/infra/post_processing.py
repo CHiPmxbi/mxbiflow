@@ -26,8 +26,8 @@ class AnimalSummary(BaseModel):
 
 class SessionSummary(BaseModel):
     session_id: int
-    start_at: float
-    end_at: float
+    start_at: datetime | None
+    end_at: datetime | None
     duration_seconds: float
     reward_type: str
     total_animals: int
@@ -39,11 +39,11 @@ class ReportImage(TypedDict):
     alt: str
 
 
-def _format_timestamp(ts: float) -> str:
-    if ts == 0:
+def _format_timestamp(dt: datetime | None) -> str:
+    if dt is None:
         return "N/A"
-    dt = datetime.fromtimestamp(ts)
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _format_duration(seconds: float) -> str:
@@ -62,7 +62,7 @@ def _calc_animal_duration(sessions: list) -> float:
     total = 0.0
     for s in sessions:
         if s.start_at and s.end_at:
-            total += s.end_at - s.start_at
+            total += (s.end_at - s.start_at).total_seconds()
     return total
 
 
@@ -103,7 +103,9 @@ def summarize() -> SessionSummary:
             )
         )
 
-    duration = session.end_at - session.start_at if session.end_at > 0 else 0
+    duration = 0.0
+    if session.start_at and session.end_at:
+        duration = (session.end_at - session.start_at).total_seconds()
 
     return SessionSummary(
         session_id=session.session_id,
@@ -123,7 +125,11 @@ def session_overview() -> str:
 
     context = {
         "session_id": summary.session_id,
-        "session_date": datetime.fromtimestamp(summary.start_at).strftime("%Y-%m-%d"),
+        "session_date": (
+            summary.start_at.astimezone().strftime("%Y-%m-%d")
+            if summary.start_at
+            else "N/A"
+        ),
         "start_time": _format_timestamp(summary.start_at),
         "end_time": _format_timestamp(summary.end_at),
         "duration": _format_duration(summary.duration_seconds),

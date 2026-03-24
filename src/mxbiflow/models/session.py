@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pydantic import BaseModel, Field, PrivateAttr, ValidationError
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_serializer
 
 from .animal import Animal, AnimalConfig
 from .reward import RewardEnum
@@ -153,8 +153,8 @@ class Session(BaseModel):
     fullscreen: bool = Field(default=False, frozen=True)
 
     session_id: int = Field(default=0, ge=0)
-    start_at: float = Field(default=0, ge=0)
-    end_at: float = Field(default=0, ge=0)
+    start_at: datetime | None = Field(default=None)
+    end_at: datetime | None = Field(default=None)
     note: str = Field(frozen=True)
 
     _current_animal: str | None = PrivateAttr(default=None)
@@ -167,10 +167,17 @@ class Session(BaseModel):
     def start(self):
         if self._session_store and self.session_id == 0:
             self.session_id = self._session_store.session_id
-        self.start_at = datetime.now(timezone.utc).timestamp()
+        self.start_at = datetime.now(timezone.utc)
 
     def end(self):
-        self.end_at = datetime.now(timezone.utc).timestamp()
+        self.end_at = datetime.now(timezone.utc)
+
+    @field_serializer("start_at", "end_at", when_used="json")
+    def _serialize_timestamp(self, value: datetime | None) -> str | None:
+        if value is None:
+            return None
+
+        return value.astimezone().isoformat(timespec="microseconds")
 
     @property
     def current_animal(self) -> Animal | None:
