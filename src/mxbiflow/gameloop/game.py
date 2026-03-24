@@ -72,7 +72,7 @@ class Game:
             filename="session",
             type=DataLoggerType.JSON,
         )
-        self._session_logger.save(self._session.model_dump())
+        self._session_logger.save(self._session.model_dump(mode="json"))
 
     def play(self) -> None:
         while self._running:
@@ -128,7 +128,7 @@ class Game:
 
     def quit(self) -> None:
         self._session.end()
-        self._session_logger.save(self._session.model_dump())
+        self._session_logger.save(self._session.model_dump(mode="json"))
 
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
