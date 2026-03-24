@@ -557,7 +557,7 @@ wheels = [
 
 [[package]]
 name = "mxbiflow"
-version = "0.3.9"
+version = "0.3.11"
 source = { editable = "." }
 dependencies = [
     { name = "gpiozero" },
