@@ -30,9 +30,7 @@ class SessionConfig(BaseModel):
 
 
 class DailySessionCounter(BaseModel):
-    day: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).date().isoformat()
-    )
+    day: str = Field(default_factory=lambda: datetime.now().date().isoformat())
     last_session_id: int = Field(default=0, ge=0)
 
 
@@ -45,8 +43,8 @@ class EmailSendState(BaseModel):
 class DailySessionIdStore:
     path: Path
 
-    def _today_utc(self):
-        return datetime.now(timezone.utc).date().isoformat()
+    def _today_local(self) -> str:
+        return datetime.now().date().isoformat()
 
     def _load(self) -> DailySessionCounter:
         if not self.path.exists():
@@ -82,7 +80,7 @@ class DailySessionIdStore:
 
     @property
     def session_id(self) -> int:
-        today = self._today_utc()
+        today = self._today_local()
         data = self._load()
 
         if data.day != today:

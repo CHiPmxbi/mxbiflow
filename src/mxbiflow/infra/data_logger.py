@@ -7,8 +7,6 @@ from pathlib import Path
 
 from ..utils.logger import logger
 
-now = datetime.now()
-
 
 class DataLoggerType(StrEnum):
     JSONL = "jsonl"
@@ -39,7 +37,7 @@ class DataLogger:
         return self._data_path
 
     def _ensure_data_dir(self) -> Path:
-        date_path = Path(f"{now.year}{now.month:02d}{now.day:02d}")
+        date_path = Path(datetime.now().strftime("%Y%m%d"))
         session_path = Path(f"{self._session_id}")
 
         if self._monkey:
