@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.12](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.11...v0.3.12) (2026-03-24)
+
+
+### Bug Fixes
+
+* **session:** :bug: fix daily rollover for session data directories ([#73](https://github.com/CHiPmxbi/mxbiflow/issues/73)) ([001a342](https://github.com/CHiPmxbi/mxbiflow/commit/001a342cdb87267801110c0320f90cfc022724c5))
+
 ## [0.3.11](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.10...v0.3.11) (2026-02-26)
 
 
