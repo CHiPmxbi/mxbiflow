@@ -40,9 +40,19 @@ class Scheduler:
         self._session.current_animal.set_current_stage(stage)
         self._need_refresh = True
 
-    def _handle_fault_event(self) -> None: ...
+    def _handle_fault_event(self) -> None:
+        fallback = self._scene_manager.fault_fallback
+        if isinstance(self._scene_manager.current, fallback):
+            return
 
-    def _handle_unknown_animal(self) -> None: ...
+        self._scene_manager.switch(fallback)
+
+    def _handle_unknown_animal(self) -> None:
+        fallback = self._scene_manager.unknown_animal_fallback
+        if isinstance(self._scene_manager.current, fallback):
+            return
+
+        self._scene_manager.switch(fallback)
 
     def handle_event(self, event: Event) -> None:
         if event.type != EVT_DETECTOR:
