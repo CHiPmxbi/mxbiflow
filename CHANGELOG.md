@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.13](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.12...v0.3.13) (2026-03-31)
+
+
+### Bug Fixes
+
+* **deps:** ⬆️ update dependency pymxbi to &gt;=0.3.6 ([#75](https://github.com/CHiPmxbi/mxbiflow/issues/75)) ([f99c7bb](https://github.com/CHiPmxbi/mxbiflow/commit/f99c7bbfd97d25e3368ab54d913dd300baa51c1c))
+* **scheduler:** :bug: route detector fallback events to configured scenes ([#76](https://github.com/CHiPmxbi/mxbiflow/issues/76)) ([81fdc13](https://github.com/CHiPmxbi/mxbiflow/commit/81fdc13c38d0d3e110743d03cd3198bcc862b21a))
+
 ## [0.3.12](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.11...v0.3.12) (2026-03-24)
 
 
