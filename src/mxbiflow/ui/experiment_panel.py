@@ -44,7 +44,9 @@ class ExperimentPanel(QMainWindow):
         layout_main.addWidget(self.group_config)
 
         self.group_scene = ExperimentSceneGroup(
-            self, stages=list(self._stage_level_tables.keys())
+            self,
+            stages=list(self._stage_level_tables.keys()),
+            animals=self._fallback_animal_options(),
         )
         layout_main.addWidget(self.group_scene)
 
@@ -107,9 +109,17 @@ class ExperimentPanel(QMainWindow):
         scene_result = self.group_scene.result()
         session_config.default_scene = scene_result.default_scene
         session_config.unknown_animal_fallback = scene_result.unknown_animal_fallback
+        session_config.unknown_animal_fallback_animal = (
+            scene_result.unknown_animal_fallback_animal
+        )
         session_config.fault_fallback = scene_result.fault_fallback
         session_config.animals = self.group_animals.result()
         return session_config
+
+    def _fallback_animal_options(self) -> list[str]:
+        names = list(self._options.value.animals.values())
+        names.extend(animal.name for animal in self._config.value.animals)
+        return list(dict.fromkeys(name for name in names if name))
 
     def _on_save(self):
         self._config.save(self.result())

@@ -100,11 +100,12 @@ class ExperimentConfigGroup(QGroupBox):
 class SceneSelection(NamedTuple):
     default_scene: str
     unknown_animal_fallback: str
+    unknown_animal_fallback_animal: str
     fault_fallback: str
 
 
 class ExperimentSceneGroup(QGroupBox):
-    def __init__(self, parent=None, *, stages: list[str]):
+    def __init__(self, parent=None, *, stages: list[str], animals: list[str]):
         super().__init__("Scene", parent)
 
         layout = QFormLayout(self)
@@ -120,6 +121,15 @@ class ExperimentSceneGroup(QGroupBox):
         self.combo_unknown_animal_fallback.addItems(stages)
         layout.addRow(label_unknown, self.combo_unknown_animal_fallback)
 
+        label_unknown_animal = QLabel("unknown fallback animal", self)
+        self.combo_unknown_animal_fallback_animal = QComboBox(self)
+        self.combo_unknown_animal_fallback_animal.addItem("")
+        self.combo_unknown_animal_fallback_animal.addItems(animals)
+        layout.addRow(
+            label_unknown_animal,
+            self.combo_unknown_animal_fallback_animal,
+        )
+
         label_fault = QLabel("fault fallback", self)
         self.combo_fault_fallback = QComboBox(self)
         self.combo_fault_fallback.addItems(stages)
@@ -132,6 +142,19 @@ class ExperimentSceneGroup(QGroupBox):
             self.combo_unknown_animal_fallback.setCurrentText(
                 config.unknown_animal_fallback
             )
+        if config.unknown_animal_fallback_animal:
+            if (
+                self.combo_unknown_animal_fallback_animal.findText(
+                    config.unknown_animal_fallback_animal
+                )
+                < 0
+            ):
+                self.combo_unknown_animal_fallback_animal.addItem(
+                    config.unknown_animal_fallback_animal
+                )
+            self.combo_unknown_animal_fallback_animal.setCurrentText(
+                config.unknown_animal_fallback_animal
+            )
         if config.fault_fallback:
             self.combo_fault_fallback.setCurrentText(config.fault_fallback)
 
@@ -139,6 +162,7 @@ class ExperimentSceneGroup(QGroupBox):
         return SceneSelection(
             default_scene=self.combo_default_scene.currentText(),
             unknown_animal_fallback=self.combo_unknown_animal_fallback.currentText(),
+            unknown_animal_fallback_animal=self.combo_unknown_animal_fallback_animal.currentText(),
             fault_fallback=self.combo_fault_fallback.currentText(),
         )
 

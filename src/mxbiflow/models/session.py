@@ -19,6 +19,7 @@ class SessionConfig(BaseModel):
 
     default_scene: str = Field(default="")
     unknown_animal_fallback: str = Field(default="")
+    unknown_animal_fallback_animal: str = Field(default="")
     fault_fallback: str = Field(default="")
 
     hide_cursor: bool = Field(default=False)
@@ -145,6 +146,7 @@ class Session(BaseModel):
 
     default_scene: str = Field(default="", frozen=True)
     unknown_animal_fallback: str = Field(default="", frozen=True)
+    unknown_animal_fallback_animal: str = Field(default="", frozen=True)
     fault_fallback: str = Field(default="", frozen=True)
 
     hide_cursor: bool = Field(default=False, frozen=True)
