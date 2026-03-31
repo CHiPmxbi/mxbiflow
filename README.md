@@ -48,7 +48,7 @@ scene_manager = SceneManager()
 scene_manager.register([IDLE, Detect, Discriminate])
 
 config_wizard(scene_manager)
-game = init_gameloop(scene_manager)
+game = init_gameloop(scene_manager, max_fps=120)
 game.play()
 ```
 

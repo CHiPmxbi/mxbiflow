@@ -15,7 +15,7 @@ from .models.session import DailySessionIdStore, Session, SessionConfig
 from .scene import SceneManager
 
 
-def init_gameloop(scene_manager: SceneManager) -> Game:
+def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:
     """
     Initialize the game loop with MXBI, session, and detector bridge.
 
@@ -23,6 +23,8 @@ def init_gameloop(scene_manager: SceneManager) -> Game:
     ----------
     scene_manager : SceneManager
         The scene manager instance to be used by the game.
+    max_fps : int, optional
+        Maximum frames per second for the game loop. Must be >= 1.
 
     Returns
     -------
@@ -42,7 +44,13 @@ def init_gameloop(scene_manager: SceneManager) -> Game:
         mxbi.detector, {i.rfid_id: i.name for i in session.animals.values()}
     )
 
-    return Game(session, scene_manager, detector_bridge, mxbi)
+    return Game(
+        session,
+        scene_manager,
+        detector_bridge,
+        mxbi,
+        max_fps=max_fps,
+    )
 
 
 def build_mxbi() -> pymxbi.MXBI:
