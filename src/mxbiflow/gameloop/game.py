@@ -21,7 +21,11 @@ class Game:
         scene_manager: SceneManager,
         detector_bridge: DetectorBridge,
         mxbi: MXBI,
+        max_fps: int = 60,
     ) -> None:
+        if max_fps < 1:
+            raise ValueError(f"max_fps must be >= 1, got {max_fps}")
+
         pygame.init()
 
         self._scene_manager = scene_manager
@@ -60,6 +64,7 @@ class Game:
             pygame.mouse.set_visible(False)
 
         self._clock = pygame.time.Clock()
+        self._max_fps = max_fps
         self._running = True
 
         self._mxbi.begin()
@@ -76,7 +81,7 @@ class Game:
 
     def play(self) -> None:
         while self._running:
-            dt = self._clock.tick(60) / 1000.0
+            dt = self._clock.tick(self._max_fps) / 1000.0
 
             self._detector_binder.emit_pygame_event()
 
