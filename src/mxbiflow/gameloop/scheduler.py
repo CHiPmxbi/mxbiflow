@@ -1,3 +1,4 @@
+from loguru import logger
 from pygame import Event
 from pymxbi.detector.detector import DetectorEvent
 
@@ -59,6 +60,7 @@ class Scheduler:
             return
 
         msg: DetectorMsg = event.msg
+        logger.debug(f"detector event received: kind={msg.kind}, animal={msg.animal}")
 
         match msg.kind:
             case DetectorEvent.FAULT_DETECTED:
