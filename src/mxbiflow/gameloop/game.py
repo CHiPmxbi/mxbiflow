@@ -26,7 +26,8 @@ class Game:
         if max_fps < 1:
             raise ValueError(f"max_fps must be >= 1, got {max_fps}")
 
-        pygame.init()
+        if not pygame.display.get_init():
+            pygame.display.init()
 
         self._scene_manager = scene_manager
         if session.default_scene:
@@ -138,4 +139,5 @@ class Game:
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
         self._mxbi.quit()
-        pygame.quit()
+        if pygame.display.get_init():
+            pygame.display.quit()

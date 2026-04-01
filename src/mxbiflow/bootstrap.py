@@ -84,6 +84,7 @@ def init_session(session_config: SessionConfig) -> Session:
         note=session_config.note,
         default_scene=session_config.default_scene,
         unknown_animal_fallback=session_config.unknown_animal_fallback,
+        unknown_animal_fallback_animal=session_config.unknown_animal_fallback_animal,
         fault_fallback=session_config.fault_fallback,
         hide_cursor=session_config.hide_cursor,
         fullscreen=session_config.fullscreen,
