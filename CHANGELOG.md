@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.14](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.13...v0.3.14) (2026-04-01)
+
+
+### Bug Fixes
+
+* **deps:** ⬆️ update dependency pymxbi to &gt;=0.3.7 ([#83](https://github.com/CHiPmxbi/mxbiflow/issues/83)) ([300d678](https://github.com/CHiPmxbi/mxbiflow/commit/300d678bf35def3dd2134c9ea786cd5e56aee6c9))
+* improve detector fallback handling and pygame display lifecycle ([#81](https://github.com/CHiPmxbi/mxbiflow/issues/81)) ([ea70f82](https://github.com/CHiPmxbi/mxbiflow/commit/ea70f82bfe9bc0ea840ab6129b7d3fe7ceb56c46))
+
 ## [0.3.13](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.12...v0.3.13) (2026-03-31)
 
 
