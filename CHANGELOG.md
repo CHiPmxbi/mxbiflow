@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.15](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.14...v0.3.15) (2026-04-14)
+
+
+### Bug Fixes
+
+* **deps:** remove pyaudio dependency ([351d065](https://github.com/CHiPmxbi/mxbiflow/commit/351d06531e9a0ced0a4640ca771355b8c7335a69))
+
 ## [0.3.14](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.13...v0.3.14) (2026-04-01)
 
 
