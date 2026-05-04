@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import TypeVar
 
-from pydantic import BaseModel, Field, PrivateAttr, field_serializer
+from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_serializer
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -75,6 +75,7 @@ class Animal(BaseModel):
 
     _current_stage: str = PrivateAttr(default="idle")
     _stages: dict[str, StageState] = PrivateAttr(default_factory=dict)
+    _initial_stage: StageState | None = PrivateAttr(default=None)
     _current_animal_session: AnimalSessionState | None = PrivateAttr(default=None)
     _sessions: list[AnimalSessionState] = PrivateAttr(default_factory=list)
 
@@ -125,9 +126,13 @@ class Animal(BaseModel):
 
         self._current_stage = stage.stage_name
         if stage.stage_name in self._stages:
+            if self._initial_stage is None:
+                self._initial_stage = self._stages[stage.stage_name].model_copy(deep=True)
             return
 
         self._stages[stage.stage_name] = stage
+        if self._initial_stage is None:
+            self._initial_stage = stage.model_copy(deep=True)
 
     def clear_current_stage(self) -> None:
         self._current_stage = "idle"
@@ -139,6 +144,19 @@ class Animal(BaseModel):
     def level_down(self) -> int:
         self.current_stage.level_down()
         return self.current_stage.level
+
+    @computed_field
+    @property
+    def initial_stage(self) -> StageState | None:
+        return self._initial_stage
+
+    @computed_field
+    @property
+    def final_stage(self) -> StageState | None:
+        try:
+            return self.current_stage
+        except ValueError:
+            return None
 
     @property
     def base_info(self) -> AnimalBaseInfo:
