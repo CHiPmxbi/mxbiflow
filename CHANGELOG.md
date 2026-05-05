@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.16](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.15...v0.3.16) (2026-05-04)
+
+
+### Features
+
+* **models:** :sparkles: add initial/final stage serialization to Animal ([#89](https://github.com/CHiPmxbi/mxbiflow/issues/89)) ([7ed5e49](https://github.com/CHiPmxbi/mxbiflow/commit/7ed5e49a30c8751f487abd15f7ca3d7c7375ec43))
+
 ## [0.3.15](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.14...v0.3.15) (2026-04-14)
 
 
