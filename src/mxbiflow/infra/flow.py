@@ -1,7 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Generic, List, Protocol, TypeVar
-
-T = TypeVar("T")
+from typing import Protocol
 
 
 class Next(Protocol):
@@ -13,9 +12,9 @@ class Step(Protocol):
 
 
 @dataclass
-class Flow(Generic[T]):
+class Flow[T]:
     ctx: T
-    _steps: List[Step] = field(default_factory=list)
+    _steps: list[Step] = field(default_factory=list)
     _i: int = 0
     _stopped: bool = False
 

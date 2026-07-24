@@ -1,9 +1,6 @@
-from datetime import datetime, timezone
-from typing import TypeVar
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_serializer
-
-T = TypeVar("T", bound=BaseModel)
 
 
 class AnimalConfig(BaseModel):
@@ -32,7 +29,7 @@ class StageState(BaseModel):
 
     _context: BaseModel | None = PrivateAttr(default=None)
 
-    def get_context(self, context_type: type[T]) -> T | None:
+    def get_context[T: BaseModel](self, context_type: type[T]) -> T | None:
         if self._context is None:
             return None
         if not isinstance(self._context, context_type):
@@ -55,7 +52,7 @@ class StageState(BaseModel):
 
 class AnimalSessionState(BaseModel):
     session_id: int = Field(ge=0)
-    start_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    start_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     end_at: datetime | None = None
     trial_id: int = Field(default=0, ge=0)
 
@@ -107,7 +104,7 @@ class Animal(BaseModel):
         if self._current_animal_session is None:
             raise ValueError("Animal session is not started")
 
-        self._current_animal_session.end_at = datetime.now(timezone.utc)
+        self._current_animal_session.end_at = datetime.now(UTC)
         self._current_animal_session = None
 
     @property

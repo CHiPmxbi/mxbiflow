@@ -1,7 +1,6 @@
 import csv
 import json
-import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -37,7 +36,7 @@ class DataLogger:
         return self._data_path
 
     def _ensure_data_dir(self) -> Path:
-        date_path = Path(datetime.now().strftime("%Y%m%d"))
+        date_path = Path(datetime.now(UTC).strftime("%Y%m%d"))
         session_path = Path(f"{self._session_id}")
 
         if self._monkey:
@@ -48,14 +47,17 @@ class DataLogger:
         try:
             already_exists = base_dir.exists()
             base_dir.mkdir(parents=True, exist_ok=True)
-            if already_exists:
-                logger.info(f"Data directory exists: {base_dir}")
-            else:
-                logger.info(f"Data directory created: {base_dir}")
-            return base_dir
-        except Exception as e:
-            logger.error(f"failed to create {base_dir}: {e}")
-            sys.exit(1)
+        except OSError:
+            logger.exception("Failed to create data directory: %s", base_dir)
+            raise
+
+        logger.info(
+            "Data directory %s: %s",
+            "exists" if already_exists else "created",
+            base_dir,
+        )
+
+        return base_dir
 
     def _get_path(self, suffix: str) -> Path:
         return self._data_dir / f"{self._filename}{suffix}"
@@ -79,7 +81,7 @@ class DataLogger:
         except TypeError as e:
             logger.error(f"Data is not JSON serializable: {e}")
             raise
-        except IOError as e:
+        except OSError as e:
             logger.error(f"Failed to write to file {self._data_path}: {e}")
             raise
         except Exception as e:
@@ -94,7 +96,7 @@ class DataLogger:
         except TypeError as e:
             logger.error(f"Data is not JSON serializable: {e}")
             raise
-        except IOError as e:
+        except OSError as e:
             logger.error(f"Failed to write to file {self._data_path}: {e}")
             raise
         except Exception as e:

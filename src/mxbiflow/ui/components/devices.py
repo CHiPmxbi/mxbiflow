@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Generic, TypeVar
 
 from pymxbi.detector import DetectorModel
 from pymxbi.rewarder import RewarderModel
@@ -18,10 +17,8 @@ from PySide6.QtWidgets import (
 from .device_card.device_card import DeviceCard
 from .dialog.add_devices_dialog import AddDeviceDialog
 
-T = TypeVar("T", RewarderModel, DetectorModel)
 
-
-class Devices(QGroupBox, Generic[T]):
+class Devices[T: (RewarderModel, DetectorModel)](QGroupBox):
     def __init__(
         self,
         parent: QWidget | None,
@@ -62,7 +59,7 @@ class Devices(QGroupBox, Generic[T]):
     def add_model(self, model: T) -> None:
         try:
             device_type = model.device_type
-        except Exception as exc:
+        except AttributeError as exc:
             QMessageBox.warning(
                 self,
                 "Unsupported device",

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
@@ -35,11 +37,11 @@ class MXBIPanel(QMainWindow):
     accepted = Signal()
     rejected = Signal()
 
-    _REWARDER_CARD_FACTORIES: dict[str, type[QWidget]] = {
+    _REWARDER_CARD_FACTORIES: ClassVar[dict[str, type[QWidget]]] = {
         RewarderEnum.RPI_GPIO: RPIGpioPumpCard,
         RewarderEnum.MOCK: MockRewarderCard,
     }
-    _DETECTOR_CARD_FACTORIES: dict[str, type[QWidget]] = {
+    _DETECTOR_CARD_FACTORIES: ClassVar[dict[str, type[QWidget]]] = {
         DetectorEnum.RFID_CONTINUOUS: RFIDDetectorCard,
         DetectorEnum.BEAMBREAK_CONTINUOUS: BeambreakDetectorCard,
         DetectorEnum.FUSION_CONTINUOUS: FusionDetectorCard,

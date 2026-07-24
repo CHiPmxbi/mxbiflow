@@ -1,7 +1,7 @@
 import os
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_serializer
@@ -31,12 +31,12 @@ class SessionConfig(BaseModel):
 
 
 class DailySessionCounter(BaseModel):
-    day: str = Field(default_factory=lambda: datetime.now().date().isoformat())
+    day: str = Field(default_factory=lambda: datetime.now(UTC).date().isoformat())
     last_session_id: int = Field(default=0, ge=0)
 
 
 class EmailSendState(BaseModel):
-    sent_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    sent_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     message_id: str = Field(default="")
 
 
@@ -45,7 +45,7 @@ class DailySessionIdStore:
     path: Path
 
     def _today_local(self) -> str:
-        return datetime.now().date().isoformat()
+        return datetime.now(UTC).date().isoformat()
 
     def _load(self) -> DailySessionCounter:
         if not self.path.exists():
@@ -167,10 +167,10 @@ class Session(BaseModel):
     def start(self):
         if self._session_store and self.session_id == 0:
             self.session_id = self._session_store.session_id
-        self.start_at = datetime.now(timezone.utc)
+        self.start_at = datetime.now(UTC)
 
     def end(self):
-        self.end_at = datetime.now(timezone.utc)
+        self.end_at = datetime.now(UTC)
 
     @field_serializer("start_at", "end_at", when_used="json")
     def _serialize_timestamp(self, value: datetime | None) -> str | None:

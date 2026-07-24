@@ -37,7 +37,6 @@ _current_mxbiflow: MXBIFlow | None = None
 
 
 def get_mxbiflow() -> MXBIFlow:
-    global _current_mxbiflow
     if _current_mxbiflow is None:
         raise RuntimeError("MXBIFlow not initialized")
     return _current_mxbiflow

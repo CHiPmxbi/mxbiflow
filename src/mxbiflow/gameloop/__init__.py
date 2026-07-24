@@ -12,11 +12,11 @@ from .settlement import (
 )
 
 __all__ = [
+    "EVT_DETECTOR",
     "CountSettlementConfig",
     "CountSettlementResult",
     "DetectorBridge",
     "DetectorMsg",
-    "EVT_DETECTOR",
     "Game",
     "RateSettlementConfig",
     "RateSettlementResult",

@@ -1,13 +1,10 @@
 import os
 from pathlib import Path
-from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-T = TypeVar("T", bound=BaseModel)
 
-
-class ConfigStore(Generic[T]):
+class ConfigStore[T: BaseModel]:
     def __init__(
         self,
         config_path: Path,

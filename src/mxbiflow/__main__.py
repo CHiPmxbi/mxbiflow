@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import UTC
 from pathlib import Path
 
 from pymotego.email import EmailClient
@@ -29,7 +29,7 @@ def main() -> None:
     summary = summarize()
 
     date_str = (
-        summary.start_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
+        summary.start_at.astimezone(UTC).strftime("%Y-%m-%d")
         if summary.start_at
         else "N/A"
     )

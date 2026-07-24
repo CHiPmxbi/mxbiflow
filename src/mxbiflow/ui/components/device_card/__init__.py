@@ -7,11 +7,11 @@ from .rewarder.mock_rewarder_card import MockRewarderCard
 from .rewarder.rpi_gpio_rewarder import RPIGpioPumpCard
 
 __all__ = [
-    "DeviceCard",
-    "MockRewarderCard",
-    "RPIGpioPumpCard",
-    "MockDetectorCard",
-    "RFIDDetectorCard",
     "BeambreakDetectorCard",
+    "DeviceCard",
     "FusionDetectorCard",
+    "MockDetectorCard",
+    "MockRewarderCard",
+    "RFIDDetectorCard",
+    "RPIGpioPumpCard",
 ]

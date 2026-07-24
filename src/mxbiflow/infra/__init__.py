@@ -7,7 +7,7 @@ __all__ = [
     "DataLogger",
     "DataLoggerType",
     "EventBus",
-    "event_bus",
     "Flow",
     "FrameTimer",
+    "event_bus",
 ]

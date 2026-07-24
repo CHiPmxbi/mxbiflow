@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
@@ -15,10 +13,8 @@ from PySide6.QtWidgets import (
 
 from ..card import CardFrame
 
-TModel = TypeVar("TModel")
 
-
-class DeviceCard(CardFrame, Generic[TModel]):
+class DeviceCard[T](CardFrame):
     remove_requested = Signal()
 
     def __init__(self, parent=None):
@@ -61,9 +57,9 @@ class DeviceCard(CardFrame, Generic[TModel]):
     def set_title(self, title: str) -> None:
         self.label_title.setText(title)
 
-    def load_config(self, model: TModel) -> None:
+    def load_config(self, model: T) -> None:
         raise NotImplementedError
 
     @property
-    def result(self) -> TModel:
+    def result(self) -> T:
         raise NotImplementedError

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pygame
 from pygame import Event
@@ -126,7 +126,7 @@ class Game:
         screenshot_dir = self._session_logger.path.parent / "screenshots"
         screenshot_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
         screenshot_path = screenshot_dir / f"screen_{timestamp}.png"
 
         pygame.image.save(self._screen, screenshot_path)
