@@ -6,6 +6,7 @@ from pygame import Event, Rect, Surface, image, transform
 
 from mxbiflow import get_mxbiflow
 from mxbiflow.assets import create_background
+from mxbiflow.scene import Scene
 
 ASSETS_PATH = Path(__file__).parent / "assets"
 
@@ -16,11 +17,10 @@ class Asset:
     rect: Rect
 
 
-class IDLE:
-    _running: bool
-    level_table: dict[str, list[int]] = {}
-
+class IDLE(Scene):
     def __init__(self) -> None:
+        super().__init__()
+
         self._mxbiflow = get_mxbiflow()
 
         self._screen_size = self._mxbiflow.mxbi.screen_size
@@ -51,10 +51,6 @@ class IDLE:
 
     def quit(self) -> None:
         self._running = False
-
-    @property
-    def running(self) -> bool:
-        return self._running
 
     def handle_event(self, event: Event) -> None: ...
 

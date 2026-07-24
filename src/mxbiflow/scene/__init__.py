@@ -1,7 +1,7 @@
 from .scene_manager import SceneManager
-from .scene_protocol import SceneProtocol
+from .scene_protocol import Scene
 
 __all__ = [
     "SceneManager",
-    "SceneProtocol",
+    "Scene",
 ]
