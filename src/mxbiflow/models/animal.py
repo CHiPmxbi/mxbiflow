@@ -127,7 +127,9 @@ class Animal(BaseModel):
         self._current_stage = stage.stage_name
         if stage.stage_name in self._stages:
             if self._initial_stage is None:
-                self._initial_stage = self._stages[stage.stage_name].model_copy(deep=True)
+                self._initial_stage = self._stages[stage.stage_name].model_copy(
+                    deep=True
+                )
             return
 
         self._stages[stage.stage_name] = stage

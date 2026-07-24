@@ -14,27 +14,32 @@ Therefore, a `task` that can be scheduled by a `Scheduler` should include the fo
 
 ```python
 class LevelConfig(BaseModel):
-    level: int # Current difficulty level
-    stimulation_size: int # Variable parameter
-    min_sound_span: float # Variable parameter
-    max_sound_span: float # Variable parameter
-    reward_delay: float # Variable parameter
-    visual_stimulus_delay: float # Variable parameter
+    level: int  # Current difficulty level
+    stimulation_size: int  # Variable parameter
+    min_sound_span: float  # Variable parameter
+    max_sound_span: float  # Variable parameter
+    reward_delay: float  # Variable parameter
+    visual_stimulus_delay: float  # Variable parameter
 
 
 class LevelConfigs(RootModel):
-    root: dict[int, LevelConfig] # Records different parameters by difficulty level
+    root: dict[int, LevelConfig]  # Records different parameters by difficulty level
 ```
 
 2. **Scheduling logic** ⚙️
 
 ```python
 class ScheduleCondition(BaseModel):
-    level_count: int = 0 # Total number of difficulty levels
-    evaluation_interval: int = 20 # Evaluate accuracy every N trials
-    difficulty_increase_threshold: float = 0.8 # Increase difficulty if accuracy exceeds this value
-    difficulty_decrease_threshold: float = 0.45 # Decrease difficulty if accuracy falls below this value
-    next_task: TaskEnum = TaskEnum.IDEL # What is the next task
+    level_count: int = 0  # Total number of difficulty levels
+    evaluation_interval: int = 20  # Evaluate accuracy every N trials
+    difficulty_increase_threshold: float = (
+        0.8  # Increase difficulty if accuracy exceeds this value
+    )
+    difficulty_decrease_threshold: float = (
+        0.45  # Decrease difficulty if accuracy falls below this value
+    )
+    next_task: TaskEnum = TaskEnum.IDEL  # What is the next task
+
 
 class TrialConfig(BaseModel):
     condition: ScheduleCondition = Field(
@@ -42,8 +47,8 @@ class TrialConfig(BaseModel):
             level_count=12,
         )
     )
-    stimulus_frequency: int = 2000 # Constant parameter
-    time_out: int = 10000 # Constant parameter
+    stimulus_frequency: int = 2000  # Constant parameter
+    time_out: int = 10000  # Constant parameter
 ```
 
 The `Scheduler` will decide how to schedule tasks based on the `ScheduleCondition` provided by the `Task`. 🎯
