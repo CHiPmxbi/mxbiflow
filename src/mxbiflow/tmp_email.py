@@ -9,5 +9,5 @@ def send_email(subject: str, body: str, attachments: list[EmailAttachment]) -> N
             html_body=body,
             attachments=attachments,
         )
-    logger.info(f"Status: {response.status_code}")
-    logger.info(f"Body: {response.text}")
+    logger.info("Status: {}", response.status_code)
+    logger.info("Body: {}", response.text)

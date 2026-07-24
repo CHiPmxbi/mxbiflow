@@ -48,11 +48,11 @@ class DataLogger:
             already_exists = base_dir.exists()
             base_dir.mkdir(parents=True, exist_ok=True)
         except OSError:
-            logger.exception("Failed to create data directory: %s", base_dir)
+            logger.exception("Failed to create data directory: {}", base_dir)
             raise
 
         logger.info(
-            "Data directory %s: %s",
+            "Data directory {}: {}",
             "exists" if already_exists else "created",
             base_dir,
         )
@@ -79,13 +79,13 @@ class DataLogger:
                 f.write(json_line + "\n")
 
         except TypeError as e:
-            logger.error(f"Data is not JSON serializable: {e}")
+            logger.error("Data is not JSON serializable: {}", e)
             raise
         except OSError as e:
-            logger.error(f"Failed to write to file {self._data_path}: {e}")
+            logger.error("Failed to write to file {}: {}", self._data_path, e)
             raise
         except Exception as e:
-            logger.error(f"Unexpected error while writing data: {e}")
+            logger.error("Unexpected error while writing data: {}", e)
             raise
 
     def _save_json(self, data: dict) -> None:
@@ -94,13 +94,13 @@ class DataLogger:
             with open(self._data_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except TypeError as e:
-            logger.error(f"Data is not JSON serializable: {e}")
+            logger.error("Data is not JSON serializable: {}", e)
             raise
         except OSError as e:
-            logger.error(f"Failed to write to file {self._data_path}: {e}")
+            logger.error("Failed to write to file {}: {}", self._data_path, e)
             raise
         except Exception as e:
-            logger.error(f"Unexpected error while writing JSON data: {e}")
+            logger.error("Unexpected error while writing JSON data: {}", e)
             raise
 
     def save_csv_row(self, data: dict) -> None:
@@ -117,5 +117,5 @@ class DataLogger:
                     writer.writeheader()
                 writer.writerow({k: data.get(k, "") for k in fieldnames})
         except Exception as e:
-            logger.error(f"Failed to write CSV row to {csv_path}: {e}")
+            logger.error("Failed to write CSV row to {}: {}", csv_path, e)
             raise

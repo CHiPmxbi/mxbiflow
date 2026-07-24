@@ -55,8 +55,8 @@ class Scheduler:
                 self._set_current_animal(fallback_animal)
             else:
                 logger.warning(
-                    "unknown_animal_fallback_animal is not in session animals: "
-                    f"{fallback_animal}"
+                    "unknown_animal_fallback_animal is not in session animals: {}",
+                    fallback_animal,
                 )
         else:
             logger.warning(
@@ -74,7 +74,9 @@ class Scheduler:
             return
 
         msg: DetectorMsg = event.msg
-        logger.debug(f"detector event received: kind={msg.kind}, animal={msg.animal}")
+        logger.debug(
+            "detector event received: kind={}, animal={}", msg.kind, msg.animal
+        )
 
         match msg.kind:
             case DetectorEvent.FAULT_DETECTED:
