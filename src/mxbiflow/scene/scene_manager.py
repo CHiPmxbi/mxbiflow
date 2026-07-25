@@ -1,7 +1,7 @@
 from pygame import Event, Surface
 
 from .idle.idle import IDLE
-from .scene_protocol import Scene
+from .scene import Scene
 
 
 class SceneManager:
