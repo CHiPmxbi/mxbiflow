@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Self, TypedDict
@@ -6,6 +7,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel
 
 from ..core.context import get_mxbiflow
+from ..models.animal import AnimalSessionState
 
 
 class StageSummary(BaseModel):
@@ -58,7 +60,7 @@ def _format_duration(seconds: float) -> str:
     return f"{secs}s"
 
 
-def _calc_animal_duration(sessions: list) -> float:
+def _calc_animal_duration(sessions: Sequence[AnimalSessionState]) -> float:
     total = 0.0
     for s in sessions:
         if s.start_at and s.end_at:
@@ -82,7 +84,7 @@ def summarize() -> SessionSummary:
 
     for name, animal in session.animals.items():
         stages: list[StageSummary] = []
-        for stage_name, stage_state in animal._stages.items():
+        for stage_name, stage_state in animal.stages.items():
             stages.append(
                 StageSummary(
                     name=stage_name,
@@ -97,8 +99,8 @@ def summarize() -> SessionSummary:
                 name=name,
                 rfid_id=animal.rfid_id,
                 total_trials=animal.trial_id,
-                animal_sessions=len(animal._sessions),
-                total_duration_seconds=_calc_animal_duration(animal._sessions),
+                animal_sessions=len(animal.sessions),
+                total_duration_seconds=_calc_animal_duration(animal.sessions),
                 stages=stages,
             )
         )
@@ -123,7 +125,7 @@ def session_overview() -> str:
     env = _get_jinja_env()
     template = env.get_template("session_overview.html")
 
-    context = {
+    context: dict[str, object] = {
         "session_id": summary.session_id,
         "session_date": (
             summary.start_at.astimezone().strftime("%Y-%m-%d")

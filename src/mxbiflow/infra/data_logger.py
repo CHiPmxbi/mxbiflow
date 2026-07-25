@@ -1,10 +1,13 @@
 import csv
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
 from ..utils.logger import logger
+
+type LogRecord = Mapping[str, object]
 
 
 class DataLoggerType(StrEnum):
@@ -62,7 +65,7 @@ class DataLogger:
     def _get_path(self, suffix: str) -> Path:
         return self._data_dir / f"{self._filename}{suffix}"
 
-    def save(self, data: dict) -> None:
+    def save(self, data: LogRecord) -> None:
         match self._type:
             case DataLoggerType.JSONL:
                 self._save_jsonl(data)
@@ -71,7 +74,7 @@ class DataLogger:
             case DataLoggerType.CSV:
                 self.save_csv_row(data)
 
-    def _save_jsonl(self, data: dict) -> None:
+    def _save_jsonl(self, data: LogRecord) -> None:
         try:
             json_line = json.dumps(data, ensure_ascii=False)
 
@@ -88,7 +91,7 @@ class DataLogger:
             logger.error("Unexpected error while writing data: {}", e)
             raise
 
-    def _save_json(self, data: dict) -> None:
+    def _save_json(self, data: LogRecord) -> None:
         try:
             self._data_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._data_path, "w", encoding="utf-8") as f:
@@ -103,13 +106,13 @@ class DataLogger:
             logger.error("Unexpected error while writing JSON data: {}", e)
             raise
 
-    def save_csv_row(self, data: dict) -> None:
+    def save_csv_row(self, data: LogRecord) -> None:
         csv_path = self._get_path(".csv")
         try:
             csv_path.parent.mkdir(parents=True, exist_ok=True)
             file_exists = csv_path.exists() and csv_path.stat().st_size > 0
 
-            fieldnames = sorted(data.keys())
+            fieldnames: list[str] = sorted(data)
 
             with csv_path.open("a", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)

@@ -1,5 +1,12 @@
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QLineEdit, QMenu
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QWidget,
+)
 
 from ...models.animal import AnimalConfig
 from .card import CardFrame
@@ -12,8 +19,11 @@ class AnimalCard(CardFrame):
     remove_requested = Signal()
 
     def __init__(
-        self, parent, animals: dict[str, str], stage_level_tables: StageLevelTables
-    ):
+        self,
+        parent: QWidget | None,
+        animals: dict[str, str],
+        stage_level_tables: StageLevelTables,
+    ) -> None:
         super().__init__(parent=parent, object_name="card")
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
@@ -88,7 +98,7 @@ class AnimalCard(CardFrame):
     def animal_name(self) -> str:
         return self.combo_animal_name.currentText()
 
-    def _on_context_menu(self, pos):
+    def _on_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
         action = menu.addAction("Remove")
         action.triggered.connect(lambda _checked=False: self.remove_requested.emit())

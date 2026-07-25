@@ -24,14 +24,9 @@ class SceneManager:
     def register(self, scene: dict[str, type[Scene]] | list[type[Scene]]) -> None:
         if isinstance(scene, dict):
             self._scenes.update(scene)
-        elif isinstance(scene, list):
+        else:
             for s in scene:
                 self._scenes[s.__name__.lower()] = s
-        else:
-            raise TypeError(
-                f"scene must be dict[str, type[Scene]] or list[type[Scene]], "
-                f"got {type(scene).__name__}"
-            )
 
     @property
     def scenes(self) -> dict[str, type[Scene]]:

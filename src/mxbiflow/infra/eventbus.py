@@ -1,17 +1,19 @@
 from collections.abc import Callable
 
+EventHandler = Callable[[], None]
+
 
 class EventBus:
     def __init__(self) -> None:
-        self._events_dict: dict[str, list[Callable]] = {}
+        self._events_dict: dict[str, list[EventHandler]] = {}
 
-    def subscribe(self, event: str, handler: Callable) -> None:
+    def subscribe(self, event: str, handler: EventHandler) -> None:
         if event in self._events_dict:
             return
 
         self._events_dict[event] = [handler]
 
-    def unsubscribe(self, event: str, handler: Callable) -> None:
+    def unsubscribe(self, event: str, handler: EventHandler) -> None:
         if event not in self._events_dict:
             return
 

@@ -1,6 +1,6 @@
 from typing import NamedTuple
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QSpinBox,
+    QWidget,
 )
 
 from ...models.animal import AnimalConfig
@@ -19,7 +20,7 @@ from .animal import AnimalCard
 
 
 class ExperimentConfigGroup(QGroupBox):
-    def __init__(self, parent, experimenters: list[str]):
+    def __init__(self, parent: QWidget | None, experimenters: list[str]) -> None:
         super().__init__("Config", parent)
 
         self._experimenters = experimenters
@@ -67,7 +68,7 @@ class ExperimentConfigGroup(QGroupBox):
         self.spin_auto_accept.setSpecialValueText("Disabled")
         layout.addWidget(self.spin_auto_accept, 4, 1)
 
-    def load_config(self, config: SessionConfig):
+    def load_config(self, config: SessionConfig) -> None:
         if config.experimenter in self._experimenters:
             self.combo_experimenter.setCurrentText(config.experimenter)
         else:
@@ -105,7 +106,13 @@ class SceneSelection(NamedTuple):
 
 
 class ExperimentSceneGroup(QGroupBox):
-    def __init__(self, parent=None, *, stages: list[str], animals: list[str]):
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        stages: list[str],
+        animals: list[str],
+    ) -> None:
         super().__init__("Scene", parent)
 
         layout = QFormLayout(self)
@@ -135,7 +142,7 @@ class ExperimentSceneGroup(QGroupBox):
         self.combo_fault_fallback.addItems(stages)
         layout.addRow(label_fault, self.combo_fault_fallback)
 
-    def load_config(self, config: SessionConfig):
+    def load_config(self, config: SessionConfig) -> None:
         if config.default_scene:
             self.combo_default_scene.setCurrentText(config.default_scene)
         if config.unknown_animal_fallback:
@@ -170,11 +177,11 @@ class ExperimentSceneGroup(QGroupBox):
 class ExperimentAnimalsGroup(QGroupBox):
     def __init__(
         self,
-        parent=None,
+        parent: QWidget | None = None,
         *,
         animals: dict[str, str],
         stage_level_tables: dict[str, dict[str, list[int]]],
-    ):
+    ) -> None:
         super().__init__("Animals", parent)
 
         self._animals = animals
@@ -185,13 +192,13 @@ class ExperimentAnimalsGroup(QGroupBox):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
-    def _on_context_menu(self, pos):
+    def _on_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
         action = menu.addAction("Add animal")
         action.triggered.connect(lambda _checked=False: self._on_add_animal())
         menu.exec(self.mapToGlobal(pos))
 
-    def _on_add_animal(self):
+    def _on_add_animal(self) -> None:
         animal_card = AnimalCard(self, self._animals, self._stage_level_tables)
         animal_card.remove_requested.connect(
             lambda _card=animal_card: self._on_remove_animal(_card)
@@ -225,7 +232,7 @@ class ExperimentAnimalsGroup(QGroupBox):
         for card in cards:
             self._add_animal_card(card)
 
-    def load_config(self, config: SessionConfig):
+    def load_config(self, config: SessionConfig) -> None:
         for animal_configs in config.animals:
             animal_card = AnimalCard(self, self._animals, self._stage_level_tables)
             animal_card.load_config(animal_configs)

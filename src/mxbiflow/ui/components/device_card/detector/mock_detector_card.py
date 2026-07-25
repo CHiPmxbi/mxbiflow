@@ -4,7 +4,7 @@ from ..device_card import DeviceCard
 
 
 class MockDetectorCard(DeviceCard[MockDetectorModel]):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.set_title("Mock Detector")
 

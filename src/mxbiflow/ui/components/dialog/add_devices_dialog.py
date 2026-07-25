@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLabel,
     QVBoxLayout,
+    QWidget,
 )
 
 
@@ -19,12 +20,12 @@ class AddDeviceDialog(QDialog):
 
     def __init__(
         self,
-        parent=None,
+        parent: QWidget | None = None,
         *,
         device_types: Sequence[str],
         title: str = "Add device",
         label: str = "device type:",
-    ):
+    ) -> None:
         super().__init__(parent)
         self._device_types = device_types
         self._title = title
@@ -32,7 +33,7 @@ class AddDeviceDialog(QDialog):
         self._init_ui()
         self._bind_events()
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
         self.setWindowTitle(self._title)
 
         self._main_layout = QVBoxLayout()
@@ -51,7 +52,7 @@ class AddDeviceDialog(QDialog):
         )
         self._main_layout.addWidget(self.button_box)
 
-    def _bind_events(self):
+    def _bind_events(self) -> None:
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
 

@@ -1,4 +1,5 @@
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QMainWindow,
@@ -23,7 +24,7 @@ class ExperimentPanel(QMainWindow):
     accepted = Signal()
     rejected = Signal()
 
-    def __init__(self, scene_manager: SceneManager):
+    def __init__(self, scene_manager: SceneManager) -> None:
         super().__init__()
         self._accepted = False
         self._config = ConfigStore(get_config_session_path(), SessionConfig)
@@ -80,7 +81,7 @@ class ExperimentPanel(QMainWindow):
         self.load_config()
         self._start_auto_accept_countdown()
 
-    def _bind_signals(self):
+    def _bind_signals(self) -> None:
         self._button_cancel.clicked.connect(self._on_cancel)
         self._button_save.clicked.connect(self._on_save)
         self._button_continue.clicked.connect(self._on_continue)
@@ -94,12 +95,12 @@ class ExperimentPanel(QMainWindow):
     def _on_user_interaction(self, _=None) -> None:
         self._countdown.pause()
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.MouseButtonPress:
             self._countdown.pause()
         return super().eventFilter(obj, event)
 
-    def load_config(self):
+    def load_config(self) -> None:
         self.group_config.load_config(self._config.value)
         self.group_scene.load_config(self._config.value)
         self.group_animals.load_config(self._config.value)
@@ -121,13 +122,13 @@ class ExperimentPanel(QMainWindow):
         names.extend(animal.name for animal in self._config.value.animals)
         return list(dict.fromkeys(name for name in names if name))
 
-    def _on_save(self):
+    def _on_save(self) -> None:
         self._config.save(self.result())
 
-    def _on_cancel(self):
+    def _on_cancel(self) -> None:
         self.close()
 
-    def _on_continue(self):
+    def _on_continue(self) -> None:
         self._on_save()
         self._accepted = True
         self.close()
@@ -139,7 +140,7 @@ class ExperimentPanel(QMainWindow):
             self._countdown.start(timeout)
             self._countdown.timeout.connect(self._on_continue)
 
-    def closeEvent(self, event) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         super().closeEvent(event)
         if event.isAccepted() and not self._accepted:
             self.rejected.emit()

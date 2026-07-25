@@ -112,6 +112,8 @@ class Game:
                 self._running = False
             case pygame.KEYDOWN:
                 self._handle_keyboard_event(event)
+            case _:
+                pass
 
     def _handle_keyboard_event(self, event: Event) -> None:
         match event.key:
@@ -121,6 +123,8 @@ class Game:
                 self._running = False
             case pygame.K_c:
                 self._capture_screen()
+            case _:
+                pass
 
     def _capture_screen(self) -> None:
         screenshot_dir = self._session_logger.path.parent / "screenshots"

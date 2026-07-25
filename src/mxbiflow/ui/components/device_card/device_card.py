@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QVBoxLayout,
+    QWidget,
 )
 
 from ..card import CardFrame
@@ -17,7 +18,7 @@ from ..card import CardFrame
 class DeviceCard[T](CardFrame):
     remove_requested = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent=parent, object_name="card")
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -46,7 +47,7 @@ class DeviceCard[T](CardFrame):
         self.line_device_id.setValidator(self.int_validator)
         self.layout_config.addRow(self.label_id, self.line_device_id)
 
-    def _open_menu(self, position) -> None:
+    def _open_menu(self, position: QPoint) -> None:
         menu = QMenu(self)
         action_remove = menu.addAction("Remove")
         action_remove.triggered.connect(

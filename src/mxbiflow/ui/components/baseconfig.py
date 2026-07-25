@@ -3,13 +3,20 @@ from __future__ import annotations
 from pymxbi import MXBIModel
 from pymxbi.screen import get_screen_size
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel, QSpinBox
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QLabel,
+    QSpinBox,
+    QWidget,
+)
 
 
 class BaseConfig(QGroupBox):
     changed = Signal(str)
 
-    def __init__(self, parent, mxbi_options: list[str]):
+    def __init__(self, parent: QWidget | None, mxbi_options: list[str]) -> None:
         super().__init__(parent)
 
         self.setTitle("Base config")
@@ -42,12 +49,13 @@ class BaseConfig(QGroupBox):
     def _emit_changed(self, msg: str) -> None:
         self.changed.emit(msg)
 
+    def _on_auto_accept_changed(self, seconds: int) -> None:
+        self._emit_changed(f"auto_accept:{seconds}")
+
     def _bind_events(self) -> None:
         self._combo_mxbi.currentTextChanged.connect(self._emit_changed)
         self._combo_screen.currentTextChanged.connect(self._emit_changed)
-        self._spin_auto_accept.valueChanged.connect(
-            lambda v: self._emit_changed(f"auto_accept:{v}")
-        )
+        self._spin_auto_accept.valueChanged.connect(self._on_auto_accept_changed)
 
     @property
     def mxbi_id(self) -> str:

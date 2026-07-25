@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_serializer
@@ -71,10 +72,14 @@ class Animal(BaseModel):
     trial_id: int = Field(default=0, ge=0)
 
     _current_stage: str = PrivateAttr(default="idle")
-    _stages: dict[str, StageState] = PrivateAttr(default_factory=dict)
+    _stages: dict[str, StageState] = PrivateAttr(
+        default_factory=dict[str, StageState]
+    )
     _initial_stage: StageState | None = PrivateAttr(default=None)
     _current_animal_session: AnimalSessionState | None = PrivateAttr(default=None)
-    _sessions: list[AnimalSessionState] = PrivateAttr(default_factory=list)
+    _sessions: list[AnimalSessionState] = PrivateAttr(
+        default_factory=list[AnimalSessionState]
+    )
 
     def add_trial(self) -> None:
         self.trial_id += 1
@@ -86,6 +91,14 @@ class Animal(BaseModel):
     @property
     def current_animal_session(self) -> AnimalSessionState | None:
         return self._current_animal_session
+
+    @property
+    def stages(self) -> Mapping[str, StageState]:
+        return self._stages
+
+    @property
+    def sessions(self) -> Sequence[AnimalSessionState]:
+        return self._sessions
 
     def start_animal_session(self):
         session_id = 1

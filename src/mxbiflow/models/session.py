@@ -27,7 +27,7 @@ class SessionConfig(BaseModel):
 
     auto_accept_timeout_seconds: int = Field(default=60, ge=0)
 
-    animals: list[AnimalConfig] = Field(default_factory=list)
+    animals: list[AnimalConfig] = Field(default_factory=list[AnimalConfig])
 
 
 class DailySessionCounter(BaseModel):
@@ -159,7 +159,7 @@ class Session(BaseModel):
 
     _current_animal: str | None = PrivateAttr(default=None)
     _session_store: DailySessionIdStore | None = PrivateAttr(default=None)
-    animals: dict[str, Animal] = Field(default_factory=dict, frozen=True)
+    animals: dict[str, Animal] = Field(default_factory=dict[str, Animal], frozen=True)
 
     def set_session_store(self, store: DailySessionIdStore) -> None:
         self._session_store = store
@@ -218,6 +218,6 @@ class Session(BaseModel):
 
 
 class Options(BaseModel):
-    mxbis: list[str] = Field(default_factory=list, frozen=True)
-    experimenter: list[str] = Field(default_factory=list, frozen=True)
-    animals: dict[str, str] = Field(default_factory=dict, frozen=True)
+    mxbis: list[str] = Field(default_factory=list[str], frozen=True)
+    experimenter: list[str] = Field(default_factory=list[str], frozen=True)
+    animals: dict[str, str] = Field(default_factory=dict[str, str], frozen=True)

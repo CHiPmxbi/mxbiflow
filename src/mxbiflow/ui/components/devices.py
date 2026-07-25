@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 from pymxbi.detector import DetectorModel
 from pymxbi.rewarder import RewarderModel
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
     QDialog,
     QGridLayout,
@@ -66,14 +67,6 @@ class Devices[T: (RewarderModel, DetectorModel)](QGroupBox):
                 f"Failed to determine device type ({exc!s})",
             )
             return
-        if device_type is None:
-            QMessageBox.warning(
-                self,
-                "Unsupported device",
-                "Missing device type",
-            )
-            return
-
         self._add_device_card(str(device_type), model=model)
 
     # -----------------------------
@@ -89,7 +82,7 @@ class Devices[T: (RewarderModel, DetectorModel)](QGroupBox):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._open_menu)
 
-    def _open_menu(self, position) -> None:
+    def _open_menu(self, position: QPoint) -> None:
         menu = QMenu(self)
         action = menu.addAction(self._action_label)
         action.triggered.connect(lambda _checked=False: self._on_add_clicked())
@@ -123,12 +116,15 @@ class Devices[T: (RewarderModel, DetectorModel)](QGroupBox):
 
         card = card_factory()
         if isinstance(card, DeviceCard):
+            typed_card = cast(DeviceCard[T], card)
             if model is not None:
-                card.load_config(model)
-            card.remove_requested.connect(lambda c=card: self._on_remove_requested(c))
-            self._cards.append(card)
+                typed_card.load_config(model)
+            typed_card.remove_requested.connect(
+                lambda c=typed_card: self._on_remove_requested(c)
+            )
+            self._cards.append(typed_card)
 
-        self._mount(card)
+        self._mount(cast(QWidget, card))
 
     def _on_remove_requested(self, card: DeviceCard[T]) -> None:
         self._remove_card(card)
@@ -154,7 +150,7 @@ class Devices[T: (RewarderModel, DetectorModel)](QGroupBox):
                 continue
             widget = item.widget()
             if isinstance(widget, DeviceCard):
-                cards.append(widget)
+                cards.append(cast(DeviceCard[T], widget))
 
         while layout.count() > 0:
             layout.takeAt(0)

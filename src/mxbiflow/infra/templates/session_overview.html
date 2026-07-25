@@ -60,7 +60,11 @@
             </tr>
             {% for animal in animals %}
             <tr>
-                <td style="padding: 16px 24px;{% if not loop.last %} border-bottom: 1px solid #F1F5F9;{% endif %}">
+                {% if not loop.last %}
+                <td style="padding: 16px 24px; border-bottom: 1px solid #F1F5F9;">
+                {% else %}
+                <td style="padding: 16px 24px;">
+                {% endif %}
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                             <td style="padding-bottom: 12px;">

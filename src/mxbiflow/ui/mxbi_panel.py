@@ -3,7 +3,8 @@ from typing import ClassVar
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QMainWindow,
@@ -48,7 +49,7 @@ class MXBIPanel(QMainWindow):
         DetectorEnum.MOCK: MockDetectorCard,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._accepted = False
         self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
@@ -169,7 +170,7 @@ class MXBIPanel(QMainWindow):
     def _on_user_interaction(self, _msg: str = "") -> None:
         self._countdown.pause()
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.MouseButtonPress:
             self._countdown.pause()
         return super().eventFilter(obj, event)
@@ -177,7 +178,7 @@ class MXBIPanel(QMainWindow):
     def _on_cancel(self) -> None:
         self.close()
 
-    def closeEvent(self, event) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         super().closeEvent(event)
         if event.isAccepted() and not self._accepted:
             self.rejected.emit()
