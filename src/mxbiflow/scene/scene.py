@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
+from typing import ClassVar
 
 from pygame.event import Event
 from pygame.surface import Surface
 
 
 class Scene(ABC):
-    level_table: dict[str, list[int]]
+    level_table: ClassVar[dict[str, list[int]]] = {}
 
     def __init__(self) -> None:
         self._running: bool = False

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from random import choice
+from typing import ClassVar
 
 from pygame import Event, Rect, Surface, image, transform
 
@@ -18,6 +19,8 @@ class Asset:
 
 
 class IDLE(Scene):
+    level_table: ClassVar[dict[str, list[int]]] = {}
+
     def __init__(self) -> None:
         super().__init__()
 
