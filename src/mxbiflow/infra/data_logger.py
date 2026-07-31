@@ -1,10 +1,10 @@
 import csv
 import json
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
+from ..models.session import Session
 from ..utils.logger import logger
 
 type LogRecord = Mapping[str, object]
@@ -19,14 +19,17 @@ class DataLoggerType(StrEnum):
 class DataLogger:
     def __init__(
         self,
-        path: Path,
-        session_id: int,
+        session: Session,
         filename: str,
         monkey: str | None = None,
         type: DataLoggerType = DataLoggerType.JSONL,
     ) -> None:
-        self._path = path
-        self._session_id = session_id
+        if session.absolute_data_path is None:
+            raise RuntimeError(
+                "Session data path is not set. Call Session.start() first."
+            )
+
+        self._session_path = session.absolute_data_path
         self._monkey = monkey
         self._filename = filename
         self._type = type
@@ -39,13 +42,10 @@ class DataLogger:
         return self._data_path
 
     def _ensure_data_dir(self) -> Path:
-        date_path = Path(datetime.now(UTC).strftime("%Y%m%d"))
-        session_path = Path(f"{self._session_id}")
-
         if self._monkey:
-            base_dir = self._path / date_path / session_path / Path(self._monkey)
+            base_dir = self._session_path / Path(self._monkey)
         else:
-            base_dir = self._path / date_path / session_path
+            base_dir = self._session_path
 
         try:
             already_exists = base_dir.exists()

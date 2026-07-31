@@ -71,10 +71,9 @@ class Game:
         self._mxbi.begin()
         self._scene_manager.init()
 
-        self._session.start()
+        self._session.start(get_data_dir_path())
         self._session_logger = DataLogger(
-            path=get_data_dir_path(),
-            session_id=self._session.session_id,
+            session=self._session,
             filename="session",
             type=DataLoggerType.JSON,
         )
