@@ -24,9 +24,13 @@ dependencies = [
     "pyside6>=6.10.1",
     "qtawesome>=1.4.1",
     "rich>=14.1.0",
+    "stamina>=26.1.0",
     "typer>=0.20.0",
     "varname>=0.15.0",
 ]
+
+[tool.uv.sources]
+pymotego = { path = "/Users/ccccr/repo/projects/cogmote/cogmote/pymoteGO", editable = true }
 
 [project.scripts]
 mxbi = "mxbi:main"

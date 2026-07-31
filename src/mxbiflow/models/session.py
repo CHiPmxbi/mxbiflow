@@ -155,22 +155,34 @@ class Session(BaseModel):
     session_id: int = Field(default=0, ge=0)
     start_at: datetime | None = Field(default=None)
     end_at: datetime | None = Field(default=None)
+    data_path: Path | None = Field(default=None)
     note: str = Field(frozen=True)
 
     _current_animal: str | None = PrivateAttr(default=None)
     _session_store: DailySessionIdStore | None = PrivateAttr(default=None)
+    _data_root: Path | None = PrivateAttr(default=None)
     animals: dict[str, Animal] = Field(default_factory=dict[str, Animal], frozen=True)
 
     def set_session_store(self, store: DailySessionIdStore) -> None:
         self._session_store = store
 
-    def start(self):
+    def start(self, data_root: Path) -> None:
         if self._session_store and self.session_id == 0:
             self.session_id = self._session_store.session_id
         self.start_at = datetime.now(UTC)
+        self._data_root = data_root.resolve()
+        self.data_path = Path(self.start_at.strftime("%Y%m%d")) / str(
+            self.session_id
+        )
 
-    def end(self):
+    def end(self) -> None:
         self.end_at = datetime.now(UTC)
+
+    @property
+    def absolute_data_path(self) -> Path | None:
+        if self.data_path is None or self._data_root is None:
+            return None
+        return self._data_root / self.data_path
 
     @field_serializer("start_at", "end_at", when_used="json")
     def _serialize_timestamp(self, value: datetime | None) -> str | None:
