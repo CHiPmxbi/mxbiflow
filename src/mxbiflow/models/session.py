@@ -12,7 +12,6 @@ from pydantic import (
     Field,
     PrivateAttr,
     ValidationError,
-    computed_field,
     field_serializer,
     model_validator,
 )
@@ -173,87 +172,70 @@ class Session(BaseModel):
     _snapshot_store: SessionSnapshotStore | None = PrivateAttr(default=None)
     _data_root: Path | None = PrivateAttr(default=None)
 
-    @computed_field
     @property
     def experimenter(self) -> str:
         return self.config.experimenter
 
-    @computed_field
     @property
     def reward_type(self) -> RewardEnum:
         return self.config.reward_type
 
-    @computed_field
     @property
     def send_email(self) -> bool:
         return self.config.send_email
 
-    @computed_field
     @property
     def sync_data(self) -> bool:
         return self.config.sync_data
 
-    @computed_field
     @property
     def note(self) -> str:
         return self.config.note
 
-    @computed_field
     @property
     def default_scene(self) -> str:
         return self.config.default_scene
 
-    @computed_field
     @property
     def unknown_animal_as(self) -> str:
         return self.config.unknown_animal_as
 
-    @computed_field
     @property
     def fault_fallback(self) -> str:
         return self.config.fault_fallback
 
-    @computed_field
     @property
     def hide_cursor(self) -> bool:
         return self.config.hide_cursor
 
-    @computed_field
     @property
     def fullscreen(self) -> bool:
         return self.config.fullscreen
 
-    @computed_field
     @property
     def session_id(self) -> int:
         return self.state.session_id
 
-    @computed_field
     @property
     def start_at(self) -> datetime | None:
         return self.state.start_at
 
-    @computed_field
     @property
     def end_at(self) -> datetime | None:
         return self.state.end_at
 
-    @computed_field
     @property
     def data_path(self) -> Path | None:
         return self.state.data_path
 
-    @computed_field
     @property
     def current_scene(self) -> str | None:
         return self.state.current_scene
 
-    @computed_field
     @property
     def animals(self) -> Mapping[str, Animal]:
         return self.state.animals
 
-    @computed_field
     @property
     def current_animal(self) -> Animal | None:
         key = self.state.current_animal_name
@@ -282,8 +264,7 @@ class Session(BaseModel):
         self._snapshot_store = store
 
     def snapshot(self) -> dict[str, object]:
-        computed_fields = set(type(self).model_computed_fields)
-        return self.model_dump(mode="json", exclude=computed_fields)
+        return self.model_dump(mode="json")
 
     def checkpoint(self) -> None:
         if self._snapshot_store is not None:
