@@ -7,10 +7,6 @@ OPTIONS_SESSION_FILENAME = "options.json"
 MXBI_CONFIG_FILENAME = "mxbi.json"
 MXBI_PANEL_CONFIG_FILENAME = "mxbi_panel.json"
 CROSS_MODAL_CONFIG_FILENAME = "config_cross_modal.json"
-SAMBA_BACKUP_DIR_NAME = "backup"
-SERVICE_DIR_NAME = "services"
-MOUNT_SERVICE_NAME = "mount.service"
-SYNC_SERVICE_NAME = "sync.service"
 
 
 def set_base_path(path: Path | str) -> None:
@@ -58,22 +54,6 @@ def get_log_path() -> Path:
 
 def get_samba_mount_path() -> Path:
     return get_base_path() / "samba_mount"
-
-
-def get_samba_backup_dir_path() -> Path:
-    return get_samba_mount_path() / SAMBA_BACKUP_DIR_NAME
-
-
-def get_service_dir_path() -> Path:
-    return get_base_path() / SERVICE_DIR_NAME
-
-
-def get_mount_service_path() -> Path:
-    return get_service_dir_path() / MOUNT_SERVICE_NAME
-
-
-def get_sync_service_path() -> Path:
-    return get_service_dir_path() / SYNC_SERVICE_NAME
 
 
 def get_internal_state_path() -> Path:
