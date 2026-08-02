@@ -44,7 +44,6 @@ class SessionConfig(BaseModel):
 
     hide_cursor: bool = False
     fullscreen: bool = False
-    auto_accept_timeout_seconds: int = Field(default=60, ge=0)
 
     animals: tuple[AnimalConfig, ...] = ()
 
@@ -230,11 +229,6 @@ class Session(BaseModel):
     @property
     def fullscreen(self) -> bool:
         return self.config.fullscreen
-
-    @computed_field
-    @property
-    def auto_accept_timeout_seconds(self) -> int:
-        return self.config.auto_accept_timeout_seconds
 
     @computed_field
     @property

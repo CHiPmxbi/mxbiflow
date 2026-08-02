@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pymxbi import MXBIModel
 from pymxbi.screen import get_screen_size
-from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -14,8 +13,6 @@ from PySide6.QtWidgets import (
 
 
 class BaseConfig(QGroupBox):
-    changed = Signal(str)
-
     def __init__(self, parent: QWidget | None, mxbi_options: list[str]) -> None:
         super().__init__(parent)
 
@@ -43,19 +40,6 @@ class BaseConfig(QGroupBox):
         self._spin_auto_accept.setRange(0, 3600)
         self._spin_auto_accept.setSpecialValueText("Disabled")
         self._layout.addRow(self._label_auto_accept, self._spin_auto_accept)
-
-        self._bind_events()
-
-    def _emit_changed(self, msg: str) -> None:
-        self.changed.emit(msg)
-
-    def _on_auto_accept_changed(self, seconds: int) -> None:
-        self._emit_changed(f"auto_accept:{seconds}")
-
-    def _bind_events(self) -> None:
-        self._combo_mxbi.currentTextChanged.connect(self._emit_changed)
-        self._combo_screen.currentTextChanged.connect(self._emit_changed)
-        self._spin_auto_accept.valueChanged.connect(self._on_auto_accept_changed)
 
     @property
     def mxbi_id(self) -> str:

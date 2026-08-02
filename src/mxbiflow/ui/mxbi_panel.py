@@ -3,8 +3,8 @@ from typing import ClassVar
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCloseEvent, QShowEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QMainWindow,
@@ -59,7 +59,6 @@ class MXBIPanel(QMainWindow):
         self._build_ui()
         self._load_from_config()
         self._bind_events()
-        self._start_auto_accept_countdown()
 
     def _build_ui(self) -> None:
         self.setWindowTitle("MXBI Configuration Panel")
@@ -132,53 +131,40 @@ class MXBIPanel(QMainWindow):
     def _on_save(self) -> None:
         self._collect_result()
         self._config.save()
-        self._save_panel_config()
+        self._save_auto_accept_timeout()
 
     def _on_continue(self) -> None:
         self._collect_result()
         self._config.save()
-        self._save_panel_config()
+        self._save_auto_accept_timeout()
         self._accepted = True
         self.close()
         self.accepted.emit()
 
-    def _save_panel_config(self) -> None:
+    def _save_auto_accept_timeout(self) -> None:
         self._panel_config.value.auto_accept_timeout_seconds = (
             self.base_config.auto_accept_timeout
         )
         self._panel_config.save()
 
     def _start_auto_accept_countdown(self) -> None:
-        timeout = self._panel_config.value.auto_accept_timeout_seconds
-        if timeout > 0:
-            self._countdown.start(timeout)
-            self._countdown.timeout.connect(self._on_continue)
+        self._countdown.start(self._panel_config.value.auto_accept_timeout_seconds)
 
     def _bind_events(self) -> None:
         self.cancel_button.clicked.connect(self._on_cancel)
         self.save_button.clicked.connect(self._on_save)
         self.continue_button.clicked.connect(self._on_continue)
-
-        self.base_config.changed.connect(self._on_user_interaction)
-
-        self.cancel_button.clicked.connect(self._countdown.stop)
-        self.save_button.clicked.connect(self._countdown.stop)
-        self.continue_button.clicked.connect(self._countdown.stop)
-
-        self._widget_main.installEventFilter(self)
-
-    def _on_user_interaction(self, _msg: str = "") -> None:
-        self._countdown.pause()
-
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.MouseButtonPress:
-            self._countdown.pause()
-        return super().eventFilter(obj, event)
+        self._countdown.timeout.connect(self._on_continue)
 
     def _on_cancel(self) -> None:
         self.close()
 
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._start_auto_accept_countdown()
+
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._countdown.stop()
         super().closeEvent(event)
         if event.isAccepted() and not self._accepted:
             self.rejected.emit()
