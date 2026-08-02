@@ -40,9 +40,12 @@ mxbiflow provides the core infrastructure for cognitive and behavioral experimen
 Implement your experiment as a set of scenes, register them, and launch:
 
 ```python
-from mxbiflow import set_base_path
-from mxbiflow.scene import SceneManager
-from mxbiflow.wizard import config_wizard, init_gameloop
+from pathlib import Path
+
+from mxbiflow import SceneManager, init_gameloop, set_base_path
+from mxbiflow.ui.wizard import config_wizard
+
+set_base_path(Path.cwd())
 
 scene_manager = SceneManager()
 scene_manager.register([IDLE, Detect, Discriminate])

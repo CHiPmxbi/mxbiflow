@@ -5,9 +5,9 @@ from typing import ClassVar
 
 from pygame import Event, Rect, Surface, image, transform
 
-from mxbiflow import get_mxbiflow
-from mxbiflow.assets import create_background
-from mxbiflow.scene import Scene
+from ...assets import create_background
+from ...core.context import get_mxbiflow
+from ..scene import Scene
 
 ASSETS_PATH = Path(__file__).parent / "assets"
 
