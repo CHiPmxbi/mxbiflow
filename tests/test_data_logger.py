@@ -4,11 +4,19 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from mxbiflow.infra.data_logger import DataLogger, DataLoggerType
-from mxbiflow.models.session import DailySessionIdStore, Session
+from mxbiflow.models.session import (
+    DailySessionIdStore,
+    Session,
+    SessionConfig,
+    SessionState,
+)
 
 
 def make_session(*, session_id: int = 7) -> Session:
-    return Session(session_id=session_id, note="")
+    return Session(
+        config=SessionConfig(),
+        state=SessionState(session_id=session_id),
+    )
 
 
 class SessionDataPathTests(unittest.TestCase):
@@ -26,8 +34,7 @@ class SessionDataPathTests(unittest.TestCase):
             self.assertEqual(session.session_id, 1)
             self.assertEqual(
                 session.data_path,
-                Path(session.start_at.strftime("%Y%m%d"))
-                / str(session.session_id),
+                Path(session.start_at.strftime("%Y%m%d")) / str(session.session_id),
             )
             assert session.data_path is not None
             self.assertFalse(session.data_path.is_absolute())
@@ -41,10 +48,12 @@ class SessionDataPathTests(unittest.TestCase):
             session = make_session()
             session.start(Path(directory) / "data")
 
-            payload = session.model_dump(mode="json")
+            payload = session.snapshot()
 
             assert session.data_path is not None
-            self.assertEqual(payload["data_path"], str(session.data_path))
+            state = payload["state"]
+            assert isinstance(state, dict)
+            self.assertEqual(state["data_path"], str(session.data_path))
 
 
 class DataLoggerTests(unittest.TestCase):
@@ -53,6 +62,8 @@ class DataLoggerTests(unittest.TestCase):
             session = make_session()
             session.start(Path(directory) / "data")
             assert session.data_path is not None
+            absolute_data_path = session.absolute_data_path
+            assert absolute_data_path is not None
 
             session_logger = DataLogger(
                 session=session,
@@ -67,11 +78,11 @@ class DataLoggerTests(unittest.TestCase):
 
             self.assertEqual(
                 session_logger.path,
-                session.absolute_data_path / "session.json",
+                absolute_data_path / "session.json",
             )
             self.assertEqual(
                 animal_logger.path,
-                session.absolute_data_path / "animal-1" / "trials.jsonl",
+                absolute_data_path / "animal-1" / "trials.jsonl",
             )
 
             session_logger.save({"session_id": session.session_id})

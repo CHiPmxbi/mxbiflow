@@ -11,7 +11,7 @@ from .core.path import (
 from .gameloop.detector_bridge import DetectorBridge
 from .gameloop.game import Game
 from .models.animal import Animal, StageState
-from .models.session import DailySessionIdStore, Session, SessionConfig
+from .models.session import DailySessionIdStore, Session, SessionConfig, SessionState
 from .scene import SceneManager
 
 
@@ -69,26 +69,15 @@ def init_session(session_config: SessionConfig) -> Session:
             level=animal_config.level,
         )
         animal_state = Animal(
-            rfid_id=animal_config.rfid_id,
-            name=animal_config.name,
+            config=animal_config,
+            current_stage_name=train_state.stage_name,
+            stages={train_state.stage_name: train_state},
         )
-        animal_state.set_current_stage(train_state)
         animal_dict[animal_config.name] = animal_state
 
     session = Session(
-        session_id=0,
-        experimenter=session_config.experimenter,
-        reward_type=session_config.reward_type,
-        send_email=False,
-        sync_data=False,
-        note=session_config.note,
-        default_scene=session_config.default_scene,
-        unknown_animal_fallback=session_config.unknown_animal_fallback,
-        unknown_animal_fallback_animal=session_config.unknown_animal_fallback_animal,
-        fault_fallback=session_config.fault_fallback,
-        hide_cursor=session_config.hide_cursor,
-        fullscreen=session_config.fullscreen,
-        animals=animal_dict,
+        config=session_config,
+        state=SessionState(animals=animal_dict),
     )
     session.set_session_store(store)
 

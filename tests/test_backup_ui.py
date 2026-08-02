@@ -1,3 +1,5 @@
+# pyright: reportPrivateUsage=false
+
 import os
 import unittest
 from collections import deque

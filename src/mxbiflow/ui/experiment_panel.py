@@ -108,14 +108,17 @@ class ExperimentPanel(QMainWindow):
     def result(self) -> SessionConfig:
         session_config = self.group_config.result()
         scene_result = self.group_scene.result()
-        session_config.default_scene = scene_result.default_scene
-        session_config.unknown_animal_fallback = scene_result.unknown_animal_fallback
-        session_config.unknown_animal_fallback_animal = (
-            scene_result.unknown_animal_fallback_animal
+        data = session_config.model_dump()
+        data.update(
+            default_scene=scene_result.default_scene,
+            unknown_animal_fallback=scene_result.unknown_animal_fallback,
+            unknown_animal_fallback_animal=(
+                scene_result.unknown_animal_fallback_animal
+            ),
+            fault_fallback=scene_result.fault_fallback,
+            animals=self.group_animals.result(),
         )
-        session_config.fault_fallback = scene_result.fault_fallback
-        session_config.animals = self.group_animals.result()
-        return session_config
+        return SessionConfig.model_validate(data)
 
     def _fallback_animal_options(self) -> list[str]:
         names = list(self._options.value.animals.values())

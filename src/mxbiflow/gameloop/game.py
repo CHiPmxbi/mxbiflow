@@ -6,7 +6,6 @@ from pymxbi import MXBI
 
 from ..core.context import MXBIFlow, set_mxbiflow
 from ..core.path import get_data_dir_path
-from ..infra.data_logger import DataLogger, DataLoggerType
 from ..models.session import Session
 from ..scene import SceneManager
 from ..utils.logger import logger
@@ -71,13 +70,11 @@ class Game:
         self._mxbi.begin()
         self._scene_manager.init()
 
+        if self._scene_manager.current is not None:
+            self._session.set_current_scene(
+                type(self._scene_manager.current).__name__.lower()
+            )
         self._session.start(get_data_dir_path())
-        self._session_logger = DataLogger(
-            session=self._session,
-            filename="session",
-            type=DataLoggerType.JSON,
-        )
-        self._session_logger.save(self._session.model_dump(mode="json"))
 
     def play(self) -> None:
         while self._running:
@@ -99,7 +96,13 @@ class Game:
             self._screen.fill((0, 0, 0))
 
             self._scene_manager.draw(self._screen)
-            self._scene_manager.apply_pending()
+            if (
+                self._scene_manager.apply_pending()
+                and self._scene_manager.current is not None
+            ):
+                self._session.set_current_scene(
+                    type(self._scene_manager.current).__name__.lower()
+                )
 
             pygame.display.flip()
 
@@ -126,7 +129,10 @@ class Game:
                 pass
 
     def _capture_screen(self) -> None:
-        screenshot_dir = self._session_logger.path.parent / "screenshots"
+        data_path = self._session.absolute_data_path
+        if data_path is None:
+            raise RuntimeError("Session data path is not available")
+        screenshot_dir = data_path / "screenshots"
         screenshot_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
@@ -136,11 +142,9 @@ class Game:
         logger.info("screen captured: {}", screenshot_path)
 
     def quit(self) -> None:
-        self._session.end()
-        self._session_logger.save(self._session.model_dump(mode="json"))
-
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
+        self._session.end()
         self._mxbi.quit()
         if pygame.display.get_init():
             pygame.display.quit()

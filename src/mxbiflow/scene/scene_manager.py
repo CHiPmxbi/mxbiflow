@@ -74,12 +74,13 @@ class SceneManager:
         self.current = next_scene
         next_scene.start()
 
-    def apply_pending(self) -> None:
+    def apply_pending(self) -> bool:
         if self._pending is None:
-            return
+            return False
         next_scene = self._pending
         self._pending = None
         self._switch(next_scene)
+        return True
 
     def handle_event(self, event: Event) -> None:
         if self.current:
