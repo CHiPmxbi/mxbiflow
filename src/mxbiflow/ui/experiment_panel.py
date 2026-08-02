@@ -1,11 +1,10 @@
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCloseEvent, QShowEvent
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
+    QDialog,
     QGridLayout,
-    QMainWindow,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 from ..core.config_store import ConfigStore
@@ -25,24 +24,16 @@ from .components.experiment_groups import (
 )
 
 
-class ExperimentPanel(QMainWindow):
-    accepted = Signal()
-    rejected = Signal()
-
+class ExperimentPanel(QDialog):
     def __init__(self, scene_manager: SceneManager) -> None:
         super().__init__()
-        self._accepted = False
         self._config = ConfigStore(get_config_session_path(), SessionConfig)
         self._options = ConfigStore(get_options_session_path(), Options)
         self._stage_level_tables = scene_manager.stage_level_tables
 
         self.setWindowTitle("Experiment Panel")
 
-        central_widget = QWidget(self)
-        self.setCentralWidget(central_widget)
-
         layout_main = QVBoxLayout(self)
-        central_widget.setLayout(layout_main)
 
         self.group_config = ExperimentConfigGroup(
             self, self._options.value.experimenter
@@ -67,7 +58,7 @@ class ExperimentPanel(QMainWindow):
         self.combo_reward_type = self.group_config.combo_reward_type
         self.line_notes = self.group_config.line_notes
 
-        layout_buttons = QGridLayout(self)
+        layout_buttons = QGridLayout()
         layout_main.addLayout(layout_buttons)
 
         self._countdown = AutoAcceptCountdown(self)
@@ -96,7 +87,7 @@ class ExperimentPanel(QMainWindow):
         self.group_scene.load_config(self._config.value)
         self.group_animals.load_config(self._config.value)
 
-    def result(self) -> SessionConfig:
+    def _collect_result(self) -> SessionConfig:
         session_config = self.group_config.result()
         scene_result = self.group_scene.result()
         data = session_config.model_dump()
@@ -114,16 +105,14 @@ class ExperimentPanel(QMainWindow):
         return list(dict.fromkeys(name for name in names if name))
 
     def _on_save(self) -> None:
-        self._config.save(self.result())
+        self._config.save(self._collect_result())
 
     def _on_cancel(self) -> None:
-        self.close()
+        self.reject()
 
     def _on_continue(self) -> None:
         self._on_save()
-        self._accepted = True
-        self.close()
-        self.accepted.emit()
+        self.accept()
 
     def _start_auto_accept_countdown(self) -> None:
         panel_config = ConfigStore(get_mxbi_panel_config_path(), MXBIPanelConfig).value
@@ -133,8 +122,6 @@ class ExperimentPanel(QMainWindow):
         super().showEvent(event)
         self._start_auto_accept_countdown()
 
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def done(self, result: int) -> None:
         self._countdown.stop()
-        super().closeEvent(event)
-        if event.isAccepted() and not self._accepted:
-            self.rejected.emit()
+        super().done(result)

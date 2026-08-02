@@ -12,7 +12,7 @@ mxbiflow provides the core infrastructure for cognitive and behavioral experimen
 ┌─────────────────────────────────────────────────────────┐
 │                       mxbiflow                          │
 │                                                         │
-│  Wizard (PySide6)          Game Loop (pygame-ce)        │
+│  Dialog Flow (PySide6)     Game Loop (pygame-ce)        │
 │  ┌────────────────┐         ┌───────────────────┐       │
 │  │ MXBIPanel      │         │ SceneManager      │       │
 │  │ ExperimentPanel│ ──────▶ │   ├─ Scene A      │       │
@@ -43,14 +43,16 @@ Implement your experiment as a set of scenes, register them, and launch:
 from pathlib import Path
 
 from mxbiflow import SceneManager, init_gameloop, set_base_path
-from mxbiflow.ui.wizard import config_wizard
+from mxbiflow.ui import run_wizard
 
 set_base_path(Path.cwd())
 
 scene_manager = SceneManager()
 scene_manager.register([IDLE, Detect, Discriminate])
 
-config_wizard(scene_manager)
+if not run_wizard(scene_manager):
+    raise SystemExit(0)
+
 game = init_gameloop(scene_manager, max_fps=120)
 game.play()
 ```

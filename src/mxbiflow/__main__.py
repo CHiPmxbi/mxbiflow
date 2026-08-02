@@ -12,7 +12,7 @@ from mxbiflow.infra.post_processing import HtmlComposer, session_overview, summa
 from mxbiflow.models.session import RuntimeStateStore
 from mxbiflow.scene import SceneManager
 from mxbiflow.scene.idle.idle import IDLE
-from mxbiflow.ui.wizard import config_wizard
+from mxbiflow.ui import run_wizard
 
 
 def main() -> None:
@@ -21,7 +21,8 @@ def main() -> None:
     scene_manager = SceneManager()
     scene_manager.register([IDLE])
 
-    config_wizard(scene_manager)
+    if not run_wizard(scene_manager):
+        return
 
     game = init_gameloop(scene_manager)
     game.play()

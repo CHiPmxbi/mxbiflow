@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QSpinBox
+from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPushButton, QSpinBox
 
 from mxbiflow.core.path import get_mxbi_panel_config_path, set_base_path
 from mxbiflow.models.panel import MXBIPanelConfig
@@ -121,7 +121,7 @@ class PanelCountdownTests(unittest.TestCase):
         panel.show()
         self.application.processEvents()
 
-        QTest.mouseClick(panel.centralWidget(), Qt.MouseButton.LeftButton)
+        QTest.mouseClick(panel, Qt.MouseButton.LeftButton)
         self.assertTrue(countdown.is_active())
 
         QTest.mouseClick(panel.save_button, Qt.MouseButton.LeftButton)
@@ -130,6 +130,42 @@ class PanelCountdownTests(unittest.TestCase):
         QTest.mouseClick(countdown.stop_button, Qt.MouseButton.LeftButton)
         self.assertFalse(countdown.is_active())
         panel.close()
+
+    def test_panel_actions_use_dialog_result_codes(self) -> None:
+        mxbi_panel = MXBIPanel()
+        mxbi_panel.show()
+        self.application.processEvents()
+        QTest.mouseClick(mxbi_panel.cancel_button, Qt.MouseButton.LeftButton)
+        self.assertEqual(mxbi_panel.result(), QDialog.DialogCode.Rejected)
+
+        mxbi_panel = MXBIPanel()
+        mxbi_panel.show()
+        self.application.processEvents()
+        QTest.mouseClick(mxbi_panel.continue_button, Qt.MouseButton.LeftButton)
+        self.assertEqual(mxbi_panel.result(), QDialog.DialogCode.Accepted)
+
+        experiment_panel = ExperimentPanel(SceneManager())
+        cancel_button = next(
+            button
+            for button in experiment_panel.findChildren(QPushButton)
+            if button.text() == "Cancel"
+        )
+        experiment_panel.show()
+        self.application.processEvents()
+        QTest.mouseClick(cancel_button, Qt.MouseButton.LeftButton)
+        self.assertEqual(experiment_panel.result(), QDialog.DialogCode.Rejected)
+
+    def test_escape_rejects_panel_and_stops_countdown(self) -> None:
+        panel = MXBIPanel()
+        countdown = find_countdown(panel)
+        panel.show()
+        self.application.processEvents()
+
+        QTest.keyClick(panel, Qt.Key.Key_Escape)
+        self.application.processEvents()
+
+        self.assertEqual(panel.result(), QDialog.DialogCode.Rejected)
+        self.assertFalse(countdown.is_active())
 
     def test_only_mxbi_panel_configures_latest_timeout(self) -> None:
         mxbi_panel = MXBIPanel()

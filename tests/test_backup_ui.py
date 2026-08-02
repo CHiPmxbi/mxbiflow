@@ -23,7 +23,7 @@ from PySide6.QtWidgets import QApplication
 
 from mxbiflow.infra.backup import BackupTaskRunner
 from mxbiflow.ui.backup import (
-    _BackupProgressDialog,
+    BackupPanel,
     _task_progress_percent,
     run_backup,
 )
@@ -101,6 +101,22 @@ def completed_runner(
     return runner
 
 
+def panel_with_runner(
+    runner: BackupTaskRunner,
+    *,
+    success_auto_close_ms: int,
+) -> BackupPanel:
+    with (
+        patch("mxbiflow.ui.backup.BackupTaskRunner", return_value=runner),
+        patch.object(runner, "start"),
+    ):
+        return BackupPanel(
+            SOURCE,
+            DESTINATION,
+            success_auto_close_ms=success_auto_close_ms,
+        )
+
+
 class BackupUITests(unittest.TestCase):
     application: QApplication
 
@@ -143,7 +159,7 @@ class BackupUITests(unittest.TestCase):
         )
 
     def test_success_closes_automatically(self) -> None:
-        dialog = _BackupProgressDialog(
+        dialog = panel_with_runner(
             completed_runner(BackupStatus.SUCCEEDED),
             success_auto_close_ms=0,
         )
@@ -156,7 +172,7 @@ class BackupUITests(unittest.TestCase):
         self.assertEqual(dialog._progress_bar.value(), 100)
 
     def test_success_shows_auto_close_countdown(self) -> None:
-        dialog = _BackupProgressDialog(
+        dialog = panel_with_runner(
             completed_runner(BackupStatus.SUCCEEDED),
             success_auto_close_ms=5_000,
         )
@@ -171,7 +187,7 @@ class BackupUITests(unittest.TestCase):
         dialog.accept()
 
     def test_clicking_panel_stops_auto_close_countdown(self) -> None:
-        dialog = _BackupProgressDialog(
+        dialog = panel_with_runner(
             completed_runner(BackupStatus.SUCCEEDED),
             success_auto_close_ms=5_000,
         )
@@ -197,7 +213,7 @@ class BackupUITests(unittest.TestCase):
             BackupStatus.PARTIALLY_SUCCEEDED,
         ):
             with self.subTest(status=status):
-                dialog = _BackupProgressDialog(
+                dialog = panel_with_runner(
                     completed_runner(status, error="entry failed"),
                     success_auto_close_ms=0,
                 )
@@ -219,7 +235,7 @@ class BackupUITests(unittest.TestCase):
         with patch("mxbiflow.infra.backup.BackupClient", return_value=client):
             runner.start(SOURCE, DESTINATION)
 
-        dialog = _BackupProgressDialog(runner, success_auto_close_ms=0)
+        dialog = panel_with_runner(runner, success_auto_close_ms=0)
         dialog.show()
         self.application.processEvents()
         dialog.close()
