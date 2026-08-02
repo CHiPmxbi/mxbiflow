@@ -26,7 +26,7 @@ class TestCountdown(AutoAcceptCountdown):
 def find_countdown(panel: MXBIPanel | ExperimentPanel) -> AutoAcceptCountdown:
     countdown = panel.findChild(AutoAcceptCountdown)
     if countdown is None:
-        raise AssertionError("面板中未找到自动继续倒计时控件")
+        raise AssertionError("Auto-accept countdown widget not found in panel")
     return countdown
 
 
@@ -145,7 +145,7 @@ class PanelCountdownTests(unittest.TestCase):
         timeout_input = mxbi_panel.findChild(QSpinBox)
         self.assertIsNotNone(timeout_input)
         if timeout_input is None:
-            raise AssertionError("MXBI 面板中未找到自动继续时长输入框")
+            raise AssertionError("Auto-accept timeout input not found in MXBI panel")
         timeout_input.setValue(17)
         QTest.mouseClick(mxbi_panel.save_button, Qt.MouseButton.LeftButton)
 
@@ -155,7 +155,7 @@ class PanelCountdownTests(unittest.TestCase):
         countdown_label = countdown.findChild(QLabel)
         self.assertIsNotNone(countdown_label)
         if countdown_label is None:
-            raise AssertionError("倒计时控件中未找到剩余时间标签")
+            raise AssertionError("Remaining-time label not found in countdown widget")
         self.assertEqual(countdown_label.text(), "Auto: 17s")
 
         experiment_save = next(
