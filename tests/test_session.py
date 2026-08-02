@@ -217,10 +217,11 @@ class SessionModelTests(unittest.TestCase):
         self.assertTrue(callable(session.level_up))
         self.assertTrue(callable(session.set_stage_context))
 
-    def test_computed_fields_expose_config_and_state(self) -> None:
+    def test_properties_expose_config_and_state(self) -> None:
         session = make_session()
         animal = session.animals["animal-1"]
 
+        self.assertFalse(Session.model_computed_fields)
         self.assertEqual(session.experimenter, "tester")
         self.assertTrue(session.send_email)
         self.assertTrue(session.sync_data)
@@ -246,6 +247,7 @@ class SessionModelTests(unittest.TestCase):
     def test_snapshot_has_only_config_and_state_at_the_top_level(self) -> None:
         session = make_session()
 
+        self.assertEqual(set(session.model_dump()), {"config", "state"})
         snapshot = session.snapshot()
 
         self.assertEqual(set(snapshot), {"config", "state"})
