@@ -79,14 +79,18 @@ class SessionState(ContextState):
         return value.astimezone().isoformat(timespec="microseconds")
 
 
-class DailySessionCounter(BaseModel):
+class SessionRuntimeState(BaseModel):
     day: str = Field(default_factory=lambda: datetime.now(UTC).date().isoformat())
     last_session_id: int = Field(default=0, ge=0)
 
 
-class EmailSendState(BaseModel):
-    sent_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+class EmailRuntimeState(BaseModel):
     message_id: str = ""
+
+
+class RuntimeState(BaseModel):
+    session: SessionRuntimeState = Field(default_factory=SessionRuntimeState)
+    email: EmailRuntimeState = Field(default_factory=EmailRuntimeState)
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -111,56 +115,45 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 @dataclass
-class DailySessionIdStore:
+class RuntimeStateStore:
     path: Path
 
-    def _today_local(self) -> str:
+    def _today(self) -> str:
         return datetime.now(UTC).date().isoformat()
 
-    def _load(self) -> DailySessionCounter:
+    def _load(self) -> RuntimeState:
         if not self.path.exists():
-            return DailySessionCounter()
+            return RuntimeState()
 
         try:
-            return DailySessionCounter.model_validate_json(self.path.read_text())
+            return RuntimeState.model_validate_json(self.path.read_text())
         except ValueError, ValidationError:
-            return DailySessionCounter()
+            return RuntimeState()
+
+    def _save(self, state: RuntimeState) -> None:
+        _atomic_write(self.path, state.model_dump_json())
 
     @property
     def session_id(self) -> int:
-        today = self._today_local()
-        data = self._load()
+        today = self._today()
+        state = self._load()
 
-        if data.day != today:
-            data.day = today
-            data.last_session_id = 0
+        if state.session.day != today:
+            state.session.day = today
+            state.session.last_session_id = 0
 
-        data.last_session_id += 1
-        _atomic_write(self.path, data.model_dump_json())
-        return data.last_session_id
+        state.session.last_session_id += 1
+        self._save(state)
+        return state.session.last_session_id
 
+    @property
+    def email_message_id(self) -> str:
+        return self._load().email.message_id
 
-@dataclass
-class EmailSendStateStore:
-    path: Path
-
-    def _load(self) -> EmailSendState:
-        if not self.path.exists():
-            return EmailSendState()
-
-        try:
-            return EmailSendState.model_validate_json(self.path.read_text())
-        except ValueError, ValidationError:
-            return EmailSendState()
-
-    def load(self) -> EmailSendState:
-        return self._load()
-
-    def save(self, message_id: str) -> None:
-        _atomic_write(
-            self.path,
-            EmailSendState(message_id=message_id).model_dump_json(),
-        )
+    def save_email_message_id(self, message_id: str) -> None:
+        state = self._load()
+        state.email.message_id = message_id
+        self._save(state)
 
 
 @dataclass
@@ -176,7 +169,7 @@ class Session(BaseModel):
     config: SessionConfig
     state: SessionState
 
-    _session_store: DailySessionIdStore | None = PrivateAttr(default=None)
+    _session_store: RuntimeStateStore | None = PrivateAttr(default=None)
     _snapshot_store: SessionSnapshotStore | None = PrivateAttr(default=None)
     _data_root: Path | None = PrivateAttr(default=None)
 
@@ -282,7 +275,7 @@ class Session(BaseModel):
             return None
         return self._data_root / self.state.data_path
 
-    def set_session_store(self, store: DailySessionIdStore) -> None:
+    def set_session_store(self, store: RuntimeStateStore) -> None:
         self._session_store = store
 
     def set_snapshot_store(self, store: SessionSnapshotStore) -> None:

@@ -7,9 +7,9 @@ from pymxbi.mxbi.factory import MXBIModel
 from mxbiflow import set_base_path
 from mxbiflow.bootstrap import init_gameloop
 from mxbiflow.core.config_store import ConfigStore
-from mxbiflow.core.path import get_email_state_path, get_mxbi_config_path
+from mxbiflow.core.path import get_mxbi_config_path, get_runtime_state_path
 from mxbiflow.infra.post_processing import HtmlComposer, session_overview, summarize
-from mxbiflow.models.session import EmailSendStateStore
+from mxbiflow.models.session import RuntimeStateStore
 from mxbiflow.scene import SceneManager
 from mxbiflow.scene.idle.idle import IDLE
 from mxbiflow.ui.wizard import config_wizard
@@ -42,16 +42,16 @@ def main() -> None:
     html = composer.html
 
     mxbi_config = ConfigStore(get_mxbi_config_path(), MXBIModel).value
-    email_store = EmailSendStateStore(get_email_state_path())
-    prev_state = email_store.load()
+    runtime_store = RuntimeStateStore(get_runtime_state_path())
+    previous_message_id = runtime_store.email_message_id
 
     with EmailClient() as client:
         result = client.send(
             subject=f"{mxbi_config.mxbi_id} Daily Report",
             html_body=html,
-            in_reply_to=prev_state.message_id if prev_state.message_id else None,
+            in_reply_to=previous_message_id or None,
         )
-        email_store.save(result.message_id)
+        runtime_store.save_email_message_id(result.message_id)
 
 
 if __name__ == "__main__":

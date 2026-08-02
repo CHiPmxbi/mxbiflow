@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from mxbiflow.infra.data_logger import DataLogger, DataLoggerType
 from mxbiflow.models.session import (
-    DailySessionIdStore,
+    RuntimeStateStore,
     Session,
     SessionConfig,
     SessionState,
@@ -25,7 +25,7 @@ class SessionDataPathTests(unittest.TestCase):
             data_root = Path(directory) / "data"
             session = make_session(session_id=0)
             session.set_session_store(
-                DailySessionIdStore(Path(directory) / "state" / "counter.json")
+                RuntimeStateStore(Path(directory) / "state" / "runtime.json")
             )
 
             session.start(data_root)

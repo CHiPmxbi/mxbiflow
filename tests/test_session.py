@@ -10,8 +10,12 @@ from pydantic import BaseModel, ValidationError
 from mxbiflow.bootstrap import init_session
 from mxbiflow.models.animal import Animal, AnimalConfig, StageSnapshot, StageState
 from mxbiflow.models.session import (
+    EmailRuntimeState,
+    RuntimeState,
+    RuntimeStateStore,
     Session,
     SessionConfig,
+    SessionRuntimeState,
     SessionSnapshotStore,
     SessionState,
 )
@@ -60,6 +64,76 @@ def make_session() -> Session:
     )
 
 
+class RuntimeStateStoreTests(unittest.TestCase):
+    def test_domains_share_one_file_without_overwriting_each_other(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "state" / "runtime.json"
+            store = RuntimeStateStore(path)
+
+            self.assertEqual(store.session_id, 1)
+            store.save_email_message_id("message-1")
+            self.assertEqual(store.session_id, 2)
+
+            state = RuntimeState.model_validate_json(path.read_text(encoding="utf-8"))
+            self.assertEqual(state.session.last_session_id, 2)
+            self.assertEqual(state.email.message_id, "message-1")
+            self.assertEqual(RuntimeStateStore(path).email_message_id, "message-1")
+
+    def test_session_counter_resets_on_a_new_day(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime.json"
+            path.write_text(
+                RuntimeState(
+                    session=SessionRuntimeState(
+                        day="2000-01-01",
+                        last_session_id=9,
+                    ),
+                    email=EmailRuntimeState(message_id="message-1"),
+                ).model_dump_json(),
+                encoding="utf-8",
+            )
+
+            store = RuntimeStateStore(path)
+
+            self.assertEqual(store.session_id, 1)
+            self.assertEqual(store.email_message_id, "message-1")
+
+    def test_missing_or_invalid_file_uses_default_state(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime.json"
+            store = RuntimeStateStore(path)
+
+            self.assertEqual(store.email_message_id, "")
+
+            path.write_text("invalid", encoding="utf-8")
+            self.assertEqual(store.email_message_id, "")
+            self.assertEqual(store.session_id, 1)
+
+    def test_legacy_state_files_are_ignored(self) -> None:
+        with TemporaryDirectory() as directory:
+            state_dir = Path(directory) / "state"
+            state_dir.mkdir()
+            (state_dir / "session_counter.json").write_text(
+                '{"day":"2099-01-01","last_session_id":99}',
+                encoding="utf-8",
+            )
+            (state_dir / "email_state.json").write_text(
+                '{"message_id":"legacy-message"}',
+                encoding="utf-8",
+            )
+            runtime_path = state_dir / "runtime.json"
+            store = RuntimeStateStore(runtime_path)
+
+            self.assertEqual(store.email_message_id, "")
+            self.assertEqual(store.session_id, 1)
+
+            state = RuntimeState.model_validate_json(
+                runtime_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(state.session.last_session_id, 1)
+            self.assertEqual(state.email.message_id, "")
+
+
 class SessionModelTests(unittest.TestCase):
     def test_session_config_without_animals_allows_empty_unknown_mapping(
         self,
@@ -105,8 +179,8 @@ class SessionModelTests(unittest.TestCase):
         )
 
         with patch(
-            "mxbiflow.bootstrap.get_session_counter_path",
-            return_value=Path("unused-session-counter.json"),
+            "mxbiflow.bootstrap.get_runtime_state_path",
+            return_value=Path("unused-runtime.json"),
         ):
             session = init_session(
                 SessionConfig(
