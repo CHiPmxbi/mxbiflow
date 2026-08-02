@@ -99,8 +99,8 @@ def summarize() -> SessionSummary:
                 name=name,
                 rfid_id=animal.rfid_id,
                 total_trials=animal.trial_id,
-                animal_sessions=len(animal.sessions),
-                total_duration_seconds=_calc_animal_duration(animal.sessions),
+                animal_sessions=len(animal.animal_sessions),
+                total_duration_seconds=_calc_animal_duration(animal.animal_sessions),
                 stages=stages,
             )
         )

@@ -841,7 +841,7 @@ wheels = [
 
 [[package]]
 name = "pymotego"
-version = "0.1.5"
+version = "0.1.6"
 source = { editable = "/Users/ccccr/repo/projects/cogmote/cogmote/pymoteGO" }
 dependencies = [
     { name = "httpx", extra = ["http2"] },

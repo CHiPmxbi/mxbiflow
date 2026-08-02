@@ -38,7 +38,7 @@ class Scheduler:
         if self._session.current_animal is None:
             return
 
-        self._session.current_animal.set_current_stage(stage)
+        self._session.set_current_stage(stage)
         self._need_refresh = True
 
     def _handle_fault_event(self) -> None:

@@ -1,33 +1,68 @@
+import json
 import os
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    ValidationError,
+    computed_field,
+    field_serializer,
+)
 
-from .animal import Animal, AnimalConfig
+from .animal import (
+    Animal,
+    AnimalConfig,
+    AnimalSessionState,
+    ContextState,
+    StageSnapshot,
+    StageState,
+    validate_context_key,
+)
 from .reward import RewardEnum
 
 
 class SessionConfig(BaseModel):
-    experimenter: str = Field(default="auto", frozen=True)
-    reward_type: RewardEnum = Field(default=RewardEnum.AGUM_ONE_FIFTH, frozen=True)
-    send_email: bool = Field(default=False, frozen=True)
-    sync_data: bool = Field(default=False, frozen=True)
+    model_config = ConfigDict(frozen=True)
+
+    experimenter: str = "auto"
+    reward_type: RewardEnum = RewardEnum.AGUM_ONE_FIFTH
+    send_email: bool = False
+    sync_data: bool = False
     note: str = Field(default="", max_length=1000)
 
-    default_scene: str = Field(default="")
-    unknown_animal_fallback: str = Field(default="")
-    unknown_animal_fallback_animal: str = Field(default="")
-    fault_fallback: str = Field(default="")
+    default_scene: str = ""
+    unknown_animal_fallback: str = ""
+    unknown_animal_fallback_animal: str = ""
+    fault_fallback: str = ""
 
-    hide_cursor: bool = Field(default=False)
-    fullscreen: bool = Field(default=False)
-
+    hide_cursor: bool = False
+    fullscreen: bool = False
     auto_accept_timeout_seconds: int = Field(default=60, ge=0)
 
-    animals: list[AnimalConfig] = Field(default_factory=list[AnimalConfig])
+    animals: tuple[AnimalConfig, ...] = ()
+
+
+class SessionState(ContextState):
+    session_id: int = Field(default=0, ge=0)
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    data_path: Path | None = None
+    current_scene: str | None = None
+    current_animal_name: str | None = None
+    animals: dict[str, Animal] = Field(default_factory=dict)
+
+    @field_serializer("start_at", "end_at", when_used="json")
+    def _serialize_timestamp(self, value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        return value.astimezone().isoformat(timespec="microseconds")
 
 
 class DailySessionCounter(BaseModel):
@@ -37,7 +72,28 @@ class DailySessionCounter(BaseModel):
 
 class EmailSendState(BaseModel):
     sent_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    message_id: str = Field(default="")
+    message_id: str = ""
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(
+        dir=str(path.parent),
+        prefix=path.name,
+        suffix=".tmp",
+    )
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            file.write(text)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            pass
 
 
 @dataclass
@@ -51,33 +107,10 @@ class DailySessionIdStore:
         if not self.path.exists():
             return DailySessionCounter()
 
-        text = self.path.read_text()
-
         try:
-            return DailySessionCounter.model_validate_json(text)
+            return DailySessionCounter.model_validate_json(self.path.read_text())
         except ValueError, ValidationError:
             return DailySessionCounter()
-
-    def _atomic_write(self, data: DailySessionCounter) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=str(self.path.parent),
-            prefix=self.path.name,
-            suffix=".tmp",
-        )
-
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(data.model_dump_json())
-                f.flush()
-                os.fsync(f.fileno())
-
-            os.replace(tmp, self.path)
-        finally:
-            try:
-                os.remove(tmp)
-            except FileNotFoundError:
-                pass
 
     @property
     def session_id(self) -> int:
@@ -89,8 +122,7 @@ class DailySessionIdStore:
             data.last_session_id = 0
 
         data.last_session_id += 1
-        self._atomic_write(data)
-
+        _atomic_write(self.path, data.model_dump_json())
         return data.last_session_id
 
 
@@ -102,134 +134,358 @@ class EmailSendStateStore:
         if not self.path.exists():
             return EmailSendState()
 
-        text = self.path.read_text()
-
         try:
-            return EmailSendState.model_validate_json(text)
+            return EmailSendState.model_validate_json(self.path.read_text())
         except ValueError, ValidationError:
             return EmailSendState()
-
-    def _atomic_write(self, data: EmailSendState) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=str(self.path.parent),
-            prefix=self.path.name,
-            suffix=".tmp",
-        )
-
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(data.model_dump_json())
-                f.flush()
-                os.fsync(f.fileno())
-
-            os.replace(tmp, self.path)
-        finally:
-            try:
-                os.remove(tmp)
-            except FileNotFoundError:
-                pass
 
     def load(self) -> EmailSendState:
         return self._load()
 
     def save(self, message_id: str) -> None:
-        data = EmailSendState(message_id=message_id)
-        self._atomic_write(data)
+        _atomic_write(
+            self.path,
+            EmailSendState(message_id=message_id).model_dump_json(),
+        )
+
+
+@dataclass
+class SessionSnapshotStore:
+    path: Path
+
+    def save(self, snapshot: Mapping[str, object]) -> None:
+        text = json.dumps(snapshot, ensure_ascii=False, indent=2)
+        _atomic_write(self.path, text)
 
 
 class Session(BaseModel):
-    experimenter: str = Field(default="auto", frozen=True)
-    reward_type: RewardEnum = Field(default=RewardEnum.AGUM_ONE_FIFTH, frozen=True)
-    send_email: bool = Field(default=False, frozen=True)
-    sync_data: bool = Field(default=False, frozen=True)
+    config: SessionConfig
+    state: SessionState
 
-    default_scene: str = Field(default="", frozen=True)
-    unknown_animal_fallback: str = Field(default="", frozen=True)
-    unknown_animal_fallback_animal: str = Field(default="", frozen=True)
-    fault_fallback: str = Field(default="", frozen=True)
-
-    hide_cursor: bool = Field(default=False, frozen=True)
-    fullscreen: bool = Field(default=False, frozen=True)
-
-    session_id: int = Field(default=0, ge=0)
-    start_at: datetime | None = Field(default=None)
-    end_at: datetime | None = Field(default=None)
-    data_path: Path | None = Field(default=None)
-    note: str = Field(frozen=True)
-
-    _current_animal: str | None = PrivateAttr(default=None)
     _session_store: DailySessionIdStore | None = PrivateAttr(default=None)
+    _snapshot_store: SessionSnapshotStore | None = PrivateAttr(default=None)
     _data_root: Path | None = PrivateAttr(default=None)
-    animals: dict[str, Animal] = Field(default_factory=dict[str, Animal], frozen=True)
+
+    @computed_field
+    @property
+    def experimenter(self) -> str:
+        return self.config.experimenter
+
+    @computed_field
+    @property
+    def reward_type(self) -> RewardEnum:
+        return self.config.reward_type
+
+    @computed_field
+    @property
+    def send_email(self) -> bool:
+        return self.config.send_email
+
+    @computed_field
+    @property
+    def sync_data(self) -> bool:
+        return self.config.sync_data
+
+    @computed_field
+    @property
+    def note(self) -> str:
+        return self.config.note
+
+    @computed_field
+    @property
+    def default_scene(self) -> str:
+        return self.config.default_scene
+
+    @computed_field
+    @property
+    def unknown_animal_fallback(self) -> str:
+        return self.config.unknown_animal_fallback
+
+    @computed_field
+    @property
+    def unknown_animal_fallback_animal(self) -> str:
+        return self.config.unknown_animal_fallback_animal
+
+    @computed_field
+    @property
+    def fault_fallback(self) -> str:
+        return self.config.fault_fallback
+
+    @computed_field
+    @property
+    def hide_cursor(self) -> bool:
+        return self.config.hide_cursor
+
+    @computed_field
+    @property
+    def fullscreen(self) -> bool:
+        return self.config.fullscreen
+
+    @computed_field
+    @property
+    def auto_accept_timeout_seconds(self) -> int:
+        return self.config.auto_accept_timeout_seconds
+
+    @computed_field
+    @property
+    def session_id(self) -> int:
+        return self.state.session_id
+
+    @computed_field
+    @property
+    def start_at(self) -> datetime | None:
+        return self.state.start_at
+
+    @computed_field
+    @property
+    def end_at(self) -> datetime | None:
+        return self.state.end_at
+
+    @computed_field
+    @property
+    def data_path(self) -> Path | None:
+        return self.state.data_path
+
+    @computed_field
+    @property
+    def current_scene(self) -> str | None:
+        return self.state.current_scene
+
+    @computed_field
+    @property
+    def animals(self) -> Mapping[str, Animal]:
+        return self.state.animals
+
+    @computed_field
+    @property
+    def current_animal(self) -> Animal | None:
+        key = self.state.current_animal_name
+        if key is None:
+            return None
+        return self.state.animals[key]
+
+    def require_current_animal(self) -> Animal:
+        animal = self.current_animal
+        if animal is None:
+            raise RuntimeError(
+                "Animal is not set. Please call set_current_animal() first"
+            )
+        return animal
+
+    @property
+    def absolute_data_path(self) -> Path | None:
+        if self.state.data_path is None or self._data_root is None:
+            return None
+        return self._data_root / self.state.data_path
 
     def set_session_store(self, store: DailySessionIdStore) -> None:
         self._session_store = store
 
+    def set_snapshot_store(self, store: SessionSnapshotStore) -> None:
+        self._snapshot_store = store
+
+    def snapshot(self) -> dict[str, object]:
+        computed_fields = set(type(self).model_computed_fields)
+        return self.model_dump(mode="json", exclude=computed_fields)
+
+    def checkpoint(self) -> None:
+        if self._snapshot_store is not None:
+            self._snapshot_store.save(self.snapshot())
+
     def start(self, data_root: Path) -> None:
-        if self._session_store and self.session_id == 0:
-            self.session_id = self._session_store.session_id
-        self.start_at = datetime.now(UTC)
+        if self.state.start_at is not None:
+            raise RuntimeError("Session is already started")
+
+        if self._session_store is not None and self.state.session_id == 0:
+            self.state.session_id = self._session_store.session_id
+
+        self.state.start_at = datetime.now(UTC)
         self._data_root = data_root.resolve()
-        self.data_path = Path(self.start_at.strftime("%Y%m%d")) / str(
-            self.session_id
+        self.state.data_path = Path(self.state.start_at.strftime("%Y%m%d")) / str(
+            self.state.session_id
         )
 
-    def end(self) -> None:
-        self.end_at = datetime.now(UTC)
-
-    @property
-    def absolute_data_path(self) -> Path | None:
-        if self.data_path is None or self._data_root is None:
-            return None
-        return self._data_root / self.data_path
-
-    @field_serializer("start_at", "end_at", when_used="json")
-    def _serialize_timestamp(self, value: datetime | None) -> str | None:
-        if value is None:
-            return None
-
-        return value.astimezone().isoformat(timespec="microseconds")
-
-    @property
-    def current_animal(self) -> Animal | None:
-        key = self._current_animal
-        if key is None:
-            return None
-
-        return self.animals[key]
-
-    @property
-    def require_current_animal(self) -> Animal:
-        key = self._current_animal
-        if key is None:
-            raise RuntimeError(
-                f"Animal: {key} is not set. Please call set_current_animal() first"
+        absolute_data_path = self.absolute_data_path
+        assert absolute_data_path is not None
+        if self._snapshot_store is None:
+            self._snapshot_store = SessionSnapshotStore(
+                absolute_data_path / "session.json"
             )
+        self.checkpoint()
 
-        return self.animals[key]
-
-    def clear_current_animal(self):
-        a = self.current_animal
-        if a is None:
+    def end(self) -> None:
+        if self.state.start_at is None:
+            raise RuntimeError("Session is not started")
+        if self.state.end_at is not None:
             return
 
-        a.end_animal_session()
-        self._current_animal = None
+        animal = self.current_animal
+        if animal is not None:
+            self._end_animal_session(animal)
+            self.state.current_animal_name = None
+        self.state.end_at = datetime.now(UTC)
+        self.checkpoint()
 
-    def set_current_animal(self, animal: str):
-        self.clear_current_animal()
+    def set_current_scene(self, scene: str | None) -> None:
+        if self.state.current_scene == scene:
+            return
+        self.state.current_scene = scene
+        self.checkpoint()
 
+    def clear_current_animal(self) -> None:
+        animal = self.current_animal
+        if animal is None:
+            return
+
+        self._end_animal_session(animal)
+        self.state.current_animal_name = None
+        self.checkpoint()
+
+    def set_current_animal(self, animal: str) -> None:
         try:
-            a = self.animals[animal]
-        except KeyError:
-            raise ValueError(f"animal {animal} not found")
+            next_animal = self.state.animals[animal]
+        except KeyError as error:
+            raise ValueError(f"animal {animal} not found") from error
 
-        self._current_animal = animal
-        a.start_animal_session()
+        current = self.current_animal
+        if (
+            next_animal is not current
+            and next_animal.current_animal_session is not None
+        ):
+            raise ValueError(f"animal {animal} session is already started")
+        if current is not None:
+            self._end_animal_session(current)
+
+        self.state.current_animal_name = animal
+        self._start_animal_session(next_animal)
+        self.checkpoint()
+
+    def set_current_stage(self, stage: StageState | str) -> None:
+        animal = self.require_current_animal()
+        if isinstance(stage, str):
+            stage = StageState(stage_name=stage)
+
+        animal.current_stage_name = stage.stage_name
+        animal.stages.setdefault(stage.stage_name, stage)
+        self.checkpoint()
+
+    def add_trial(self) -> None:
+        animal = self.require_current_animal()
+        animal_session = animal.current_animal_session
+        if animal_session is None:
+            raise RuntimeError("Animal session is not started")
+        stage = animal.current_stage
+
+        animal.trial_id += 1
+        stage.stage_trial_id += 1
+        stage.level_trial_id += 1
+        animal_session.trial_id += 1
+        self.checkpoint()
+
+    def level_up(
+        self,
+        *,
+        animal: str | None = None,
+        stage: str | None = None,
+    ) -> int:
+        stage_state = self._resolve_stage(animal=animal, stage=stage)
+        stage_state.level_trial_id = 0
+        stage_state.level += 1
+        self.checkpoint()
+        return stage_state.level
+
+    def level_down(
+        self,
+        *,
+        animal: str | None = None,
+        stage: str | None = None,
+    ) -> int:
+        stage_state = self._resolve_stage(animal=animal, stage=stage)
+        if stage_state.level == 0:
+            raise ValueError("level cannot be less than 0")
+
+        stage_state.level_trial_id = 0
+        stage_state.level -= 1
+        self.checkpoint()
+        return stage_state.level
+
+    def get_context[T: BaseModel](self, key: str, context_type: type[T]) -> T | None:
+        return self.state.get_context(key, context_type)
+
+    def set_context(self, key: str, context: BaseModel) -> None:
+        validate_context_key(key)
+        self.state.contexts[key] = context
+        self.checkpoint()
+
+    def _resolve_animal(self, animal: str | None) -> Animal:
+        if animal is None:
+            return self.require_current_animal()
+        try:
+            return self.state.animals[animal]
+        except KeyError as error:
+            raise ValueError(f"animal {animal} not found") from error
+
+    def set_animal_context(
+        self,
+        key: str,
+        context: BaseModel,
+        *,
+        animal: str | None = None,
+    ) -> None:
+        validate_context_key(key)
+        self._resolve_animal(animal).contexts[key] = context
+        self.checkpoint()
+
+    def set_stage_context(
+        self,
+        key: str,
+        context: BaseModel,
+        *,
+        animal: str | None = None,
+        stage: str | None = None,
+    ) -> None:
+        stage_state = self._resolve_stage(animal=animal, stage=stage)
+        validate_context_key(key)
+        stage_state.contexts[key] = context
+        self.checkpoint()
+
+    def _start_animal_session(self, animal: Animal) -> None:
+        if animal.current_animal_session is not None:
+            raise ValueError("Animal session is already started")
+
+        if animal.initial_stage is None:
+            animal.initial_stage = StageSnapshot.from_state(animal.current_stage)
+        animal.final_stage = None
+
+        animal_session = AnimalSessionState(session_id=len(animal.animal_sessions) + 1)
+        animal.current_animal_session = animal_session
+        animal.animal_sessions.append(animal_session)
+
+    def _end_animal_session(self, animal: Animal) -> None:
+        animal_session = animal.current_animal_session
+        if animal_session is None:
+            raise ValueError("Animal session is not started")
+
+        animal_session.end_at = datetime.now(UTC)
+        animal.current_animal_session = None
+        animal.final_stage = StageSnapshot.from_state(animal.current_stage)
+
+    def _resolve_stage(
+        self,
+        *,
+        animal: str | None,
+        stage: str | None,
+    ) -> StageState:
+        animal_state = self._resolve_animal(animal)
+        if stage is None:
+            return animal_state.current_stage
+        try:
+            return animal_state.stages[stage]
+        except KeyError as error:
+            raise ValueError(f"stage {stage} not found") from error
 
 
 class Options(BaseModel):
-    mxbis: list[str] = Field(default_factory=list[str], frozen=True)
-    experimenter: list[str] = Field(default_factory=list[str], frozen=True)
-    animals: dict[str, str] = Field(default_factory=dict[str, str], frozen=True)
+    mxbis: list[str] = Field(default_factory=list, frozen=True)
+    experimenter: list[str] = Field(default_factory=list, frozen=True)
+    animals: dict[str, str] = Field(default_factory=dict, frozen=True)
