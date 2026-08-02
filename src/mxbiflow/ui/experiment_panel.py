@@ -111,10 +111,7 @@ class ExperimentPanel(QMainWindow):
         data = session_config.model_dump()
         data.update(
             default_scene=scene_result.default_scene,
-            unknown_animal_fallback=scene_result.unknown_animal_fallback,
-            unknown_animal_fallback_animal=(
-                scene_result.unknown_animal_fallback_animal
-            ),
+            unknown_animal_as=scene_result.unknown_animal_as,
             fault_fallback=scene_result.fault_fallback,
             animals=self.group_animals.result(),
         )
