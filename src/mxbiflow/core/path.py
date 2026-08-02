@@ -80,9 +80,5 @@ def get_internal_state_path() -> Path:
     return get_base_path() / ".mxbiflow" / "state"
 
 
-def get_session_counter_path() -> Path:
-    return get_internal_state_path() / "session_counter.json"
-
-
-def get_email_state_path() -> Path:
-    return get_internal_state_path() / "email_state.json"
+def get_runtime_state_path() -> Path:
+    return get_internal_state_path() / "runtime.json"

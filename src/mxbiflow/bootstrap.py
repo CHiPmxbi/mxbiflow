@@ -6,12 +6,12 @@ from .core.config_store import ConfigStore
 from .core.path import (
     get_config_session_path,
     get_mxbi_config_path,
-    get_session_counter_path,
+    get_runtime_state_path,
 )
 from .gameloop.detector_bridge import DetectorBridge
 from .gameloop.game import Game
 from .models.animal import Animal, StageState
-from .models.session import DailySessionIdStore, Session, SessionConfig, SessionState
+from .models.session import RuntimeStateStore, Session, SessionConfig, SessionState
 from .scene import SceneManager
 
 
@@ -59,7 +59,7 @@ def build_mxbi() -> pymxbi.MXBI:
 
 
 def init_session(session_config: SessionConfig) -> Session:
-    store = DailySessionIdStore(get_session_counter_path())
+    store = RuntimeStateStore(get_runtime_state_path())
 
     animal_dict: dict[str, Animal] = {}
     for animal_config in session_config.animals:
