@@ -126,9 +126,7 @@ class ExperimentPanel(QMainWindow):
         self.accepted.emit()
 
     def _start_auto_accept_countdown(self) -> None:
-        panel_config = ConfigStore(
-            get_mxbi_panel_config_path(), MXBIPanelConfig
-        ).value
+        panel_config = ConfigStore(get_mxbi_panel_config_path(), MXBIPanelConfig).value
         self._countdown.start(panel_config.auto_accept_timeout_seconds)
 
     def showEvent(self, event: QShowEvent) -> None:

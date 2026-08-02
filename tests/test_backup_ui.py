@@ -89,7 +89,9 @@ class FakeBackupClient:
         self.closed = True
 
 
-def completed_runner(status: BackupStatus, *, error: str | None = None) -> BackupTaskRunner:
+def completed_runner(
+    status: BackupStatus, *, error: str | None = None
+) -> BackupTaskRunner:
     client = FakeBackupClient([make_task(status, error=error)])
     runner = BackupTaskRunner(poll_interval_s=0.001)
     with patch("mxbiflow.infra.backup.BackupClient", return_value=client):
@@ -106,9 +108,7 @@ class BackupUITests(unittest.TestCase):
     def setUpClass(cls) -> None:
         application = QApplication.instance()
         cls.application = (
-            application
-            if isinstance(application, QApplication)
-            else QApplication([])
+            application if isinstance(application, QApplication) else QApplication([])
         )
 
     def tearDown(self) -> None:

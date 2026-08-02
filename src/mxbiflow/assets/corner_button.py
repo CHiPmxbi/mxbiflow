@@ -59,7 +59,11 @@ class CornerButton(Sprite):
 
     def handle_event(self, event: Event) -> bool:
         rect = cast(Rect, self.rect)
-        if event.type == MOUSEBUTTONDOWN and event.button == 1 and rect.collidepoint(event.pos):
+        if (
+            event.type == MOUSEBUTTONDOWN
+            and event.button == 1
+            and rect.collidepoint(event.pos)
+        ):
             self.image = self._pressed_image
             self._pressed_remaining_s = self._pressed_duration_s
             self._on_click()

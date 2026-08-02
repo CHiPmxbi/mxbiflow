@@ -2,7 +2,9 @@ from PySide6.QtWidgets import QFrame, QWidget
 
 
 class CardFrame(QFrame):
-    def __init__(self, parent: QWidget | None = None, object_name: str = "card") -> None:
+    def __init__(
+        self, parent: QWidget | None = None, object_name: str = "card"
+    ) -> None:
         super().__init__(parent=parent)
 
         self.setObjectName(object_name)

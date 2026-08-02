@@ -37,9 +37,7 @@ class AutoAcceptCountdownTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         application = QApplication.instance()
         cls.application = (
-            application
-            if isinstance(application, QApplication)
-            else QApplication([])
+            application if isinstance(application, QApplication) else QApplication([])
         )
 
     def test_only_stop_button_stops_countdown(self) -> None:
@@ -84,9 +82,7 @@ class PanelCountdownTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         application = QApplication.instance()
         cls.application = (
-            application
-            if isinstance(application, QApplication)
-            else QApplication([])
+            application if isinstance(application, QApplication) else QApplication([])
         )
 
     def setUp(self) -> None:

@@ -53,13 +53,13 @@ class SessionConfig(BaseModel):
             return self
 
         if not self.unknown_animal_as:
-            raise ValueError("unknown_animal_as must be set when animals are configured")
+            raise ValueError(
+                "unknown_animal_as must be set when animals are configured"
+            )
 
         animal_names = {animal.name for animal in self.animals}
         if self.unknown_animal_as not in animal_names:
-            raise ValueError(
-                "unknown_animal_as must match a configured animal name"
-            )
+            raise ValueError("unknown_animal_as must match a configured animal name")
         return self
 
 
