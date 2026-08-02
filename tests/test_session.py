@@ -51,6 +51,7 @@ def make_session() -> Session:
         experimenter="tester",
         send_email=True,
         sync_data=True,
+        unknown_animal_as=animal_config.name,
         animals=(animal_config,),
     )
     return Session(
@@ -60,6 +61,41 @@ def make_session() -> Session:
 
 
 class SessionModelTests(unittest.TestCase):
+    def test_session_config_without_animals_allows_empty_unknown_mapping(
+        self,
+    ) -> None:
+        config = SessionConfig()
+
+        self.assertEqual(config.unknown_animal_as, "")
+
+    def test_session_config_requires_valid_unknown_animal_mapping(self) -> None:
+        animal = AnimalConfig(name="animal-1")
+
+        with self.assertRaisesRegex(ValidationError, "unknown_animal_as must be set"):
+            SessionConfig(animals=(animal,))
+        with self.assertRaisesRegex(
+            ValidationError,
+            "unknown_animal_as must match a configured animal name",
+        ):
+            SessionConfig(unknown_animal_as="missing", animals=(animal,))
+
+        config = SessionConfig(
+            unknown_animal_as=animal.name,
+            animals=(animal,),
+        )
+        self.assertEqual(config.unknown_animal_as, animal.name)
+
+    def test_legacy_unknown_animal_field_does_not_configure_mapping(self) -> None:
+        animal = AnimalConfig(name="animal-1")
+
+        with self.assertRaisesRegex(ValidationError, "unknown_animal_as must be set"):
+            SessionConfig.model_validate(
+                {
+                    "unknown_animal_fallback_animal": animal.name,
+                    "animals": [animal],
+                }
+            )
+
     def test_bootstrap_reuses_animal_config(self) -> None:
         animal_config = AnimalConfig(
             rfid_id="rfid-1",
@@ -72,7 +108,12 @@ class SessionModelTests(unittest.TestCase):
             "mxbiflow.bootstrap.get_session_counter_path",
             return_value=Path("unused-session-counter.json"),
         ):
-            session = init_session(SessionConfig(animals=(animal_config,)))
+            session = init_session(
+                SessionConfig(
+                    unknown_animal_as=animal_config.name,
+                    animals=(animal_config,),
+                )
+            )
         animal = session.animals["animal-1"]
 
         self.assertIs(animal.config, session.config.animals[0])
@@ -139,6 +180,9 @@ class SessionModelTests(unittest.TestCase):
         animal = state["animals"]["animal-1"]
         config = snapshot["config"]
         assert isinstance(config, dict)
+        self.assertEqual(config["unknown_animal_as"], "animal-1")
+        self.assertNotIn("unknown_animal_fallback", config)
+        self.assertNotIn("unknown_animal_fallback_animal", config)
         self.assertEqual(
             config["animals"][0],
             {

@@ -49,25 +49,7 @@ class Scheduler:
         self._scene_manager.switch(fallback)
 
     def _handle_unknown_animal(self) -> None:
-        fallback_animal = self._session.unknown_animal_fallback_animal
-        if fallback_animal:
-            if fallback_animal in self._session.animals:
-                self._set_current_animal(fallback_animal)
-            else:
-                logger.warning(
-                    "unknown_animal_fallback_animal is not in session animals: {}",
-                    fallback_animal,
-                )
-        else:
-            logger.warning(
-                "unknown_animal_fallback_animal is empty; current_animal remains unset"
-            )
-
-        fallback = self._scene_manager.unknown_animal_fallback
-        if isinstance(self._scene_manager.current, fallback):
-            return
-
-        self._scene_manager.switch(fallback)
+        self._set_current_animal(self._session.unknown_animal_as)
 
     def handle_event(self, event: Event) -> None:
         if event.type != EVT_DETECTOR:
