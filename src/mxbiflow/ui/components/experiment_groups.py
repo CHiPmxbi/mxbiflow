@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMenu,
-    QSpinBox,
     QWidget,
 )
 
@@ -62,12 +61,6 @@ class ExperimentConfigGroup(QGroupBox):
         self.line_notes.setPlaceholderText("Notes")
         layout.addWidget(self.line_notes, 3, 1, 1, 3)
 
-        layout.addWidget(QLabel("auto accept (s)", self), 4, 0)
-        self.spin_auto_accept = QSpinBox(self)
-        self.spin_auto_accept.setRange(0, 3600)
-        self.spin_auto_accept.setSpecialValueText("Disabled")
-        layout.addWidget(self.spin_auto_accept, 4, 1)
-
     def load_config(self, config: SessionConfig) -> None:
         if config.experimenter in self._experimenters:
             self.combo_experimenter.setCurrentText(config.experimenter)
@@ -81,7 +74,6 @@ class ExperimentConfigGroup(QGroupBox):
 
         self.check_hide_cursor.setChecked(config.hide_cursor)
         self.check_fullscreen.setChecked(config.fullscreen)
-        self.spin_auto_accept.setValue(config.auto_accept_timeout_seconds)
         self.check_send_email.setChecked(config.send_email)
         self.check_sync_data.setChecked(config.sync_data)
 
@@ -92,7 +84,6 @@ class ExperimentConfigGroup(QGroupBox):
             note=self.line_notes.text(),
             hide_cursor=self.check_hide_cursor.isChecked(),
             fullscreen=self.check_fullscreen.isChecked(),
-            auto_accept_timeout_seconds=self.spin_auto_accept.value(),
             send_email=self.check_send_email.isChecked(),
             sync_data=self.check_sync_data.isChecked(),
         )

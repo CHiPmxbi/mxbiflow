@@ -1,5 +1,5 @@
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCloseEvent, QShowEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QMainWindow,
@@ -9,7 +9,12 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.config_store import ConfigStore
-from ..core.path import get_config_session_path, get_options_session_path
+from ..core.path import (
+    get_config_session_path,
+    get_mxbi_panel_config_path,
+    get_options_session_path,
+)
+from ..models.panel import MXBIPanelConfig
 from ..models.session import Options, SessionConfig
 from ..scene import SceneManager
 from .components.countdown import AutoAcceptCountdown
@@ -79,26 +84,12 @@ class ExperimentPanel(QMainWindow):
 
         self._bind_signals()
         self.load_config()
-        self._start_auto_accept_countdown()
 
     def _bind_signals(self) -> None:
         self._button_cancel.clicked.connect(self._on_cancel)
         self._button_save.clicked.connect(self._on_save)
         self._button_continue.clicked.connect(self._on_continue)
-
-        self._button_cancel.clicked.connect(self._countdown.stop)
-        self._button_save.clicked.connect(self._countdown.stop)
-        self._button_continue.clicked.connect(self._countdown.stop)
-
-        self.centralWidget().installEventFilter(self)
-
-    def _on_user_interaction(self, _=None) -> None:
-        self._countdown.pause()
-
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.MouseButtonPress:
-            self._countdown.pause()
-        return super().eventFilter(obj, event)
+        self._countdown.timeout.connect(self._on_continue)
 
     def load_config(self) -> None:
         self.group_config.load_config(self._config.value)
@@ -135,12 +126,17 @@ class ExperimentPanel(QMainWindow):
         self.accepted.emit()
 
     def _start_auto_accept_countdown(self) -> None:
-        timeout = self._config.value.auto_accept_timeout_seconds
-        if timeout > 0:
-            self._countdown.start(timeout)
-            self._countdown.timeout.connect(self._on_continue)
+        panel_config = ConfigStore(
+            get_mxbi_panel_config_path(), MXBIPanelConfig
+        ).value
+        self._countdown.start(panel_config.auto_accept_timeout_seconds)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._start_auto_accept_countdown()
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._countdown.stop()
         super().closeEvent(event)
         if event.isAccepted() and not self._accepted:
             self.rejected.emit()
