@@ -82,9 +82,7 @@ class FakeBackupClient:
 class BackupTaskRunnerTests(unittest.TestCase):
     def test_monitors_created_task_until_success(self) -> None:
         final_task = make_task(BackupStatus.SUCCEEDED)
-        client = FakeBackupClient(
-            [make_task(BackupStatus.RUNNING), final_task]
-        )
+        client = FakeBackupClient([make_task(BackupStatus.RUNNING), final_task])
         monitor = BackupTaskRunner(poll_interval_s=0.001)
 
         with patch("mxbiflow.infra.backup.BackupClient", return_value=client):
@@ -190,9 +188,7 @@ class BackupTaskRunnerTests(unittest.TestCase):
             create_error=create_error,
             close_error=ConnectError("close failed"),
         )
-        successful_client = FakeBackupClient(
-            [make_task(BackupStatus.SUCCEEDED)]
-        )
+        successful_client = FakeBackupClient([make_task(BackupStatus.SUCCEEDED)])
         monitor = BackupTaskRunner(poll_interval_s=0.001)
 
         with patch(
