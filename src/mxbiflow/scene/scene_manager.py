@@ -13,7 +13,6 @@ class SceneManager:
         self.current: Scene | None = None
         self._pending: Scene | None = None
         self._default_scene: type[Scene] = IDLE
-        self._unknown_animal_fallback: type[Scene] = IDLE
         self._fault_fallback: type[Scene] = IDLE
 
         self.register([IDLE])
@@ -43,14 +42,6 @@ class SceneManager:
     @default_scene.setter
     def default_scene(self, name: str) -> None:
         self._default_scene = self._scenes[name]
-
-    @property
-    def unknown_animal_fallback(self) -> type[Scene]:
-        return self._unknown_animal_fallback
-
-    @unknown_animal_fallback.setter
-    def unknown_animal_fallback(self, name: str) -> None:
-        self._unknown_animal_fallback = self._scenes[name]
 
     @property
     def fault_fallback(self) -> type[Scene]:
