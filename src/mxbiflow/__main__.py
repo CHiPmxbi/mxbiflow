@@ -4,20 +4,20 @@ from pathlib import Path
 from pymotego.email import EmailClient
 from pymxbi.mxbi.factory import MXBIModel
 
-from mxbiflow import set_base_path
-from mxbiflow.bootstrap import init_gameloop
-from mxbiflow.core.config_store import ConfigStore
-from mxbiflow.core.path import (
+from . import set_base_path
+from .bootstrap import init_gameloop
+from .core.config_store import ConfigStore
+from .core.path import (
     get_log_path,
     get_mxbi_config_path,
     get_runtime_state_path,
 )
-from mxbiflow.infra.post_processing import HtmlComposer, session_overview, summarize
-from mxbiflow.models.session import RuntimeStateStore
-from mxbiflow.scene import SceneManager
-from mxbiflow.scene.idle.idle import IDLE
-from mxbiflow.ui import run_wizard
-from mxbiflow.utils.logger import setup_logging
+from .infra.post_processing import HtmlComposer, session_overview, summarize
+from .models.session import RuntimeStateStore
+from .scene import SceneManager
+from .scene.idle.idle import IDLE
+from .ui import run_wizard
+from .utils.logger import setup_logging
 
 
 def main() -> None:
