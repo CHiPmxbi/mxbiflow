@@ -61,7 +61,7 @@ class MXBIPanel(QDialog):
 
         self._layout_main = QVBoxLayout(self)
 
-        self.base_config = BaseConfig(self, self._options.value.mxbis)
+        self.base_config = BaseConfig(self)
         self._layout_main.addWidget(self.base_config)
         self._build_device_groups()
         self._layout_main.addLayout(self._build_buttons_layout())
