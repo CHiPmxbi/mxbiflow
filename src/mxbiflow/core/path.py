@@ -53,10 +53,6 @@ def get_log_path() -> Path:
     return get_base_path() / "log"
 
 
-def get_samba_mount_path() -> Path:
-    return get_base_path() / "samba_mount"
-
-
 def get_internal_state_path() -> Path:
     return get_base_path() / ".mxbiflow" / "state"
 
