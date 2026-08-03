@@ -43,13 +43,24 @@ class AutoAcceptCountdownTests(unittest.TestCase):
     def test_only_stop_button_stops_countdown(self) -> None:
         countdown = AutoAcceptCountdown()
         countdown.start(10)
+        label = countdown.findChild(QLabel)
+        self.assertIsNotNone(label)
+        if label is None:
+            raise AssertionError("Remaining-time label not found in countdown widget")
 
         QTest.mouseClick(countdown, Qt.MouseButton.LeftButton)
         self.assertTrue(countdown.is_active())
 
         QTest.mouseClick(countdown.stop_button, Qt.MouseButton.LeftButton)
         self.assertFalse(countdown.is_active())
-        self.assertTrue(countdown.isHidden())
+        self.assertFalse(countdown.isHidden())
+        self.assertEqual(label.text(), "Auto: 10s")
+        self.assertFalse(countdown.stop_button.isEnabled())
+
+        countdown.start(5)
+        self.assertTrue(countdown.is_active())
+        self.assertEqual(label.text(), "Auto: 5s")
+        self.assertTrue(countdown.stop_button.isEnabled())
 
     def test_countdowns_are_independent_and_emit_once(self) -> None:
         first = TestCountdown()
@@ -129,6 +140,7 @@ class PanelCountdownTests(unittest.TestCase):
 
         QTest.mouseClick(countdown.stop_button, Qt.MouseButton.LeftButton)
         self.assertFalse(countdown.is_active())
+        self.assertTrue(countdown.isVisible())
         panel.close()
 
     def test_panel_actions_use_dialog_result_codes(self) -> None:

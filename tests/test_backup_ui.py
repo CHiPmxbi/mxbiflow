@@ -181,12 +181,14 @@ class BackupUITests(unittest.TestCase):
 
         self.assertTrue(dialog._countdown_label.isVisible())
         self.assertEqual(dialog._countdown_label.text(), "Auto-closing in 5s")
+        self.assertTrue(dialog._stop_countdown_button.isEnabled())
+        self.assertTrue(dialog._close_button.isEnabled())
 
         dialog._tick_countdown()
         self.assertEqual(dialog._countdown_label.text(), "Auto-closing in 4s")
         dialog.accept()
 
-    def test_clicking_panel_stops_auto_close_countdown(self) -> None:
+    def test_only_stop_button_stops_auto_close_countdown(self) -> None:
         dialog = panel_with_runner(
             completed_runner(BackupStatus.SUCCEEDED),
             success_auto_close_ms=5_000,
@@ -197,10 +199,21 @@ class BackupUITests(unittest.TestCase):
         QTest.mouseClick(dialog, Qt.MouseButton.LeftButton)
         self.application.processEvents()
 
+        self.assertTrue(dialog._countdown_timer.isActive())
+        self.assertTrue(dialog._auto_close_timer.isActive())
+
+        countdown_text = dialog._countdown_label.text()
+        QTest.mouseClick(
+            dialog._stop_countdown_button,
+            Qt.MouseButton.LeftButton,
+        )
+        self.application.processEvents()
+
         self.assertFalse(dialog._countdown_timer.isActive())
         self.assertFalse(dialog._auto_close_timer.isActive())
-        self.assertEqual(dialog._countdown_label.text(), "Auto-close cancelled")
-        self.assertTrue(dialog._close_button.isVisible())
+        self.assertEqual(dialog._countdown_label.text(), countdown_text)
+        self.assertFalse(dialog._stop_countdown_button.isEnabled())
+        self.assertTrue(dialog._close_button.isEnabled())
 
         self.application.processEvents()
         self.application.processEvents()
@@ -215,13 +228,16 @@ class BackupUITests(unittest.TestCase):
             with self.subTest(status=status):
                 dialog = panel_with_runner(
                     completed_runner(status, error="entry failed"),
-                    success_auto_close_ms=0,
+                    success_auto_close_ms=5_000,
                 )
                 dialog.show()
                 self.application.processEvents()
 
                 self.assertTrue(dialog.isVisible())
-                self.assertTrue(dialog._close_button.isVisible())
+                self.assertFalse(dialog._countdown_timer.isActive())
+                self.assertFalse(dialog._auto_close_timer.isActive())
+                self.assertFalse(dialog._stop_countdown_button.isEnabled())
+                self.assertTrue(dialog._close_button.isEnabled())
                 self.assertIn("entry failed", dialog._error_label.text())
                 dialog.accept()
 
@@ -238,6 +254,10 @@ class BackupUITests(unittest.TestCase):
         dialog = panel_with_runner(runner, success_auto_close_ms=0)
         dialog.show()
         self.application.processEvents()
+        self.assertTrue(dialog._stop_countdown_button.isVisible())
+        self.assertFalse(dialog._stop_countdown_button.isEnabled())
+        self.assertTrue(dialog._close_button.isVisible())
+        self.assertFalse(dialog._close_button.isEnabled())
         dialog.close()
         self.application.processEvents()
 

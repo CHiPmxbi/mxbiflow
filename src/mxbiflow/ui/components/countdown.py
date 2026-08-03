@@ -35,6 +35,7 @@ class AutoAcceptCountdown(QWidget):
 
         self._remaining_seconds = seconds
         self._is_active = True
+        self.stop_button.setEnabled(True)
         self._update_label()
         self.show()
         self._timer.start()
@@ -42,8 +43,7 @@ class AutoAcceptCountdown(QWidget):
     def stop(self) -> None:
         self._timer.stop()
         self._is_active = False
-        self._remaining_seconds = 0
-        self.hide()
+        self.stop_button.setEnabled(False)
 
     def is_active(self) -> bool:
         return self._is_active
