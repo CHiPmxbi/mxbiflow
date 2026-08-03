@@ -1,15 +1,12 @@
 from dataclasses import dataclass
-from pathlib import Path
 from random import choice
 from typing import ClassVar
 
 from pygame import Event, Rect, Surface, image, transform
 
-from ...assets import create_background
+from ...assets import APPLE_IMAGES, create_background
 from ...core.context import get_mxbiflow
 from ..scene import Scene
-
-ASSETS_PATH = Path(__file__).parent / "assets"
 
 
 @dataclass
@@ -44,7 +41,7 @@ class IDLE(Scene):
                 ),
                 asset_image.get_rect(center=self._pos),
             )
-            for path in ASSETS_PATH.glob("*.png")
+            for path in APPLE_IMAGES
         ]
 
         self._asset = choice(self._assets)
