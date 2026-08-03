@@ -31,8 +31,10 @@ class SessionSummary(BaseModel):
     start_at: datetime | None
     end_at: datetime | None
     duration_seconds: float
+    experimenter: str = ""
     reward_type: str
     total_animals: int
+    note: str = ""
     animals: list[AnimalSummary]
 
 
@@ -114,8 +116,10 @@ def summarize() -> SessionSummary:
         start_at=session.start_at,
         end_at=session.end_at,
         duration_seconds=duration,
+        experimenter=session.experimenter,
         reward_type=session.reward_type.value,
         total_animals=len(session.animals),
+        note=session.note,
         animals=animal_summaries,
     )
 
