@@ -10,11 +10,12 @@ from PySide6.QtWidgets import (
 from ..core.config_store import ConfigStore
 from ..core.path import (
     get_config_session_path,
+    get_database_path,
     get_mxbi_panel_config_path,
-    get_options_session_path,
 )
+from ..models.database import MXBIDatabase
 from ..models.panel import MXBIPanelConfig
-from ..models.session import Options, SessionConfig
+from ..models.session import SessionConfig
 from ..scene import SceneManager
 from .components.countdown import AutoAcceptCountdown
 from .components.experiment_groups import (
@@ -28,7 +29,7 @@ class ExperimentPanel(QDialog):
     def __init__(self, scene_manager: SceneManager) -> None:
         super().__init__()
         self._config = ConfigStore(get_config_session_path(), SessionConfig)
-        self._options = ConfigStore(get_options_session_path(), Options)
+        self._database = ConfigStore(get_database_path(), MXBIDatabase)
         self._stage_level_tables = scene_manager.stage_level_tables
 
         self.setWindowTitle("Experiment Panel")
@@ -36,7 +37,7 @@ class ExperimentPanel(QDialog):
         layout_main = QVBoxLayout(self)
 
         self.group_config = ExperimentConfigGroup(
-            self, self._options.value.experimenter
+            self, self._database.value.experimenter
         )
         layout_main.addWidget(self.group_config)
 
@@ -49,7 +50,7 @@ class ExperimentPanel(QDialog):
 
         self.group_animals = ExperimentAnimalsGroup(
             self,
-            animals=self._options.value.animals,
+            animals=self._database.value.animals,
             stage_level_tables=self._stage_level_tables,
         )
         layout_main.addWidget(self.group_animals)
@@ -100,7 +101,7 @@ class ExperimentPanel(QDialog):
         return SessionConfig.model_validate(data)
 
     def _fallback_animal_options(self) -> list[str]:
-        names = list(self._options.value.animals.values())
+        names = list(self._database.value.animals.values())
         names.extend(animal.name for animal in self._config.value.animals)
         return list(dict.fromkeys(name for name in names if name))
 
