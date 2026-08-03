@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from mxbiflow.assets.background import create_background as create_background
-from mxbiflow.assets.corner_button import Corner as Corner
-from mxbiflow.assets.corner_button import CornerButton as CornerButton
-from mxbiflow.assets.image_sprite import ImageSprite as ImageSprite
-from mxbiflow.assets.result_widget import ResultWidget as ResultWidget
+from .background import create_background as create_background
+from .corner_button import Corner as Corner
+from .corner_button import CornerButton as CornerButton
+from .image_sprite import ImageSprite as ImageSprite
+from .result_widget import ResultWidget as ResultWidget
 
 ROOT = Path(__file__).parent
 
