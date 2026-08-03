@@ -1,5 +1,3 @@
-import sys
-
 from pymotego import (
     BackupDestination,
     BackupSource,
@@ -9,7 +7,6 @@ from pymotego import (
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
-    QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -20,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..infra.backup import BackupTaskRunner
+from .application import require_application
 
 _REFRESH_INTERVAL_MS = 250
 _SUCCESS_AUTO_CLOSE_MS = 10_000
@@ -35,54 +33,34 @@ def run_backup(
     success_auto_close_ms: int = _SUCCESS_AUTO_CLOSE_MS,
 ) -> None:
     """Create a backup and show a blocking progress dialog."""
-    runner = BackupTaskRunner(
+    _application = require_application()
+    BackupPanel(
+        source,
+        destination,
         poll_interval_s=poll_interval_s,
         max_attempts=max_attempts,
-    )
-    runner.start(source, destination)
-    _show_progress_dialog(
-        runner,
         refresh_interval_ms=refresh_interval_ms,
         success_auto_close_ms=success_auto_close_ms,
-    )
+    ).exec()
 
 
-def _show_progress_dialog(
-    runner: BackupTaskRunner,
-    *,
-    refresh_interval_ms: int,
-    success_auto_close_ms: int,
-) -> None:
-    application = _require_application()
-    dialog = _BackupProgressDialog(
-        runner,
-        refresh_interval_ms=refresh_interval_ms,
-        success_auto_close_ms=success_auto_close_ms,
-    )
-    dialog.finished.connect(application.quit)
-    dialog.show()
-    application.exec()
-
-
-def _require_application() -> QApplication:
-    application = QApplication.instance()
-    if application is None:
-        application = QApplication(sys.argv)
-    if not isinstance(application, QApplication):
-        raise TypeError("The active Qt application is not a QApplication")
-    return application
-
-
-class _BackupProgressDialog(QDialog):
+class BackupPanel(QDialog):
     def __init__(
         self,
-        runner: BackupTaskRunner,
+        source: BackupSource,
+        destination: BackupDestination,
         *,
+        poll_interval_s: float = 1.0,
+        max_attempts: int = 3,
         refresh_interval_ms: int = _REFRESH_INTERVAL_MS,
         success_auto_close_ms: int = _SUCCESS_AUTO_CLOSE_MS,
     ) -> None:
         super().__init__()
-        self._runner = runner
+        self._runner = BackupTaskRunner(
+            poll_interval_s=poll_interval_s,
+            max_attempts=max_attempts,
+        )
+        self._runner.start(source, destination)
         self._can_close = False
         self._terminal_state_shown = False
         self._success_auto_close_ms = success_auto_close_ms

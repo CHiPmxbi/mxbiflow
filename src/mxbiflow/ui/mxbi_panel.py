@@ -3,11 +3,11 @@ from typing import ClassVar
 from pymxbi import MXBIModel
 from pymxbi.detector import DetectorEnum, DetectorModel
 from pymxbi.rewarder import RewarderEnum, RewarderModel
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCloseEvent, QShowEvent
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
+    QDialog,
     QGridLayout,
-    QMainWindow,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -34,10 +34,7 @@ from .components.device_card import (
 from .components.devices import Devices
 
 
-class MXBIPanel(QMainWindow):
-    accepted = Signal()
-    rejected = Signal()
-
+class MXBIPanel(QDialog):
     _REWARDER_CARD_FACTORIES: ClassVar[dict[str, type[QWidget]]] = {
         RewarderEnum.RPI_GPIO: RPIGpioPumpCard,
         RewarderEnum.MOCK: MockRewarderCard,
@@ -51,7 +48,6 @@ class MXBIPanel(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self._accepted = False
         self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
         self._options = ConfigStore(get_options_session_path(), Options)
         self._panel_config = ConfigStore(get_mxbi_panel_config_path(), MXBIPanelConfig)
@@ -63,10 +59,7 @@ class MXBIPanel(QMainWindow):
     def _build_ui(self) -> None:
         self.setWindowTitle("MXBI Configuration Panel")
 
-        self._widget_main = QWidget()
-        self._layout_main = QVBoxLayout()
-        self._widget_main.setLayout(self._layout_main)
-        self.setCentralWidget(self._widget_main)
+        self._layout_main = QVBoxLayout(self)
 
         self.base_config = BaseConfig(self, self._options.value.mxbis)
         self._layout_main.addWidget(self.base_config)
@@ -137,9 +130,7 @@ class MXBIPanel(QMainWindow):
         self._collect_result()
         self._config.save()
         self._save_auto_accept_timeout()
-        self._accepted = True
-        self.close()
-        self.accepted.emit()
+        self.accept()
 
     def _save_auto_accept_timeout(self) -> None:
         self._panel_config.value.auto_accept_timeout_seconds = (
@@ -157,14 +148,12 @@ class MXBIPanel(QMainWindow):
         self._countdown.timeout.connect(self._on_continue)
 
     def _on_cancel(self) -> None:
-        self.close()
+        self.reject()
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
         self._start_auto_accept_countdown()
 
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def done(self, result: int) -> None:
         self._countdown.stop()
-        super().closeEvent(event)
-        if event.isAccepted() and not self._accepted:
-            self.rejected.emit()
+        super().done(result)
