@@ -7,16 +7,22 @@ from pymxbi.mxbi.factory import MXBIModel
 from mxbiflow import set_base_path
 from mxbiflow.bootstrap import init_gameloop
 from mxbiflow.core.config_store import ConfigStore
-from mxbiflow.core.path import get_mxbi_config_path, get_runtime_state_path
+from mxbiflow.core.path import (
+    get_log_path,
+    get_mxbi_config_path,
+    get_runtime_state_path,
+)
 from mxbiflow.infra.post_processing import HtmlComposer, session_overview, summarize
 from mxbiflow.models.session import RuntimeStateStore
 from mxbiflow.scene import SceneManager
 from mxbiflow.scene.idle.idle import IDLE
 from mxbiflow.ui import run_wizard
+from mxbiflow.utils.logger import setup_logging
 
 
 def main() -> None:
     set_base_path(Path.cwd())
+    setup_logging(log_file=get_log_path() / "mxbi.log")
 
     scene_manager = SceneManager()
     scene_manager.register([IDLE])

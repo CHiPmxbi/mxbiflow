@@ -1,5 +1,4 @@
 import pymxbi
-from loguru import logger
 from pymxbi import MXBIModel
 
 from .core.config_store import ConfigStore
@@ -13,6 +12,7 @@ from .gameloop.game import Game
 from .models.animal import Animal, StageState
 from .models.session import RuntimeStateStore, Session, SessionConfig, SessionState
 from .scene import SceneManager
+from .utils.logger import logger
 
 
 def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:

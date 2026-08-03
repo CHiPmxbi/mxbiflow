@@ -1,10 +1,10 @@
-from loguru import logger
 from pygame import Event
 from pymxbi.detector.detector import DetectorEvent
 
 from ..models.session import Session
 from ..scene import SceneManager
 from ..scene.idle.idle import IDLE
+from ..utils.logger import logger
 from .detector_bridge import EVT_DETECTOR, DetectorMsg
 
 
@@ -57,7 +57,7 @@ class Scheduler:
 
         msg: DetectorMsg = event.msg
         logger.debug(
-            "detector event received: kind={}, animal={}", msg.kind, msg.animal
+            "detector event received: kind=%s, animal=%s", msg.kind, msg.animal
         )
 
         match msg.kind:
