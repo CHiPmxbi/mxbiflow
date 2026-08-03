@@ -564,7 +564,6 @@ dependencies = [
     { name = "inflection" },
     { name = "jinja2" },
     { name = "keyring" },
-    { name = "loguru" },
     { name = "matplotlib" },
     { name = "mss" },
     { name = "numpy" },
@@ -583,8 +582,14 @@ dependencies = [
     { name = "varname" },
 ]
 
+[package.optional-dependencies]
+log = [
+    { name = "loguru" },
+]
+
 [package.dev-dependencies]
 dev = [
+    { name = "loguru" },
     { name = "pyright" },
     { name = "ruff" },
 ]
@@ -595,7 +600,7 @@ requires-dist = [
     { name = "inflection", specifier = ">=0.5.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "keyring", specifier = ">=25.6.0" },
-    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "loguru", marker = "extra == 'log'", specifier = ">=0.7.3" },
     { name = "matplotlib", specifier = ">=3.10.6" },
     { name = "mss", specifier = ">=10.1.0" },
     { name = "numpy", specifier = ">=2.3.3" },
@@ -613,9 +618,11 @@ requires-dist = [
     { name = "typer", specifier = ">=0.20.0" },
     { name = "varname", specifier = ">=0.15.0" },
 ]
+provides-extras = ["log"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "loguru", specifier = ">=0.7.3" },
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "ruff", specifier = ">=0.16.0" },
 ]

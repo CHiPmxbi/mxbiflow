@@ -135,7 +135,7 @@ class Game:
         screenshot_path = screenshot_dir / f"screen_{timestamp}.png"
 
         pygame.image.save(self._screen, screenshot_path)
-        logger.info("screen captured: {}", screenshot_path)
+        logger.info("screen captured: %s", screenshot_path)
 
     def quit(self) -> None:
         if self._scene_manager.current is not None:

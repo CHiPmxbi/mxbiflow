@@ -73,6 +73,34 @@ class MyScene:
     def draw(self, screen: Surface) -> None: ...
 ```
 
+## Logging
+
+mxbiflow never configures logging on import. For a batteries-included
+setup, enable the optional `log` extra and call `setup_logging()` once,
+then use loguru directly:
+
+```shell
+uv add mxbiflow[log]
+```
+
+```python
+from loguru import logger
+from mxbiflow.utils.logger import setup_logging
+
+setup_logging(level="DEBUG", log_file="log/mxbi.log")
+
+logger.info("session started: {}", session_id)
+```
+
+`setup_logging()` wires mxbiflow's records into loguru and configures its
+sinks (stderr, plus an optional rotating, JSON-serialized file log).
+Because loguru's logger is a global singleton, the `logger` you import
+above is the configured one — no instance is returned. The CLI
+(`python -m mxbiflow`) enables this setup automatically.
+
+Without loguru, the library stays silent: you can handle mxbiflow's
+records with your own standard-library handlers instead.
+
 ## Installation
 
 ```shell
