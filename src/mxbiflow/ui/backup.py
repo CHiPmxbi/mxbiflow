@@ -4,7 +4,7 @@ from pymotego import (
     BackupStatus,
     BackupTask,
 )
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 from ..infra.backup import BackupTaskRunner
@@ -67,9 +66,6 @@ class BackupPanel(QDialog):
         self._remaining_seconds = 0
 
         self._build_ui()
-        self.installEventFilter(self)
-        for widget in self.findChildren(QWidget):
-            widget.installEventFilter(self)
 
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(refresh_interval_ms)
@@ -132,9 +128,13 @@ class BackupPanel(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch()
+        self._stop_countdown_button = QPushButton("Stop countdown", self)
+        self._stop_countdown_button.setEnabled(False)
+        self._stop_countdown_button.clicked.connect(self._stop_auto_close)
+        buttons.addWidget(self._stop_countdown_button)
         self._close_button = QPushButton("Close", self)
+        self._close_button.setEnabled(False)
         self._close_button.clicked.connect(self.accept)
-        self._close_button.hide()
         buttons.addWidget(self._close_button)
         layout.addLayout(buttons)
 
@@ -202,6 +202,8 @@ class BackupPanel(QDialog):
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setValue(100)
         self._status_label.setText("Backup succeeded.")
+        self._stop_countdown_button.setEnabled(True)
+        self._close_button.setEnabled(True)
         if self._success_auto_close_ms > 0:
             self._start_countdown()
         self._auto_close_timer.start(self._success_auto_close_ms)
@@ -234,14 +236,8 @@ class BackupPanel(QDialog):
             return
         self._countdown_timer.stop()
         self._auto_close_timer.stop()
-        self._countdown_label.setText("Auto-close cancelled")
-        self._close_button.show()
+        self._stop_countdown_button.setEnabled(False)
         self._close_button.setFocus()
-
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.MouseButtonPress:
-            self._stop_auto_close()
-        return super().eventFilter(obj, event)
 
     def _show_failure(self, message: str) -> None:
         self._terminal_state_shown = True
@@ -251,7 +247,7 @@ class BackupPanel(QDialog):
         self._status_label.setText("Backup requires attention")
         self._error_label.setText(message)
         self._error_label.show()
-        self._close_button.show()
+        self._close_button.setEnabled(True)
         self._close_button.setFocus()
 
     def closeEvent(self, event: QCloseEvent) -> None:
