@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import socket
+
 from pymxbi import MXBIModel
 from pymxbi.screen import get_screen_size
 from PySide6.QtWidgets import (
@@ -13,7 +15,7 @@ from PySide6.QtWidgets import (
 
 
 class BaseConfig(QGroupBox):
-    def __init__(self, parent: QWidget | None, mxbi_options: list[str]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
 
         self.setTitle("Base config")
@@ -22,9 +24,8 @@ class BaseConfig(QGroupBox):
         self.setLayout(self._layout)
 
         self._label_mxbi = QLabel("mxbi id:")
-        self._combo_mxbi = QComboBox()
-        self._combo_mxbi.addItems(mxbi_options)
-        self._layout.addRow(self._label_mxbi, self._combo_mxbi)
+        self._value_mxbi = QLabel(self.mxbi_id)
+        self._layout.addRow(self._label_mxbi, self._value_mxbi)
 
         self._label_screen = QLabel("screen:")
         self._combo_screen = QComboBox()
@@ -43,7 +44,7 @@ class BaseConfig(QGroupBox):
 
     @property
     def mxbi_id(self) -> str:
-        return self._combo_mxbi.currentText()
+        return socket.gethostname()
 
     @property
     def screen_size(self) -> tuple[int, int]:
@@ -54,7 +55,6 @@ class BaseConfig(QGroupBox):
         return self._spin_auto_accept.value()
 
     def load_from_model(self, model: MXBIModel) -> None:
-        self._combo_mxbi.setCurrentText(model.mxbi_id)
         for i in range(self._combo_screen.count()):
             if self._combo_screen.itemData(i) == tuple(model.screen_size):
                 self._combo_screen.setCurrentIndex(i)
