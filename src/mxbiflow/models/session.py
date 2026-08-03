@@ -461,8 +461,3 @@ class Session(BaseModel):
             return animal_state.stages[stage]
         except KeyError as error:
             raise ValueError(f"stage {stage} not found") from error
-
-
-class Options(BaseModel):
-    experimenter: list[str] = Field(default_factory=list, frozen=True)
-    animals: dict[str, str] = Field(default_factory=dict, frozen=True)

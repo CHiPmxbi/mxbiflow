@@ -15,12 +15,12 @@ from PySide6.QtWidgets import (
 
 from ..core.config_store import ConfigStore
 from ..core.path import (
+    get_database_path,
     get_mxbi_config_path,
     get_mxbi_panel_config_path,
-    get_options_session_path,
 )
+from ..models.database import MXBIDatabase
 from ..models.panel import MXBIPanelConfig
-from ..models.session import Options
 from .components.baseconfig import BaseConfig
 from .components.countdown import AutoAcceptCountdown
 from .components.device_card import (
@@ -49,7 +49,7 @@ class MXBIPanel(QDialog):
     def __init__(self) -> None:
         super().__init__()
         self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
-        self._options = ConfigStore(get_options_session_path(), Options)
+        self._database = ConfigStore(get_database_path(), MXBIDatabase)
         self._panel_config = ConfigStore(get_mxbi_panel_config_path(), MXBIPanelConfig)
 
         self._build_ui()

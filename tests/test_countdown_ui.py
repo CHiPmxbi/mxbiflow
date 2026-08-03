@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -98,10 +98,15 @@ class PanelCountdownTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self._temporary_directory = tempfile.TemporaryDirectory()
+        self._home_patch = patch.dict(
+            os.environ, {"HOME": self._temporary_directory.name}
+        )
+        self._home_patch.start()
         set_base_path(Path(self._temporary_directory.name))
 
     def tearDown(self) -> None:
         self.application.processEvents()
+        self._home_patch.stop()
         self._temporary_directory.cleanup()
 
     def test_panels_start_counting_only_when_shown(self) -> None:

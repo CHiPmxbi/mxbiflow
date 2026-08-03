@@ -12,7 +12,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel
 
 from mxbiflow.core.path import get_mxbi_config_path, set_base_path
-from mxbiflow.models.session import Options
+from mxbiflow.models.database import MXBIDatabase
 from mxbiflow.ui.mxbi_panel import MXBIPanel
 
 
@@ -28,10 +28,15 @@ class BaseConfigTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self._temporary_directory = tempfile.TemporaryDirectory()
+        self._home_patch = patch.dict(
+            os.environ, {"HOME": self._temporary_directory.name}
+        )
+        self._home_patch.start()
         set_base_path(Path(self._temporary_directory.name))
 
     def tearDown(self) -> None:
         self.application.processEvents()
+        self._home_patch.stop()
         self._temporary_directory.cleanup()
 
     @patch("mxbiflow.ui.components.baseconfig.socket.gethostname")
@@ -57,7 +62,7 @@ class BaseConfigTests(unittest.TestCase):
         panel.close()
 
     def test_legacy_mxbis_option_is_ignored_and_not_exported(self) -> None:
-        options = Options.model_validate(
+        database = MXBIDatabase.model_validate(
             {
                 "mxbis": ["mxbi1"],
                 "experimenter": ["tester"],
@@ -65,7 +70,7 @@ class BaseConfigTests(unittest.TestCase):
             }
         )
 
-        exported = options.model_dump()
+        exported = database.model_dump()
         self.assertNotIn("mxbis", exported)
         self.assertEqual(exported["experimenter"], ["tester"])
         self.assertEqual(exported["animals"], {"abcd": "mouse"})

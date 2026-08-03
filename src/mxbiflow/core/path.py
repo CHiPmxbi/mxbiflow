@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 
 _base_path: Path | None = None
 
 CONFIG_SESSION_FILENAME = "session.json"
-OPTIONS_SESSION_FILENAME = "options.json"
+DATABASE_FILENAME = "db.json"
 MXBI_CONFIG_FILENAME = "mxbi.json"
 MXBI_PANEL_CONFIG_FILENAME = "mxbi_panel.json"
 CROSS_MODAL_CONFIG_FILENAME = "config_cross_modal.json"
@@ -36,8 +37,8 @@ def get_config_session_path() -> Path:
     return get_config_dir_path() / CONFIG_SESSION_FILENAME
 
 
-def get_options_session_path() -> Path:
-    return get_config_dir_path() / OPTIONS_SESSION_FILENAME
+def get_database_path() -> Path:
+    return Path(os.environ["HOME"]) / ".config" / "mxbi" / DATABASE_FILENAME
 
 
 def get_cross_modal_config_path() -> Path:
