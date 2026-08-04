@@ -36,8 +36,10 @@ def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:
     This function orchestrates the initialization of all core components
     required for the MXBI game loop to function.
     """
-    mxbi = build_mxbi()
+    mxbi_config = ConfigStore(get_mxbi_config_path(), MXBIModel).value
+    mxbi = build_mxbi(mxbi_config)
     session_config = ConfigStore(get_config_session_path(), SessionConfig).value
+    session_config = session_config.model_copy(update={"mxbi": mxbi_config})
     session = init_session(session_config)
 
     detector_bridge = DetectorBridge(
@@ -53,8 +55,7 @@ def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:
     )
 
 
-def build_mxbi() -> pymxbi.MXBI:
-    mxbi_config = ConfigStore(get_mxbi_config_path(), MXBIModel).value
+def build_mxbi(mxbi_config: MXBIModel) -> pymxbi.MXBI:
     return pymxbi.build_mxbi(mxbi_config, logger)
 
 
