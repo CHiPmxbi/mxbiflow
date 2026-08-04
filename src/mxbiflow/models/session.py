@@ -15,6 +15,7 @@ from pydantic import (
     field_serializer,
     model_validator,
 )
+from pymxbi import MXBIModel
 
 from .animal import (
     Animal,
@@ -45,6 +46,8 @@ class SessionConfig(BaseModel):
     fullscreen: bool = False
 
     animals: tuple[AnimalConfig, ...] = ()
+
+    mxbi: MXBIModel = Field(default_factory=MXBIModel)
 
     @model_validator(mode="after")
     def _validate_unknown_animal_as(self) -> SessionConfig:
@@ -235,6 +238,10 @@ class Session(BaseModel):
     @property
     def animals(self) -> Mapping[str, Animal]:
         return self.state.animals
+
+    @property
+    def mxbi_config(self) -> MXBIModel:
+        return self.config.mxbi
 
     @property
     def current_animal(self) -> Animal | None:
