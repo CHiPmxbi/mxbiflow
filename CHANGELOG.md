@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.17](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.16...v0.3.17) (2026-08-05)
+
+
+### Features
+
+* **api:** :sparkles: expose experiment scaffold API ([#110](https://github.com/CHiPmxbi/mxbiflow/issues/110)) ([e1f4a9c](https://github.com/CHiPmxbi/mxbiflow/commit/e1f4a9c8e3131a54ca23ef6b0566dec92652de1c))
+* **assets:** :sparkles: add ImageSprite and reorganize asset directories ([#118](https://github.com/CHiPmxbi/mxbiflow/issues/118)) ([52b3fcb](https://github.com/CHiPmxbi/mxbiflow/commit/52b3fcbe5a653b8a57dff02010eee6e25f35ca04))
+* **assets:** :sparkles: add pygame experiment widgets ([#98](https://github.com/CHiPmxbi/mxbiflow/issues/98)) ([6fc9897](https://github.com/CHiPmxbi/mxbiflow/commit/6fc98978b0f313f1494050c45bb76cb4e11abe6c))
+* **assets:** ✨ support configurable background colors ([#122](https://github.com/CHiPmxbi/mxbiflow/issues/122)) ([aa49d93](https://github.com/CHiPmxbi/mxbiflow/commit/aa49d93e67ff35360b4e06cc46944d1ca949c037))
+* **backup:** :sparkles: add backup task monitoring and progress UI ([#100](https://github.com/CHiPmxbi/mxbiflow/issues/100)) ([714647d](https://github.com/CHiPmxbi/mxbiflow/commit/714647d4ebb563b3270aeca01a3215a9baed87e2))
+* **crash-report:** :sparkles: add crash report generation with email notification ([#121](https://github.com/CHiPmxbi/mxbiflow/issues/121)) ([81f6221](https://github.com/CHiPmxbi/mxbiflow/commit/81f62216842f9400c65d00c642fe0557ec864581))
+* **driver:** :sparkles: integrate pymxbi hardware layer ([936d481](https://github.com/CHiPmxbi/mxbiflow/commit/936d481cf76d9bc5ba5487c425c05f3869fc0f47))
+* **driver:** ✨ integrate pymxbi hardware layer ([15522d0](https://github.com/CHiPmxbi/mxbiflow/commit/15522d0ba587681fef6e3b6486c4d9c1400a0aaf))
+* **session:** :sparkles: track stage data paths ([#123](https://github.com/CHiPmxbi/mxbiflow/issues/123)) ([471383d](https://github.com/CHiPmxbi/mxbiflow/commit/471383dea509f8dfdfa211b26a28c2c17b81021a))
+* **ui:** :sparkles: add session summary panel ([#113](https://github.com/CHiPmxbi/mxbiflow/issues/113)) ([7506f4e](https://github.com/CHiPmxbi/mxbiflow/commit/7506f4e19a5f911aebdcfec61e7d2d08f19ce2ea))
+* **ui:** ✨ run companion tasks in backup panel ([#124](https://github.com/CHiPmxbi/mxbiflow/issues/124)) ([325af5e](https://github.com/CHiPmxbi/mxbiflow/commit/325af5e2a0c27ef48223dbfb60e901774d554f4b))
+
+
+### Bug Fixes
+
+* **ui:** make countdown controls explicit ([#112](https://github.com/CHiPmxbi/mxbiflow/issues/112)) ([8e0e019](https://github.com/CHiPmxbi/mxbiflow/commit/8e0e019fc37a5b4ed8f3da57f9deeb29e4bb2d59))
+* **ui:** make panel countdowns independent ([#104](https://github.com/CHiPmxbi/mxbiflow/issues/104)) ([e833836](https://github.com/CHiPmxbi/mxbiflow/commit/e8338368a52921a941026f626e263e7b5d42050b))
+
 ## [0.3.16](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.15...v0.3.16) (2026-05-04)
 
 
