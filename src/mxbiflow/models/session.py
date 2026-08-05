@@ -73,6 +73,7 @@ class SessionState(ContextState):
     current_scene: str | None = None
     current_animal_name: str | None = None
     animals: dict[str, Animal] = Field(default_factory=dict)
+    stage_data_paths: dict[str, dict[str, Path]] = Field(default_factory=dict)
 
     @field_serializer("start_at", "end_at", when_used="json")
     def _serialize_timestamp(self, value: datetime | None) -> str | None:
@@ -173,6 +174,9 @@ class Session(BaseModel):
 
     _session_store: RuntimeStateStore | None = PrivateAttr(default=None)
     _snapshot_store: SessionSnapshotStore | None = PrivateAttr(default=None)
+    _animal_snapshot_stores: dict[str, SessionSnapshotStore] = PrivateAttr(
+        default_factory=dict
+    )
     _data_root: Path | None = PrivateAttr(default=None)
 
     @property
@@ -264,6 +268,54 @@ class Session(BaseModel):
             return None
         return self._data_root / self.state.data_path
 
+    @property
+    def data_root(self) -> Path | None:
+        return self._data_root
+
+    def animal_data_path(self, animal: str) -> Path:
+        if self.state.data_path is None:
+            raise RuntimeError("Session is not started")
+        if animal not in self.state.animals:
+            raise ValueError(f"animal {animal} not found")
+        return Path(animal) / self.state.data_path
+
+    def absolute_animal_data_path(self, animal: str) -> Path:
+        if self._data_root is None:
+            raise RuntimeError("Session is not started")
+        return self._data_root / self.animal_data_path(animal)
+
+    @property
+    def screenshot_data_path(self) -> Path:
+        if self.state.data_path is None:
+            raise RuntimeError("Session is not started")
+        return Path("screenshot") / self.state.data_path
+
+    @property
+    def absolute_screenshot_data_path(self) -> Path:
+        if self._data_root is None:
+            raise RuntimeError("Session is not started")
+        return self._data_root / self.screenshot_data_path
+
+    @property
+    def participant_data_paths(self) -> tuple[Path, ...]:
+        return tuple(
+            self.animal_data_path(animal) for animal in self._animal_snapshot_stores
+        )
+
+    @property
+    def stage_data_paths(self) -> Mapping[str, Mapping[str, Path]]:
+        return self.state.stage_data_paths
+
+    def register_stage_data_path(self, *, animal: str, stage: str) -> Path:
+        path = self.animal_data_path(animal) / stage
+        paths_by_animal = self.state.stage_data_paths.setdefault(stage, {})
+        if paths_by_animal.get(animal) == path:
+            return path
+
+        paths_by_animal[animal] = path
+        self.checkpoint()
+        return path
+
     def set_session_store(self, store: RuntimeStateStore) -> None:
         self._session_store = store
 
@@ -274,8 +326,11 @@ class Session(BaseModel):
         return self.model_dump(mode="json")
 
     def checkpoint(self) -> None:
+        snapshot = self.snapshot()
         if self._snapshot_store is not None:
-            self._snapshot_store.save(self.snapshot())
+            self._snapshot_store.save(snapshot)
+        for store in self._animal_snapshot_stores.values():
+            store.save(snapshot)
 
     def start(self, data_root: Path) -> None:
         if self.state.start_at is not None:
@@ -290,12 +345,6 @@ class Session(BaseModel):
             self.state.session_id
         )
 
-        absolute_data_path = self.absolute_data_path
-        assert absolute_data_path is not None
-        if self._snapshot_store is None:
-            self._snapshot_store = SessionSnapshotStore(
-                absolute_data_path / "session.json"
-            )
         self.checkpoint()
 
     def end(self) -> None:
@@ -343,7 +392,16 @@ class Session(BaseModel):
 
         self.state.current_animal_name = animal
         self._start_animal_session(next_animal)
+        if self._data_root is not None:
+            self._ensure_animal_snapshot_store(animal)
         self.checkpoint()
+
+    def _ensure_animal_snapshot_store(self, animal: str) -> None:
+        if animal in self._animal_snapshot_stores:
+            return
+        self._animal_snapshot_stores[animal] = SessionSnapshotStore(
+            self.absolute_animal_data_path(animal) / "session.json"
+        )
 
     def set_current_stage(self, stage: StageState | str) -> None:
         animal = self.require_current_animal()

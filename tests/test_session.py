@@ -407,8 +407,7 @@ class SessionModelTests(unittest.TestCase):
             session.set_current_animal("animal-1")
             session.add_trial()
 
-            data_path = session.absolute_data_path
-            assert data_path is not None
+            data_path = session.absolute_animal_data_path("animal-1")
             payload = json.loads(
                 (data_path / "session.json").read_text(encoding="utf-8")
             )
@@ -416,6 +415,58 @@ class SessionModelTests(unittest.TestCase):
             self.assertEqual(set(payload), {"config", "state"})
             self.assertEqual(payload["state"]["current_animal_name"], "animal-1")
             self.assertEqual(payload["state"]["animals"]["animal-1"]["trial_id"], 1)
+            self.assertEqual(
+                session.participant_data_paths,
+                (session.animal_data_path("animal-1"),),
+            )
+            absolute_data_path = session.absolute_data_path
+            assert absolute_data_path is not None
+            self.assertFalse((absolute_data_path / "session.json").exists())
+
+    def test_participant_snapshots_are_synchronized(self) -> None:
+        with TemporaryDirectory() as directory:
+            session = make_session()
+            second_config = AnimalConfig(
+                rfid_id="rfid-2",
+                name="animal-2",
+                stage="vocalization_discriminate",
+            )
+            second_stage = StageState(
+                stage_name=second_config.stage,
+                initial_level=second_config.level,
+                level=second_config.level,
+            )
+            session.config = session.config.model_copy(
+                update={"animals": (*session.config.animals, second_config)}
+            )
+            session.state.animals[second_config.name] = Animal(
+                config=second_config,
+                current_stage_name=second_stage.stage_name,
+                stages={second_stage.stage_name: second_stage},
+            )
+            session.start(Path(directory) / "data")
+
+            session.set_current_animal("animal-1")
+            session.add_trial()
+            session.set_current_animal("animal-2")
+            session.add_trial()
+            session.end()
+
+            first_path = session.absolute_animal_data_path("animal-1")
+            second_path = session.absolute_animal_data_path("animal-2")
+            first = json.loads((first_path / "session.json").read_text())
+            second = json.loads((second_path / "session.json").read_text())
+
+            self.assertEqual(first, second)
+            self.assertEqual(first["state"]["animals"]["animal-1"]["trial_id"], 1)
+            self.assertEqual(first["state"]["animals"]["animal-2"]["trial_id"], 1)
+            self.assertEqual(
+                session.participant_data_paths,
+                (
+                    session.animal_data_path("animal-1"),
+                    session.animal_data_path("animal-2"),
+                ),
+            )
 
     def test_invalid_context_access_and_state_transitions_fail_explicitly(self) -> None:
         session = make_session()

@@ -2,8 +2,10 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import Mock
 
 from mxbiflow.infra.data_logger import DataLogger, DataLoggerType
+from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import (
     RuntimeStateStore,
     Session,
@@ -13,9 +15,27 @@ from mxbiflow.models.session import (
 
 
 def make_session(*, session_id: int = 7) -> Session:
+    animal_config = AnimalConfig(
+        rfid_id="rfid-1",
+        name="animal-1",
+        stage="stage-1",
+    )
+    stage = StageState(stage_name="stage-1")
     return Session(
-        config=SessionConfig(),
-        state=SessionState(session_id=session_id),
+        config=SessionConfig(
+            unknown_animal_as=animal_config.name,
+            animals=(animal_config,),
+        ),
+        state=SessionState(
+            session_id=session_id,
+            animals={
+                animal_config.name: Animal(
+                    config=animal_config,
+                    current_stage_name=stage.stage_name,
+                    stages={stage.stage_name: stage},
+                )
+            },
+        ),
     )
 
 
@@ -55,46 +75,144 @@ class SessionDataPathTests(unittest.TestCase):
             assert isinstance(state, dict)
             self.assertEqual(state["data_path"], str(session.data_path))
 
-
-class DataLoggerTests(unittest.TestCase):
-    def test_loggers_share_the_session_data_path(self) -> None:
+    def test_derived_paths_keep_the_path_created_at_session_start(self) -> None:
         with TemporaryDirectory() as directory:
             session = make_session()
             session.start(Path(directory) / "data")
-            assert session.data_path is not None
-            absolute_data_path = session.absolute_data_path
-            assert absolute_data_path is not None
+            animal_path = session.animal_data_path("animal-1")
+            screenshot_path = session.screenshot_data_path
 
-            session_logger = DataLogger(
+            session.state.session_id += 1
+
+            self.assertEqual(session.animal_data_path("animal-1"), animal_path)
+            self.assertEqual(session.screenshot_data_path, screenshot_path)
+
+
+class DataLoggerTests(unittest.TestCase):
+    def test_logger_uses_animal_session_and_stage_path(self) -> None:
+        with TemporaryDirectory() as directory:
+            session = make_session()
+            session.start(Path(directory) / "data")
+
+            json_logger = DataLogger(
                 session=session,
-                filename="session",
+                animal="animal-1",
+                stage="stage-1",
+                filename="summary",
                 type=DataLoggerType.JSON,
             )
-            animal_logger = DataLogger(
+            jsonl_logger = DataLogger(
                 session=session,
-                filename="trials",
-                monkey="animal-1",
+                animal="animal-1",
+                stage="stage-1",
             )
 
-            self.assertEqual(
-                session_logger.path,
-                absolute_data_path / "session.json",
-            )
-            self.assertEqual(
-                animal_logger.path,
-                absolute_data_path / "animal-1" / "trials.jsonl",
-            )
-
-            session_logger.save({"session_id": session.session_id})
-            animal_logger.save({"trial_id": 1})
+            self.assertEqual(session.stage_data_paths, {})
 
             self.assertEqual(
-                json.loads(session_logger.path.read_text(encoding="utf-8")),
+                json_logger.path,
+                session.absolute_animal_data_path("animal-1")
+                / "stage-1"
+                / "summary.json",
+            )
+            self.assertEqual(
+                jsonl_logger.path,
+                session.absolute_animal_data_path("animal-1")
+                / "stage-1"
+                / "result.jsonl",
+            )
+
+            json_logger.save({"session_id": session.session_id})
+            jsonl_logger.save({"trial_id": 1})
+
+            self.assertEqual(
+                json.loads(json_logger.path.read_text(encoding="utf-8")),
                 {"session_id": session.session_id},
             )
             self.assertEqual(
-                animal_logger.path.read_text(encoding="utf-8"),
+                jsonl_logger.path.read_text(encoding="utf-8"),
                 '{"trial_id": 1}\n',
+            )
+            self.assertEqual(
+                session.stage_data_paths,
+                {
+                    "stage-1": {
+                        "animal-1": session.animal_data_path("animal-1") / "stage-1"
+                    }
+                },
+            )
+
+    def test_stage_path_is_registered_once_after_successful_save(self) -> None:
+        with TemporaryDirectory() as directory:
+            session = make_session()
+            session.start(Path(directory) / "data")
+            logger = DataLogger(
+                session=session,
+                animal="animal-1",
+                stage="stage-1",
+            )
+            snapshot_store = Mock()
+            session.set_snapshot_store(snapshot_store)
+
+            logger.save({"trial_id": 1})
+            logger.save({"trial_id": 2})
+
+            snapshot_store.save.assert_called_once()
+
+    def test_failed_save_does_not_register_stage_path(self) -> None:
+        with TemporaryDirectory() as directory:
+            session = make_session()
+            session.start(Path(directory) / "data")
+            logger = DataLogger(
+                session=session,
+                animal="animal-1",
+                stage="stage-1",
+            )
+
+            with self.assertRaises(TypeError):
+                logger.save({"invalid": object()})
+
+            self.assertEqual(session.stage_data_paths, {})
+
+    def test_csv_direct_save_registers_stage_path(self) -> None:
+        with TemporaryDirectory() as directory:
+            session = make_session()
+            session.start(Path(directory) / "data")
+            logger = DataLogger(
+                session=session,
+                animal="animal-1",
+                stage="stage-2",
+                type=DataLoggerType.CSV,
+            )
+
+            logger.save_csv_row({"trial_id": 1})
+
+            self.assertEqual(
+                session.stage_data_paths["stage-2"]["animal-1"],
+                session.animal_data_path("animal-1") / "stage-2",
+            )
+
+    def test_stage_paths_are_serialized_as_relative_strings(self) -> None:
+        with TemporaryDirectory() as directory:
+            session = make_session()
+            session.start(Path(directory) / "data")
+            DataLogger(
+                session=session,
+                animal="animal-1",
+                stage="stage-1",
+            ).save({"trial_id": 1})
+
+            state = session.snapshot()["state"]
+            assert isinstance(state, dict)
+            self.assertEqual(
+                state["stage_data_paths"],
+                {
+                    "stage-1": {
+                        "animal-1": str(
+                            session.animal_data_path("animal-1") / "stage-1"
+                        )
+                    }
+                },
             )
 
     def test_unstarted_session_is_rejected_without_creating_directories(
@@ -105,7 +223,7 @@ class DataLoggerTests(unittest.TestCase):
             session = make_session()
 
             with self.assertRaisesRegex(RuntimeError, "Session.start"):
-                DataLogger(session=session, filename="session")
+                DataLogger(session=session, animal="animal-1", stage="stage-1")
 
             self.assertFalse(data_root.exists())
 
