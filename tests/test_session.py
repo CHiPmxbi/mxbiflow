@@ -8,6 +8,7 @@ from unittest.mock import patch
 from pydantic import BaseModel, ValidationError
 
 from mxbiflow.bootstrap import init_session
+from mxbiflow.driver import MXBIModel
 from mxbiflow.models.animal import Animal, AnimalConfig, StageSnapshot, StageState
 from mxbiflow.models.session import (
     EmailRuntimeState,
@@ -60,6 +61,10 @@ def make_session() -> Session:
     )
     return Session(
         config=config,
+        mxbi_config=MXBIModel(
+            backup_source_root_id="source",
+            backup_destination_root_id="destination",
+        ),
         state=SessionState(animals={animal.name: animal}),
     )
 
@@ -177,6 +182,10 @@ class SessionModelTests(unittest.TestCase):
             stage="vocalization_discriminate",
             level=2,
         )
+        mxbi_config = MXBIModel(
+            backup_source_root_id="source",
+            backup_destination_root_id="destination",
+        )
 
         with patch(
             "mxbiflow.bootstrap.get_runtime_state_path",
@@ -186,11 +195,13 @@ class SessionModelTests(unittest.TestCase):
                 SessionConfig(
                     unknown_animal_as=animal_config.name,
                     animals=(animal_config,),
-                )
+                ),
+                mxbi_config,
             )
         animal = session.animals["animal-1"]
 
         self.assertIs(animal.config, session.config.animals[0])
+        self.assertIs(session.mxbi_config, mxbi_config)
         self.assertEqual(animal.rfid_id, "rfid-1")
         self.assertEqual(animal.name, "animal-1")
 

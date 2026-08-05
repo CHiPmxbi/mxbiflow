@@ -57,7 +57,7 @@ def _session_context(session: Session) -> str:
     """Summary of the session's animals."""
     try:
         animals = [
-            f"{animal.name} ({animal.current_stage.stage_name} level "
+            f"{animal.config.name} ({animal.current_stage.stage_name} level "
             f"{animal.current_stage.level}, trial {animal.trial_id})"
             for animal in session.animals.values()
         ]

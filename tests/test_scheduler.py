@@ -2,6 +2,7 @@ import unittest
 
 from pygame import Event, Surface
 
+from mxbiflow.driver import MXBIModel
 from mxbiflow.driver.detector.detector import DetectorEvent
 from mxbiflow.gameloop.detector_bridge import EVT_DETECTOR, DetectorMsg
 from mxbiflow.gameloop.scheduler import Scheduler
@@ -40,6 +41,10 @@ class SchedulerTests(unittest.TestCase):
             config=SessionConfig(
                 unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
+            ),
+            mxbi_config=MXBIModel(
+                backup_source_root_id="source",
+                backup_destination_root_id="destination",
             ),
             state=SessionState(animals={animal.name: animal}),
         )

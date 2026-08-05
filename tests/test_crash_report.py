@@ -12,7 +12,12 @@ from mxbiflow.models.session import Session, SessionConfig, SessionState
 
 def _make_session() -> Session:
     return Session(
-        config=SessionConfig(mxbi=MXBIModel(mxbi_id="mxbi5")),
+        config=SessionConfig(),
+        mxbi_config=MXBIModel(
+            mxbi_id="mxbi5",
+            backup_source_root_id="source",
+            backup_destination_root_id="destination",
+        ),
         state=SessionState(),
     )
 

@@ -10,7 +10,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPushButton, QSpinBox
 
-from mxbiflow.core.path import get_mxbi_panel_config_path, set_base_path
+from mxbiflow.core.path import (
+    get_mxbi_config_path,
+    get_mxbi_panel_config_path,
+    set_base_path,
+)
+from mxbiflow.driver import MXBIModel
 from mxbiflow.models.panel import MXBIPanelConfig
 from mxbiflow.scene import SceneManager
 from mxbiflow.ui.components.countdown import AutoAcceptCountdown
@@ -103,6 +108,15 @@ class PanelCountdownTests(unittest.TestCase):
         )
         self._home_patch.start()
         set_base_path(Path(self._temporary_directory.name))
+        config_path = get_mxbi_config_path()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            MXBIModel(
+                backup_source_root_id="source",
+                backup_destination_root_id="destination",
+            ).model_dump_json(indent=4),
+            encoding="utf-8",
+        )
 
     def tearDown(self) -> None:
         self.application.processEvents()

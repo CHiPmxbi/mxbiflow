@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..infra.backup import BackupTaskRunner
+from ..models.session import Session
 from .application import require_application
 
 _REFRESH_INTERVAL_MS = 250
@@ -103,6 +104,23 @@ def run_backup(
         success_auto_close_ms=success_auto_close_ms,
         task=task,
     ).exec()
+
+
+def run_session_backup(session: Session) -> None:
+    """Back up all data produced by a completed session."""
+    entries = list(session.participant_data_paths)
+    if not entries:
+        raise RuntimeError("Session has no data available for backup")
+
+    run_backup(
+        BackupSource(
+            root_id=session.mxbi_config.backup_source_root_id,
+            entries=tuple(path.as_posix() for path in entries),
+        ),
+        BackupDestination(
+            root_id=session.mxbi_config.backup_destination_root_id,
+        ),
+    )
 
 
 class BackupPanel(QDialog):

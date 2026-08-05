@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock
 
+from mxbiflow.driver import MXBIModel
 from mxbiflow.infra.data_logger import DataLogger, DataLoggerType
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import (
@@ -25,6 +26,10 @@ def make_session(*, session_id: int = 7) -> Session:
         config=SessionConfig(
             unknown_animal_as=animal_config.name,
             animals=(animal_config,),
+        ),
+        mxbi_config=MXBIModel(
+            backup_source_root_id="source",
+            backup_destination_root_id="destination",
         ),
         state=SessionState(
             session_id=session_id,
