@@ -1,8 +1,8 @@
 import unittest
 
 from pygame import Event, Surface
-from pymxbi.detector.detector import DetectorEvent
 
+from mxbiflow.driver.detector.detector import DetectorEvent
 from mxbiflow.gameloop.detector_bridge import EVT_DETECTOR, DetectorMsg
 from mxbiflow.gameloop.scheduler import Scheduler
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState

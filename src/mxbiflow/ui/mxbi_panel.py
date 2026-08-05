@@ -1,8 +1,5 @@
 from typing import ClassVar
 
-from pymxbi import MXBIModel
-from pymxbi.detector import DetectorEnum, DetectorModel
-from pymxbi.rewarder import RewarderEnum, RewarderModel
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
@@ -12,6 +9,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from mxbiflow.driver import MXBIModel
+from mxbiflow.driver.detector import DetectorEnum, DetectorModel
+from mxbiflow.driver.rewarder import RewarderEnum, RewarderModel
 
 from ..core.config_store import ConfigStore
 from ..core.path import (

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pymxbi import MXBI
+from mxbiflow.driver import MXBI
 
 from ..infra.timer import FrameTimer
 from ..models.session import Session

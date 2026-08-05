@@ -2,7 +2,8 @@ from datetime import UTC, datetime
 
 import pygame
 from pygame import Event
-from pymxbi import MXBI
+
+from mxbiflow.driver import MXBI
 
 from ..core.context import MXBIFlow, set_mxbiflow
 from ..core.path import get_data_dir_path

@@ -3,9 +3,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from pymotego import EmailAttachment
-from pymxbi import MXBIModel
 
 from mxbiflow.core.path import set_base_path
+from mxbiflow.driver import MXBIModel
 from mxbiflow.infra import build_crash_report
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 

@@ -1,4 +1,4 @@
-from pymxbi.rewarder import MockRewarderModel
+from mxbiflow.driver.rewarder import MockRewarderModel
 
 from ..device_card import DeviceCard
 

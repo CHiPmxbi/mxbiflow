@@ -1,7 +1,7 @@
 [project]
 name = "mxbiflow"
 version = "0.3.16"
-description = "mxbiflow is a toolkit based on pygame and pymxbi"
+description = "Framework and hardware drivers for MXBI behavioral experiments"
 readme = "README.md"
 authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
 requires-python = ">=3.14"
@@ -12,19 +12,21 @@ dependencies = [
     "keyring>=25.6.0",
     "matplotlib>=3.10.6",
     "mss>=10.1.0",
-    "numpy>=2.3.3",
+    "numpy>=2.4.1",
     "pandas>=2.3.2",
     "pillow>=11.3.0",
-    "pydantic>=2.11.7",
+    "pydantic>=2.12.5",
     "pygame-ce>=2.5.6",
+    "pyglet>=2.1.13",
     "pymotego>=0.1.6",
-    "pymxbi>=0.3.7",
     "pyserial>=3.5",
     "pyside6>=6.10.1",
     "qtawesome>=1.4.1",
     "rich>=14.1.0",
+    "sounddevice>=0.5.3",
+    "soundfile>=0.13.1",
     "stamina>=26.1.0",
-    "typer>=0.20.0",
+    "typer>=0.21.1",
     "varname>=0.15.0",
 ]
 
@@ -41,6 +43,9 @@ exclude = ["src/mxbiflow/tasks"]
 extraPaths = ["src"]
 typeCheckingMode = "basic"
 reportPrivateUsage = "error"
+
+[tool.ruff]
+extend-exclude = ["src/mxbiflow/tasks"]
 
 [project.scripts]
 mxbi = "mxbi:main"

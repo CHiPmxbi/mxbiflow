@@ -49,8 +49,7 @@ def _environment_summary() -> str:
         f"Python: {python_version()}\n"
         f"Platform: {platform()}\n"
         f"mxbiflow: {_package_version('mxbiflow')}\n"
-        f"pymotego: {_package_version('pymotego')}\n"
-        f"pymxbi: {_package_version('pymxbi')}"
+        f"pymotego: {_package_version('pymotego')}"
     )
 
 

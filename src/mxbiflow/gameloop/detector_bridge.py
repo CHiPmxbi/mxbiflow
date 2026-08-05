@@ -3,8 +3,9 @@ from queue import Empty, SimpleQueue
 
 import pygame
 from pygame import Event, event
-from pymxbi.detector import MockDetector
-from pymxbi.detector.detector import DetectionResult, Detector, DetectorEvent
+
+from mxbiflow.driver.detector import MockDetector
+from mxbiflow.driver.detector.detector import DetectionResult, Detector, DetectorEvent
 
 EVT_DETECTOR = pygame.USEREVENT + 1
 
