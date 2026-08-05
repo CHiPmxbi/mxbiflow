@@ -2,7 +2,6 @@ from pathlib import Path
 
 from . import get_mxbiflow, set_base_path
 from .bootstrap import init_gameloop
-from .core.path import get_log_path
 from .infra import send_crash_report
 from .models.session import Session
 from .scene import SceneManager
@@ -13,8 +12,7 @@ from .utils.logger import setup_logging
 
 def main() -> None:
     set_base_path(Path.cwd())
-    log_file = get_log_path() / "mxbi.log"
-    setup_logging(log_file=log_file)
+    setup_logging()
 
     scene_manager = SceneManager()
     scene_manager.register([IDLE])
@@ -27,7 +25,7 @@ def main() -> None:
         game.play()
         run_session_post_processing(session, {})
     except Exception as exc:
-        send_crash_report(exc, session, log_file)
+        send_crash_report(exc, session)
         raise
 
 

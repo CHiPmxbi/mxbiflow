@@ -16,10 +16,18 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from loguru import logger
 from pymotego import EmailAttachment, EmailClient
 
+from ..core.path import get_default_log_file_path
 from ..models.session import Session
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _MAX_LOG_BYTES = 512 * 1024
+
+
+class _DefaultLogFile:
+    pass
+
+
+_DEFAULT_LOG_FILE = _DefaultLogFile()
 
 
 @dataclass(frozen=True)
@@ -131,7 +139,7 @@ def build_crash_report(
 def send_crash_report(
     exc: BaseException,
     session: Session | None,
-    log_file: Path | None = None,
+    log_file: Path | None | _DefaultLogFile = _DEFAULT_LOG_FILE,
 ) -> None:
     """Send a crash report without masking the original exception."""
     if session is None:
@@ -139,7 +147,12 @@ def send_crash_report(
         return
 
     try:
-        report = build_crash_report(exc, session, log_file)
+        resolved_log_file = (
+            get_default_log_file_path()
+            if isinstance(log_file, _DefaultLogFile)
+            else log_file
+        )
+        report = build_crash_report(exc, session, resolved_log_file)
         with EmailClient() as client:
             client.send(
                 subject=report.subject,

@@ -8,6 +8,7 @@ DATABASE_FILENAME = "db.json"
 MXBI_CONFIG_FILENAME = "mxbi.json"
 MXBI_PANEL_CONFIG_FILENAME = "mxbi_panel.json"
 CROSS_MODAL_CONFIG_FILENAME = "config_cross_modal.json"
+DEFAULT_LOG_FILENAME = "mxbi.log"
 
 
 def set_base_path(path: Path | str) -> None:
@@ -51,6 +52,10 @@ def get_data_dir_path() -> Path:
 
 def get_log_path() -> Path:
     return get_base_path() / "log"
+
+
+def get_default_log_file_path() -> Path:
+    return get_log_path() / DEFAULT_LOG_FILENAME
 
 
 def get_internal_state_path() -> Path:
