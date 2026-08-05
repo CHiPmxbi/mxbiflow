@@ -1,5 +1,5 @@
 from .backup import BackupMonitoringError, BackupTaskRunner
-from .crash_report import CrashReport, build_crash_report
+from .crash_report import CrashReport, build_crash_report, send_crash_report
 from .data_logger import DataLogger, DataLoggerType
 from .eventbus import EventBus, event_bus
 from .timer import FrameTimer
@@ -14,4 +14,5 @@ __all__ = [
     "FrameTimer",
     "build_crash_report",
     "event_bus",
+    "send_crash_report",
 ]
