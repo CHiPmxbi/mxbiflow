@@ -1,12 +1,14 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from pymotego import EmailAttachment
 
 from mxbiflow.core.path import set_base_path
 from mxbiflow.driver import MXBIModel
-from mxbiflow.infra import build_crash_report
+from mxbiflow.infra import build_crash_report, send_crash_report
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 
 
@@ -61,6 +63,58 @@ class BuildCrashReportTests(unittest.TestCase):
 
         self.assertIn("&lt;script&gt;", report.html_body)
         self.assertNotIn("<script>alert", report.html_body)
+
+
+class SendCrashReportTests(unittest.TestCase):
+    @patch("mxbiflow.infra.crash_report.EmailClient")
+    @patch("mxbiflow.infra.crash_report.build_crash_report")
+    def test_sends_built_report(
+        self,
+        build_report: Mock,
+        email_client_cls: Mock,
+    ) -> None:
+        report = SimpleNamespace(
+            subject="mxbi5 Crash Report",
+            html_body="<html>boom</html>",
+            attachments=(),
+        )
+        build_report.return_value = report
+        email_client = email_client_cls.return_value.__enter__.return_value
+        error = RuntimeError("boom")
+        session = _make_session()
+        log_file = Path("mxbi.log")
+
+        send_crash_report(error, session, log_file)
+
+        build_report.assert_called_once_with(error, session, log_file)
+        email_client.send.assert_called_once_with(
+            subject=report.subject,
+            html_body=report.html_body,
+            attachments=report.attachments,
+        )
+
+    @patch("mxbiflow.infra.crash_report.EmailClient", side_effect=RuntimeError)
+    @patch("mxbiflow.infra.crash_report.build_crash_report", return_value=Mock())
+    def test_send_failure_is_suppressed(
+        self,
+        _build_report: Mock,
+        _email_client_cls: Mock,
+    ) -> None:
+        send_crash_report(ValueError("original"), _make_session())
+
+    @patch("mxbiflow.infra.crash_report.logger.warning")
+    @patch("mxbiflow.infra.crash_report.build_crash_report")
+    def test_missing_session_skips_report(
+        self,
+        build_report: Mock,
+        warning: Mock,
+    ) -> None:
+        send_crash_report(RuntimeError("boom"), None)
+
+        build_report.assert_not_called()
+        warning.assert_called_once_with(
+            "crash before session init; skipping crash report"
+        )
 
 
 if __name__ == "__main__":

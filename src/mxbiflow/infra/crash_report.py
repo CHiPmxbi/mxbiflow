@@ -13,7 +13,8 @@ from pathlib import Path
 from platform import platform, python_version
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from pymotego import EmailAttachment
+from loguru import logger
+from pymotego import EmailAttachment, EmailClient
 
 from ..models.session import Session
 
@@ -125,3 +126,26 @@ def build_crash_report(
         html_body=composer.html,
         attachments=(attachment,) if attachment is not None else (),
     )
+
+
+def send_crash_report(
+    exc: BaseException,
+    session: Session | None,
+    log_file: Path | None = None,
+) -> None:
+    """Send a crash report without masking the original exception."""
+    if session is None:
+        logger.warning("crash before session init; skipping crash report")
+        return
+
+    try:
+        report = build_crash_report(exc, session, log_file)
+        with EmailClient() as client:
+            client.send(
+                subject=report.subject,
+                html_body=report.html_body,
+                attachments=report.attachments,
+            )
+        logger.info("crash report sent: {}", report.subject)
+    except Exception:  # noqa: BLE001 - never mask the original exception
+        logger.exception("failed to send crash report email")
