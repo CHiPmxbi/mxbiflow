@@ -5,10 +5,13 @@ import subprocess
 import sys
 import textwrap
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, cast
 
 from loguru import logger as loguru_logger
 
+from mxbiflow.core.path import get_default_log_file_path, set_base_path
 from mxbiflow.utils.logger import logger, setup_logging
 
 
@@ -55,13 +58,25 @@ class LoggerTests(unittest.TestCase):
         """setup_logging() must route stdlib records through loguru."""
         records: list[str] = []
 
-        setup_logging(level="DEBUG")
+        setup_logging(level="DEBUG", log_file=None)
         loguru_logger.remove()
         loguru_logger.add(records.append, format="{message}")
 
         logger.info("bridged %s", "record")
 
         self.assertEqual([m.rstrip("\n") for m in records], ["bridged record"])
+
+    def test_setup_logging_uses_default_log_file(self) -> None:
+        with TemporaryDirectory() as directory:
+            set_base_path(directory)
+
+            setup_logging(level="INFO")
+            loguru_logger.info("default file record")
+
+            log_file = Path(directory) / "log" / "mxbi.log"
+            self.assertEqual(get_default_log_file_path(), log_file)
+            self.assertIn("default file record", log_file.read_text(encoding="utf-8"))
+            loguru_logger.remove()
 
     def test_default_records_reach_user_stdlib_handler(self) -> None:
         """Without setup_logging(), user stdlib handlers still receive records."""

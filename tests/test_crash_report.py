@@ -93,6 +93,40 @@ class SendCrashReportTests(unittest.TestCase):
             attachments=report.attachments,
         )
 
+    @patch("mxbiflow.infra.crash_report.get_default_log_file_path")
+    @patch("mxbiflow.infra.crash_report.EmailClient")
+    @patch("mxbiflow.infra.crash_report.build_crash_report")
+    def test_uses_default_log_file_when_omitted(
+        self,
+        build_report: Mock,
+        _email_client_cls: Mock,
+        get_default_log_file_path: Mock,
+    ) -> None:
+        error = RuntimeError("boom")
+        session = _make_session()
+        get_default_log_file_path.return_value = Path("log/mxbi.log")
+
+        send_crash_report(error, session)
+
+        build_report.assert_called_once_with(error, session, Path("log/mxbi.log"))
+
+    @patch("mxbiflow.infra.crash_report.get_default_log_file_path")
+    @patch("mxbiflow.infra.crash_report.EmailClient")
+    @patch("mxbiflow.infra.crash_report.build_crash_report")
+    def test_explicit_none_disables_log_attachment(
+        self,
+        build_report: Mock,
+        _email_client_cls: Mock,
+        get_default_log_file_path: Mock,
+    ) -> None:
+        error = RuntimeError("boom")
+        session = _make_session()
+
+        send_crash_report(error, session, log_file=None)
+
+        get_default_log_file_path.assert_not_called()
+        build_report.assert_called_once_with(error, session, None)
+
     @patch("mxbiflow.infra.crash_report.EmailClient", side_effect=RuntimeError)
     @patch("mxbiflow.infra.crash_report.build_crash_report", return_value=Mock())
     def test_send_failure_is_suppressed(

@@ -22,11 +22,20 @@ import logging
 import sys
 from pathlib import Path
 
+from ..core.path import get_default_log_file_path
+
 #: The logger used across mxbiflow. A :class:`logging.NullHandler` is
 #: attached so importing the library never emits "no handler" warnings;
 #: the host application remains free to add its own handlers.
 logger = logging.getLogger("mxbiflow")
 logger.addHandler(logging.NullHandler())
+
+
+class _DefaultLogFile:
+    pass
+
+
+_DEFAULT_LOG_FILE = _DefaultLogFile()
 
 
 class InterceptHandler(logging.Handler):
@@ -65,7 +74,7 @@ class InterceptHandler(logging.Handler):
 def setup_logging(
     *,
     level: str | int = "DEBUG",
-    log_file: str | Path | None = None,
+    log_file: str | Path | None | _DefaultLogFile = _DEFAULT_LOG_FILE,
     rotation: str = "10 MB",
     retention: str = "7 days",
     compression: str = "zip",
@@ -79,8 +88,8 @@ def setup_logging(
     - attaches an :class:`InterceptHandler` to the root stdlib logger so
       mxbiflow's records are re-emitted through loguru;
     - resets loguru's global configuration and adds a stderr sink;
-    - optionally adds a rotating file sink (``log_file``), mirroring the
-      behaviour of the former ``init_logger()``.
+    - adds a rotating file sink at mxbiflow's default log path unless
+      ``log_file=None`` explicitly disables it.
 
     After calling this, ``from loguru import logger`` gives you the
     configured logger — loguru's logger is a global singleton, so no
@@ -108,9 +117,14 @@ def setup_logging(
     loguru_logger.remove()
     loguru_logger.add(sys.stderr, level=level)
 
-    if log_file is not None:
+    resolved_log_file = (
+        get_default_log_file_path()
+        if isinstance(log_file, _DefaultLogFile)
+        else log_file
+    )
+    if resolved_log_file is not None:
         loguru_logger.add(
-            str(log_file),
+            str(resolved_log_file),
             rotation=rotation,
             retention=retention,
             compression=compression,
