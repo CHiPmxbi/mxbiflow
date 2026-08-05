@@ -1,12 +1,11 @@
-import pymxbi
-from pymxbi import MXBIModel
-
 from .core.config_store import ConfigStore
 from .core.path import (
     get_config_session_path,
     get_mxbi_config_path,
     get_runtime_state_path,
 )
+from .driver import MXBI, MXBIModel
+from .driver import build_mxbi as build_driver_mxbi
 from .gameloop.detector_bridge import DetectorBridge
 from .gameloop.game import Game
 from .models.animal import Animal, StageState
@@ -55,8 +54,8 @@ def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:
     )
 
 
-def build_mxbi(mxbi_config: MXBIModel) -> pymxbi.MXBI:
-    return pymxbi.build_mxbi(mxbi_config, logger)
+def build_mxbi(mxbi_config: MXBIModel) -> MXBI:
+    return build_driver_mxbi(mxbi_config, logger)
 
 
 def init_session(session_config: SessionConfig) -> Session:

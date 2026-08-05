@@ -571,12 +571,14 @@ dependencies = [
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pygame-ce" },
+    { name = "pyglet" },
     { name = "pymotego" },
-    { name = "pymxbi" },
     { name = "pyserial" },
     { name = "pyside6" },
     { name = "qtawesome" },
     { name = "rich" },
+    { name = "sounddevice" },
+    { name = "soundfile" },
     { name = "stamina" },
     { name = "typer" },
     { name = "varname" },
@@ -603,19 +605,21 @@ requires-dist = [
     { name = "loguru", marker = "extra == 'log'", specifier = ">=0.7.3" },
     { name = "matplotlib", specifier = ">=3.10.6" },
     { name = "mss", specifier = ">=10.1.0" },
-    { name = "numpy", specifier = ">=2.3.3" },
+    { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "pillow", specifier = ">=11.3.0" },
-    { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pygame-ce", specifier = ">=2.5.6" },
+    { name = "pyglet", specifier = ">=2.1.13" },
     { name = "pymotego", editable = "/Users/ccccr/repo/projects/cogmote/cogmote/pymoteGO" },
-    { name = "pymxbi", specifier = ">=0.3.7" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyside6", specifier = ">=6.10.1" },
     { name = "qtawesome", specifier = ">=1.4.1" },
     { name = "rich", specifier = ">=14.1.0" },
+    { name = "sounddevice", specifier = ">=0.5.3" },
+    { name = "soundfile", specifier = ">=0.13.1" },
     { name = "stamina", specifier = ">=26.1.0" },
-    { name = "typer", specifier = ">=0.20.0" },
+    { name = "typer", specifier = ">=0.21.1" },
     { name = "varname", specifier = ">=0.15.0" },
 ]
 provides-extras = ["log"]
@@ -737,18 +741,6 @@ wheels = [
 ]
 
 [[package]]
-name = "prompt-toolkit"
-version = "3.0.52"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "wcwidth" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/96/06e01a7b38dce6fe1db213e061a4602dd6032a8a97ef6c1a862537732421/prompt_toolkit-3.0.52.tar.gz", hash = "sha256:28cde192929c8e7321de85de1ddbe736f1375148b02f2e17edd840042b1be855", size = 434198, upload-time = "2025-08-27T15:24:02.057Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl", hash = "sha256:9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955", size = 391431, upload-time = "2025-08-27T15:23:59.498Z" },
-]
-
-[[package]]
 name = "pycparser"
 version = "3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -867,29 +859,6 @@ requires-dist = [
 dev = [
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "ruff", specifier = ">=0.16.0" },
-]
-
-[[package]]
-name = "pymxbi"
-version = "0.3.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "gpiozero" },
-    { name = "loguru" },
-    { name = "numpy" },
-    { name = "prompt-toolkit" },
-    { name = "pydantic" },
-    { name = "pyglet" },
-    { name = "pymotego" },
-    { name = "pyserial" },
-    { name = "rich" },
-    { name = "sounddevice" },
-    { name = "soundfile" },
-    { name = "typer" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/db/ac/fd3a1a77543613b2ab03cbdad901d0d5b799880274ddb54019138d6be333/pymxbi-0.3.7.tar.gz", hash = "sha256:f6a988d55af33ee689f543dcefa34bcd05e404af6905469574a86c5ed4cb0afe", size = 29891, upload-time = "2026-04-01T12:25:45.619Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/ed/718cb47a8321ade35a0ef1e13fd0f337ce4e3e716721a2f7c5eefe4e3055/pymxbi-0.3.7-py3-none-any.whl", hash = "sha256:89cfccc08a4321c618ebb4d65abd887ab7cebd7c7e3261e0ab68657e3c7a35eb", size = 50217, upload-time = "2026-04-01T12:25:46.319Z" },
 ]
 
 [[package]]
@@ -1248,15 +1217,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5c/a8/a5603b66d4d9d038b20207ac52fc6db0a34a6afed8a89ecbc95ee80dea35/varname-0.15.1.tar.gz", hash = "sha256:cf1b9aa38197f4df5ad9bd9db32ce0439aa6b43e24456fe5d20ad352a8014ade", size = 27692, upload-time = "2025-12-01T15:54:43.069Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/4a/c6fd02a642bbe4e9f25cdd3714a328e3fc3eb6bd7b5e96f1a2285bd928b9/varname-0.15.1-py3-none-any.whl", hash = "sha256:291a71ea6f88328a9a2ee2f7badcc9075dd69afa93f1463ccc2657aef54d2ea1", size = 25620, upload-time = "2025-12-01T15:54:42.242Z" },
-]
-
-[[package]]
-name = "wcwidth"
-version = "0.6.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/35/a2/8e3becb46433538a38726c948d3399905a4c7cabd0df578ede5dc51f0ec2/wcwidth-0.6.0.tar.gz", hash = "sha256:cdc4e4262d6ef9a1a57e018384cbeb1208d8abbc64176027e2c2455c81313159", size = 159684, upload-time = "2026-02-06T19:19:40.919Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/5a/199c59e0a824a3db2b89c5d2dade7ab5f9624dbf6448dc291b46d5ec94d3/wcwidth-0.6.0-py3-none-any.whl", hash = "sha256:1a3a1e510b553315f8e146c54764f4fb6264ffad731b3d78088cdb1478ffbdad", size = 94189, upload-time = "2026-02-06T19:19:39.646Z" },
 ]
 
 [[package]]

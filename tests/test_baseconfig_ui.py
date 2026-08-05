@@ -6,12 +6,12 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from pymxbi import MXBIModel
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel
 
 from mxbiflow.core.path import get_mxbi_config_path, set_base_path
+from mxbiflow.driver import MXBIModel
 from mxbiflow.models.database import MXBIDatabase
 from mxbiflow.ui.mxbi_panel import MXBIPanel
 

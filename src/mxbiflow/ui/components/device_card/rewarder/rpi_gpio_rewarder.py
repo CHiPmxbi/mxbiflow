@@ -1,9 +1,10 @@
-from pymxbi.rewarder import GPIORewarderModel
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
 )
+
+from mxbiflow.driver.rewarder import GPIORewarderModel
 
 from ..device_card import DeviceCard
 

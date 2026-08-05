@@ -1,5 +1,6 @@
 from pygame import Event
-from pymxbi.detector.detector import DetectorEvent
+
+from mxbiflow.driver.detector.detector import DetectorEvent
 
 from ..models.session import Session
 from ..scene import SceneManager

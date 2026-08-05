@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import cast
 
-from pymxbi.detector import DetectorModel
-from pymxbi.rewarder import RewarderModel
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -14,6 +12,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QWidget,
 )
+
+from mxbiflow.driver.detector import DetectorModel
+from mxbiflow.driver.rewarder import RewarderModel
 
 from .device_card.device_card import DeviceCard
 from .dialog.add_devices_dialog import AddDeviceDialog

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import socket
 
-from pymxbi import MXBIModel
-from pymxbi.screen import get_screen_size
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -12,6 +10,9 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QWidget,
 )
+
+from mxbiflow.driver import MXBIModel
+from mxbiflow.driver.screen import get_screen_size
 
 
 class BaseConfig(QGroupBox):

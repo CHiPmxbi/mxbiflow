@@ -15,7 +15,8 @@ from pydantic import (
     field_serializer,
     model_validator,
 )
-from pymxbi import MXBIModel
+
+from mxbiflow.driver import MXBIModel
 
 from .animal import (
     Animal,

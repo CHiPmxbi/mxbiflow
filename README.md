@@ -25,14 +25,12 @@ mxbiflow provides the core infrastructure for cognitive and behavioral experimen
 │                                                         │
 │  ConfigStore ◄──── JSON config files                    │
 │  DataLogger  ────► session data output                  │
+│                                                         │
+│  Driver Layer                                           │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ RFID / Rewarder / Detector / Audio / Peripherals │  │
+│  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌───────────────────┐
-│     pymxbi        │
-│  RFID / Rewarder  │
-│  Detector / Audio │
-└───────────────────┘
 ```
 
 ## Usage
@@ -107,7 +105,18 @@ records with your own standard-library handlers instead.
 uv add mxbiflow
 ```
 
+Hardware interfaces and drivers are available under `mxbiflow.driver`:
+
+```python
+from mxbiflow.driver import MXBI, MXBIModel
+from mxbiflow.driver.detector import DetectorEvent
+```
+
+The former `pymxbi` package is now part of mxbiflow. Replace imports such as
+`pymxbi.detector` with `mxbiflow.driver.detector`; no compatibility namespace
+is installed.
+
 ## Requirements
 
 - Python 3.14+
-- pygame-ce, PySide6, pymxbi
+- pygame-ce and PySide6

@@ -1,9 +1,10 @@
-from pymxbi.detector import RFIDContinuousDetectorModel
 from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QLineEdit,
 )
+
+from mxbiflow.driver.detector import RFIDContinuousDetectorModel
 
 from .....utils.serial import get_all_ports, get_baudrates
 from ..device_card import DeviceCard

@@ -2,7 +2,8 @@ from datetime import UTC
 from pathlib import Path
 
 from pymotego.email import EmailClient
-from pymxbi.mxbi.factory import MXBIModel
+
+from mxbiflow.driver.mxbi.factory import MXBIModel
 
 from . import set_base_path
 from .bootstrap import init_gameloop

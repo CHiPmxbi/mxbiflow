@@ -1,4 +1,4 @@
-from pymxbi.detector import MockDetectorModel
+from mxbiflow.driver.detector import MockDetectorModel
 
 from ..device_card import DeviceCard
 

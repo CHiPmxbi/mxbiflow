@@ -110,14 +110,14 @@ class SessionSummaryPanelTests(unittest.TestCase):
         self.assertEqual(len(tables), 2)
         self.assertTrue(all(table.rowCount() == 0 for table in tables))
 
-    def test_upload_accepts_and_cancel_rejects(self) -> None:
+    def test_continue_accepts_and_cancel_rejects(self) -> None:
         panel = SessionSummaryPanel(make_summary())
         buttons = {button.text(): button for button in panel.findChildren(QPushButton)}
         self.assertEqual(buttons["Cancel"].minimumHeight(), 0)
-        self.assertEqual(buttons["Upload"].minimumHeight(), 0)
-        self.assertFalse(buttons["Upload"].isDefault())
+        self.assertEqual(buttons["Continue"].minimumHeight(), 0)
+        self.assertFalse(buttons["Continue"].isDefault())
 
-        QTest.mouseClick(buttons["Upload"], Qt.MouseButton.LeftButton)
+        QTest.mouseClick(buttons["Continue"], Qt.MouseButton.LeftButton)
         self.assertEqual(panel.result(), SessionSummaryPanel.DialogCode.Accepted)
 
         panel = SessionSummaryPanel(make_summary())
@@ -153,12 +153,12 @@ class SessionSummaryPanelTests(unittest.TestCase):
 
         self.assertFalse(countdown.is_active())
         self.assertEqual(panel.result(), SessionSummaryPanel.DialogCode.Rejected)
-        upload_button = next(
+        continue_button = next(
             button
             for button in panel.findChildren(QPushButton)
-            if button.text() == "Upload"
+            if button.text() == "Continue"
         )
-        QTest.mouseClick(upload_button, Qt.MouseButton.LeftButton)
+        QTest.mouseClick(continue_button, Qt.MouseButton.LeftButton)
         self.assertEqual(panel.result(), SessionSummaryPanel.DialogCode.Accepted)
 
     def test_tables_show_two_rows_and_scroll_when_data_overflows(self) -> None:

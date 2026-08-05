@@ -1,5 +1,6 @@
-from pymxbi.detector import BeamBreakContinuousDetectorModel
 from PySide6.QtWidgets import QLabel, QLineEdit
+
+from mxbiflow.driver.detector import BeamBreakContinuousDetectorModel
 
 from ..device_card import DeviceCard
 
