@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..core.context import get_mxbiflow
 from ..infra.post_processing import SessionSummary, summarize
 from .application import require_application
 from .components.countdown import AutoAcceptCountdown
@@ -27,7 +28,10 @@ _VISIBLE_TABLE_ROWS = 2
 def run_session_summary() -> bool:
     """Show the current session summary and return whether upload should continue."""
     _application = require_application()
-    return SessionSummaryPanel(summarize()).exec() == QDialog.DialogCode.Accepted
+    return (
+        SessionSummaryPanel(summarize(get_mxbiflow().session)).exec()
+        == QDialog.DialogCode.Accepted
+    )
 
 
 class SessionSummaryPanel(QDialog):
