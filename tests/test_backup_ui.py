@@ -6,7 +6,7 @@ from collections import deque
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from threading import Event
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -24,6 +24,8 @@ from PySide6.QtWidgets import QApplication
 from mxbiflow.infra.backup import BackupTaskRunner
 from mxbiflow.ui.backup import (
     BackupPanel,
+    BackupPanelTask,
+    _PanelTaskStatus,
     _task_progress_percent,
     run_backup,
 )
@@ -105,6 +107,7 @@ def panel_with_runner(
     runner: BackupTaskRunner,
     *,
     success_auto_close_ms: int,
+    task: BackupPanelTask | None = None,
 ) -> BackupPanel:
     with (
         patch("mxbiflow.ui.backup.BackupTaskRunner", return_value=runner),
@@ -114,6 +117,7 @@ def panel_with_runner(
             SOURCE,
             DESTINATION,
             success_auto_close_ms=success_auto_close_ms,
+            task=task,
         )
 
 
@@ -170,6 +174,85 @@ class BackupUITests(unittest.TestCase):
 
         self.assertFalse(dialog.isVisible())
         self.assertEqual(dialog._progress_bar.value(), 100)
+
+    def test_success_waits_for_background_task_and_shows_done(self) -> None:
+        task_gate = Event()
+
+        def wait_for_task_gate() -> None:
+            task_gate.wait(1)
+
+        dialog = panel_with_runner(
+            completed_runner(BackupStatus.SUCCEEDED),
+            success_auto_close_ms=5_000,
+            task=BackupPanelTask(
+                label="Daily report",
+                action=wait_for_task_gate,
+            ),
+        )
+        dialog.show()
+
+        dialog._refresh()
+        first_frame = dialog._task_status_label.text()
+        dialog._refresh()
+        second_frame = dialog._task_status_label.text()
+        self.assertNotEqual(first_frame, second_frame)
+        self.assertFalse(dialog._close_button.isEnabled())
+        self.assertFalse(dialog._auto_close_timer.isActive())
+
+        task_gate.set()
+        assert dialog._task_runner is not None
+        for _ in range(100):
+            if dialog._task_runner.status is _PanelTaskStatus.SUCCEEDED:
+                break
+            QTest.qWait(10)
+        dialog._refresh()
+
+        self.assertEqual(dialog._task_status_label.text(), "✓ Daily report: Done")
+        self.assertTrue(dialog._close_button.isEnabled())
+        self.assertTrue(dialog._auto_close_timer.isActive())
+        dialog.accept()
+
+    def test_background_task_failure_is_shown_and_requires_manual_close(self) -> None:
+        def fail() -> None:
+            raise RuntimeError("SMTP unavailable")
+
+        dialog = panel_with_runner(
+            completed_runner(BackupStatus.SUCCEEDED),
+            success_auto_close_ms=5_000,
+            task=BackupPanelTask(label="Daily report", action=fail),
+        )
+        dialog.show()
+        assert dialog._task_runner is not None
+        for _ in range(100):
+            if dialog._task_runner.status is _PanelTaskStatus.FAILED:
+                break
+            QTest.qWait(10)
+        dialog._refresh()
+
+        self.assertEqual(dialog._task_status_label.text(), "✕ Daily report: Failed")
+        self.assertIn("SMTP unavailable", dialog._task_error_label.text())
+        self.assertTrue(dialog._close_button.isEnabled())
+        self.assertFalse(dialog._auto_close_timer.isActive())
+        dialog.accept()
+
+    def test_disabled_background_task_is_shown_as_skipped(self) -> None:
+        action = Mock()
+        dialog = panel_with_runner(
+            completed_runner(BackupStatus.SUCCEEDED),
+            success_auto_close_ms=5_000,
+            task=BackupPanelTask(
+                label="Daily report",
+                action=action,
+                enabled=False,
+            ),
+        )
+        dialog.show()
+        dialog._refresh()
+
+        action.assert_not_called()
+        self.assertEqual(dialog._task_status_label.text(), "Daily report: Skipped")
+        self.assertTrue(dialog._close_button.isEnabled())
+        dialog.accept()
 
     def test_success_shows_auto_close_countdown(self) -> None:
         dialog = panel_with_runner(
