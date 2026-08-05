@@ -20,17 +20,21 @@ class DataLogger:
     def __init__(
         self,
         session: Session,
-        filename: str,
-        monkey: str | None = None,
+        *,
+        animal: str,
+        stage: str,
+        filename: str = "result",
         type: DataLoggerType = DataLoggerType.JSONL,
     ) -> None:
-        if session.absolute_data_path is None:
+        if session.data_root is None:
             raise RuntimeError(
                 "Session data path is not set. Call Session.start() first."
             )
 
-        self._session_path = session.absolute_data_path
-        self._monkey = monkey
+        self._session_path = session.absolute_animal_data_path(animal)
+        self._session = session
+        self._animal = animal
+        self._stage = stage
         self._filename = filename
         self._type = type
 
@@ -42,10 +46,7 @@ class DataLogger:
         return self._data_path
 
     def _ensure_data_dir(self) -> Path:
-        if self._monkey:
-            base_dir = self._session_path / Path(self._monkey)
-        else:
-            base_dir = self._session_path
+        base_dir = self._session_path / self._stage
 
         try:
             already_exists = base_dir.exists()
@@ -64,6 +65,12 @@ class DataLogger:
 
     def _get_path(self, suffix: str) -> Path:
         return self._data_dir / f"{self._filename}{suffix}"
+
+    def _register_data_path(self) -> None:
+        self._session.register_stage_data_path(
+            animal=self._animal,
+            stage=self._stage,
+        )
 
     def save(self, data: LogRecord) -> None:
         match self._type:
@@ -91,6 +98,8 @@ class DataLogger:
             logger.error("Unexpected error while writing data: %s", e)
             raise
 
+        self._register_data_path()
+
     def _save_json(self, data: LogRecord) -> None:
         try:
             self._data_path.parent.mkdir(parents=True, exist_ok=True)
@@ -105,6 +114,8 @@ class DataLogger:
         except Exception as e:
             logger.error("Unexpected error while writing JSON data: %s", e)
             raise
+
+        self._register_data_path()
 
     def save_csv_row(self, data: LogRecord) -> None:
         csv_path = self._get_path(".csv")
@@ -122,3 +133,5 @@ class DataLogger:
         except Exception as e:
             logger.error("Failed to write CSV row to %s: %s", csv_path, e)
             raise
+
+        self._register_data_path()

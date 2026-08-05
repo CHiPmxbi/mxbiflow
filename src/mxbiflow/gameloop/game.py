@@ -125,10 +125,7 @@ class Game:
                 pass
 
     def _capture_screen(self) -> None:
-        data_path = self._session.absolute_data_path
-        if data_path is None:
-            raise RuntimeError("Session data path is not available")
-        screenshot_dir = data_path / "screenshots"
+        screenshot_dir = self._session.absolute_screenshot_data_path
         screenshot_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
