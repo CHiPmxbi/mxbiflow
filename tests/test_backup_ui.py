@@ -5,7 +5,9 @@ import unittest
 from collections import deque
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from pathlib import Path
 from threading import Event
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -28,6 +30,7 @@ from mxbiflow.ui.backup import (
     _PanelTaskStatus,
     _task_progress_percent,
     run_backup,
+    run_session_backup,
 )
 
 SOURCE = BackupSource(root_id="project-data", entries=("run-01",))
@@ -364,6 +367,47 @@ class BackupUITests(unittest.TestCase):
             )
 
         self.assertTrue(client.closed)
+
+    @patch("mxbiflow.ui.backup.run_backup")
+    def test_session_backup_uses_configured_roots_and_participant_paths(
+        self,
+        run_backup_mock: Mock,
+    ) -> None:
+        session = Mock()
+        session.participant_data_paths = (
+            Path("animal-1/20260805/1"),
+            Path("animal-2/20260805/1"),
+        )
+        session.mxbi_config = SimpleNamespace(
+            backup_source_root_id="mxbi-data",
+            backup_destination_root_id="mxbi-server",
+        )
+
+        run_session_backup(session)
+
+        source, destination = run_backup_mock.call_args.args
+        self.assertEqual(source.root_id, "mxbi-data")
+        self.assertEqual(
+            source.entries,
+            (
+                "animal-1/20260805/1",
+                "animal-2/20260805/1",
+            ),
+        )
+        self.assertEqual(destination.root_id, "mxbi-server")
+
+    @patch("mxbiflow.ui.backup.run_backup")
+    def test_session_backup_rejects_session_without_data(
+        self,
+        run_backup_mock: Mock,
+    ) -> None:
+        session = Mock()
+        session.participant_data_paths = ()
+
+        with self.assertRaisesRegex(RuntimeError, "no data"):
+            run_session_backup(session)
+
+        run_backup_mock.assert_not_called()
 
 
 if __name__ == "__main__":

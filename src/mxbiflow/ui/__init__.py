@@ -1,4 +1,4 @@
-from .backup import BackupPanel, BackupPanelTask, run_backup
+from .backup import BackupPanel, BackupPanelTask, run_backup, run_session_backup
 from .experiment_panel import ExperimentPanel
 from .mxbi_panel import MXBIPanel
 from .session_summary_panel import SessionSummaryPanel, run_session_summary
@@ -11,6 +11,7 @@ __all__ = [
     "MXBIPanel",
     "SessionSummaryPanel",
     "run_backup",
+    "run_session_backup",
     "run_session_summary",
     "run_wizard",
 ]

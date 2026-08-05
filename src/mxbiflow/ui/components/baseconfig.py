@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QLabel,
+    QLineEdit,
     QSpinBox,
     QWidget,
 )
@@ -37,6 +38,18 @@ class BaseConfig(QGroupBox):
             )
         self._layout.addRow(self._label_screen, self._combo_screen)
 
+        self.input_backup_source_root_id = QLineEdit()
+        self._layout.addRow(
+            "backup source root id:",
+            self.input_backup_source_root_id,
+        )
+
+        self.input_backup_destination_root_id = QLineEdit()
+        self._layout.addRow(
+            "backup destination root id:",
+            self.input_backup_destination_root_id,
+        )
+
         self._label_auto_accept = QLabel("auto accept (s):")
         self._spin_auto_accept = QSpinBox()
         self._spin_auto_accept.setRange(0, 3600)
@@ -55,11 +68,21 @@ class BaseConfig(QGroupBox):
     def auto_accept_timeout(self) -> int:
         return self._spin_auto_accept.value()
 
+    @property
+    def backup_source_root_id(self) -> str:
+        return self.input_backup_source_root_id.text()
+
+    @property
+    def backup_destination_root_id(self) -> str:
+        return self.input_backup_destination_root_id.text()
+
     def load_from_model(self, model: MXBIModel) -> None:
         for i in range(self._combo_screen.count()):
             if self._combo_screen.itemData(i) == tuple(model.screen_size):
                 self._combo_screen.setCurrentIndex(i)
                 break
+        self.input_backup_source_root_id.setText(model.backup_source_root_id)
+        self.input_backup_destination_root_id.setText(model.backup_destination_root_id)
 
     def load_auto_accept_timeout(self, timeout_seconds: int) -> None:
         self._spin_auto_accept.setValue(timeout_seconds)
@@ -67,3 +90,5 @@ class BaseConfig(QGroupBox):
     def apply_to_model(self, model: MXBIModel) -> None:
         model.mxbi_id = self.mxbi_id
         model.screen_size = self._combo_screen.currentData()
+        model.backup_source_root_id = self.backup_source_root_id
+        model.backup_destination_root_id = self.backup_destination_root_id

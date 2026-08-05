@@ -38,12 +38,12 @@ def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:
     mxbi_config = ConfigStore(get_mxbi_config_path(), MXBIModel).value
     mxbi = build_mxbi(mxbi_config)
     session_config = ConfigStore(get_config_session_path(), SessionConfig).value
-    session_config = session_config.model_copy(update={"mxbi": mxbi_config})
-    session = init_session(session_config)
+    session = init_session(session_config, mxbi_config)
 
-    detector_bridge = DetectorBridge(
-        mxbi.detector, {i.rfid_id: i.name for i in session.animals.values()}
-    )
+    animals_map = {
+        animal.config.rfid_id: animal.config.name for animal in session.animals.values()
+    }
+    detector_bridge = DetectorBridge(mxbi.detector, animals_map)
 
     return Game(
         session,
@@ -58,7 +58,10 @@ def build_mxbi(mxbi_config: MXBIModel) -> MXBI:
     return build_driver_mxbi(mxbi_config, logger)
 
 
-def init_session(session_config: SessionConfig) -> Session:
+def init_session(
+    session_config: SessionConfig,
+    mxbi_config: MXBIModel,
+) -> Session:
     store = RuntimeStateStore(get_runtime_state_path())
 
     animal_dict: dict[str, Animal] = {}
@@ -77,6 +80,7 @@ def init_session(session_config: SessionConfig) -> Session:
 
     session = Session(
         config=session_config,
+        mxbi_config=mxbi_config,
         state=SessionState(animals=animal_dict),
     )
     session.set_session_store(store)

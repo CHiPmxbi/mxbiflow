@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from pydantic import ValidationError
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel
@@ -47,7 +48,11 @@ class BaseConfigTests(unittest.TestCase):
         config_path = get_mxbi_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(
-            MXBIModel(mxbi_id="outdated").model_dump_json(indent=4),
+            MXBIModel(
+                mxbi_id="outdated",
+                backup_source_root_id="original-source",
+                backup_destination_root_id="original-destination",
+            ).model_dump_json(indent=4),
             encoding="utf-8",
         )
 
@@ -60,6 +65,39 @@ class BaseConfigTests(unittest.TestCase):
         saved = MXBIModel.model_validate_json(config_path.read_text(encoding="utf-8"))
         self.assertEqual(saved.mxbi_id, "mxbi-host")
         panel.close()
+
+    def test_backup_root_ids_are_loaded_and_saved(self) -> None:
+        config_path = get_mxbi_config_path()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            MXBIModel(
+                backup_source_root_id="original-source",
+                backup_destination_root_id="original-destination",
+            ).model_dump_json(indent=4),
+            encoding="utf-8",
+        )
+
+        panel = MXBIPanel()
+        self.assertEqual(panel.base_config.backup_source_root_id, "original-source")
+        self.assertEqual(
+            panel.base_config.backup_destination_root_id,
+            "original-destination",
+        )
+
+        panel.base_config.input_backup_source_root_id.setText("updated-source")
+        panel.base_config.input_backup_destination_root_id.setText(
+            "updated-destination"
+        )
+        QTest.mouseClick(panel.save_button, Qt.MouseButton.LeftButton)
+
+        saved = MXBIModel.model_validate_json(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved.backup_source_root_id, "updated-source")
+        self.assertEqual(saved.backup_destination_root_id, "updated-destination")
+        panel.close()
+
+    def test_backup_root_ids_are_required(self) -> None:
+        with self.assertRaises(ValidationError):
+            MXBIModel.model_validate({})
 
     def test_legacy_mxbis_option_is_ignored_and_not_exported(self) -> None:
         database = MXBIDatabase.model_validate(

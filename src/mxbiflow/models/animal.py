@@ -129,7 +129,7 @@ class Animal(ContextState):
             raise ValueError("Animal session is not started")
 
         return AnimalBaseInfo(
-            animal=self.name,
+            animal=self.config.name,
             trial_id=self.trial_id,
             level=self.current_stage.level,
             level_trial_id=self.current_stage.level_trial_id,
