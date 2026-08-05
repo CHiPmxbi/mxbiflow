@@ -195,10 +195,12 @@ class SessionSummaryPanelTests(unittest.TestCase):
 
     @patch("mxbiflow.ui.session_summary_panel.SessionSummaryPanel")
     @patch("mxbiflow.ui.session_summary_panel.summarize")
+    @patch("mxbiflow.ui.session_summary_panel.get_mxbiflow")
     @patch("mxbiflow.ui.session_summary_panel.require_application")
     def test_run_session_summary_returns_dialog_decision(
         self,
         require_application: Mock,
+        get_mxbiflow: Mock,
         summarize: Mock,
         panel_class: Mock,
     ) -> None:
@@ -211,6 +213,8 @@ class SessionSummaryPanelTests(unittest.TestCase):
         self.assertFalse(run_session_summary())
 
         self.assertEqual(require_application.call_count, 2)
+        self.assertEqual(get_mxbiflow.call_count, 2)
+        summarize.assert_called_with(get_mxbiflow.return_value.session)
         self.assertEqual(summarize.call_count, 2)
         self.assertEqual(panel_class.call_count, 2)
 

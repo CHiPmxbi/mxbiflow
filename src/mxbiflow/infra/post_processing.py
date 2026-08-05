@@ -1,13 +1,18 @@
-from collections.abc import Sequence
-from datetime import datetime
+from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Self, TypedDict
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from loguru import logger
 from pydantic import BaseModel
+from pymotego import EmailClient, EmailEmbed
 
-from ..core.context import get_mxbiflow
+from ..core.path import get_runtime_state_path
 from ..models.animal import AnimalSessionState
+from ..models.session import RuntimeStateStore, Session
 
 
 class StageSummary(BaseModel):
@@ -41,6 +46,22 @@ class SessionSummary(BaseModel):
 class ReportImage(TypedDict):
     cid: str
     alt: str
+
+
+@dataclass(frozen=True)
+class PostProcessingResult:
+    html: str
+    embeds: tuple[EmailEmbed, ...] = ()
+
+
+class StagePostProcessor(ABC):
+    @abstractmethod
+    def process(
+        self,
+        session: Session,
+        stage_data_paths: Mapping[str, Path],
+    ) -> PostProcessingResult:
+        """Build the report section for one stage."""
 
 
 def _format_timestamp(dt: datetime | None) -> str:
@@ -80,8 +101,7 @@ def _get_jinja_env() -> Environment:
     )
 
 
-def summarize() -> SessionSummary:
-    session = get_mxbiflow().session
+def summarize(session: Session) -> SessionSummary:
     animal_summaries: list[AnimalSummary] = []
 
     for name, animal in session.animals.items():
@@ -124,8 +144,7 @@ def summarize() -> SessionSummary:
     )
 
 
-def session_overview() -> str:
-    summary = summarize()
+def session_overview(summary: SessionSummary) -> str:
     env = _get_jinja_env()
     template = env.get_template("session_overview.html")
 
@@ -181,3 +200,61 @@ class HtmlComposer:
 
     def save(self, path: Path) -> None:
         path.write_text(self.html, encoding="utf-8")
+
+
+def build_session_report(
+    session: Session,
+    stage_post_processors: Mapping[str, StagePostProcessor],
+) -> PostProcessingResult:
+    summary = summarize(session)
+    date = (
+        summary.start_at.astimezone(UTC).strftime("%Y-%m-%d")
+        if summary.start_at is not None
+        else "N/A"
+    )
+    composer = HtmlComposer(title=f"Session #{summary.session_id}", date=date)
+    composer.add_section(session_overview(summary))
+
+    embeds: list[EmailEmbed] = []
+    if session.data_root is not None:
+        for stage_name, paths_by_animal in session.stage_data_paths.items():
+            post_processor = stage_post_processors.get(stage_name)
+            if post_processor is None:
+                logger.warning("skipping stage without post-processor: {}", stage_name)
+                continue
+
+            stage_paths = {
+                animal: session.data_root / path
+                for animal, path in paths_by_animal.items()
+            }
+            result = post_processor.process(session, stage_paths)
+            composer.add_section(result.html)
+            embeds.extend(result.embeds)
+
+    return PostProcessingResult(html=composer.html, embeds=tuple(embeds))
+
+
+def send_session_report(
+    session: Session,
+    stage_post_processors: Mapping[str, StagePostProcessor],
+) -> None:
+    """Build and send the completed session report."""
+    if not session.send_email:
+        return
+
+    try:
+        report = build_session_report(session, stage_post_processors)
+        runtime_store = RuntimeStateStore(get_runtime_state_path())
+        previous_message_id = runtime_store.email_message_id
+        with EmailClient() as client:
+            result = client.send(
+                subject=f"{session.mxbi_config.mxbi_id} Daily Report",
+                html_body=report.html,
+                embeds=list(report.embeds),
+                in_reply_to=previous_message_id or None,
+            )
+        runtime_store.save_email_message_id(result.message_id)
+        logger.info("session report sent: session_id={}", session.session_id)
+    except Exception:
+        logger.exception("failed to send session report")
+        raise
