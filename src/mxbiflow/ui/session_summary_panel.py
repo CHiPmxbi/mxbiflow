@@ -143,9 +143,9 @@ class SessionSummaryPanel(QDialog):
         cancel_button.clicked.connect(self.reject)
         layout.addWidget(cancel_button)
 
-        upload_button = QPushButton("Upload", self)
-        upload_button.clicked.connect(self.accept)
-        layout.addWidget(upload_button)
+        continue_button = QPushButton("Continue", self)
+        continue_button.clicked.connect(self.accept)
+        layout.addWidget(continue_button)
         return layout
 
     def showEvent(self, event: QShowEvent) -> None:

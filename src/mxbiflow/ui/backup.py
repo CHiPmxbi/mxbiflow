@@ -1,3 +1,8 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum, auto
+from threading import Lock, Thread
+
 from pymotego import (
     BackupDestination,
     BackupSource,
@@ -20,6 +25,61 @@ from .application import require_application
 
 _REFRESH_INTERVAL_MS = 250
 _SUCCESS_AUTO_CLOSE_MS = 10_000
+_SPINNER_FRAMES = ("◐", "◓", "◑", "◒")
+
+
+@dataclass(frozen=True)
+class BackupPanelTask:
+    label: str
+    action: Callable[[], None]
+    enabled: bool = True
+
+
+class _PanelTaskStatus(StrEnum):
+    RUNNING = auto()
+    SUCCEEDED = auto()
+    FAILED = auto()
+    SKIPPED = auto()
+
+
+class _PanelTaskRunner:
+    def __init__(self, task: BackupPanelTask) -> None:
+        self.task = task
+        self._lock = Lock()
+        self._status = (
+            _PanelTaskStatus.RUNNING if task.enabled else _PanelTaskStatus.SKIPPED
+        )
+        self._error: Exception | None = None
+
+    @property
+    def status(self) -> _PanelTaskStatus:
+        with self._lock:
+            return self._status
+
+    @property
+    def error(self) -> Exception | None:
+        with self._lock:
+            return self._error
+
+    def start(self) -> None:
+        if not self.task.enabled:
+            return
+        Thread(
+            target=self._run,
+            name="backup-panel-task",
+            daemon=True,
+        ).start()
+
+    def _run(self) -> None:
+        try:
+            self.task.action()
+        except Exception as error:  # noqa: BLE001 - task failures are shown in the panel
+            with self._lock:
+                self._error = error
+                self._status = _PanelTaskStatus.FAILED
+        else:
+            with self._lock:
+                self._status = _PanelTaskStatus.SUCCEEDED
 
 
 def run_backup(
@@ -30,6 +90,7 @@ def run_backup(
     max_attempts: int = 3,
     refresh_interval_ms: int = _REFRESH_INTERVAL_MS,
     success_auto_close_ms: int = _SUCCESS_AUTO_CLOSE_MS,
+    task: BackupPanelTask | None = None,
 ) -> None:
     """Create a backup and show a blocking progress dialog."""
     _application = require_application()
@@ -40,6 +101,7 @@ def run_backup(
         max_attempts=max_attempts,
         refresh_interval_ms=refresh_interval_ms,
         success_auto_close_ms=success_auto_close_ms,
+        task=task,
     ).exec()
 
 
@@ -53,6 +115,7 @@ class BackupPanel(QDialog):
         max_attempts: int = 3,
         refresh_interval_ms: int = _REFRESH_INTERVAL_MS,
         success_auto_close_ms: int = _SUCCESS_AUTO_CLOSE_MS,
+        task: BackupPanelTask | None = None,
     ) -> None:
         super().__init__()
         self._runner = BackupTaskRunner(
@@ -60,10 +123,14 @@ class BackupPanel(QDialog):
             max_attempts=max_attempts,
         )
         self._runner.start(source, destination)
+        self._task_runner = _PanelTaskRunner(task) if task is not None else None
+        if self._task_runner is not None:
+            self._task_runner.start()
         self._can_close = False
         self._terminal_state_shown = False
         self._success_auto_close_ms = success_auto_close_ms
         self._remaining_seconds = 0
+        self._spinner_index = 0
 
         self._build_ui()
 
@@ -120,6 +187,17 @@ class BackupPanel(QDialog):
         )
         layout.addWidget(self._path_label)
 
+        self._task_status_label = QLabel("", self)
+        self._task_status_label.setAccessibleName("Background task status")
+        self._task_error_label = QLabel("", self)
+        self._task_error_label.setWordWrap(True)
+        self._task_error_label.setStyleSheet("color: #C62828;")
+        self._task_error_label.hide()
+        if self._task_runner is None:
+            self._task_status_label.hide()
+        layout.addWidget(self._task_status_label)
+        layout.addWidget(self._task_error_label)
+
         self._error_label = QLabel("", self)
         self._error_label.setWordWrap(True)
         self._error_label.setAccessibleName("Backup error")
@@ -146,24 +224,73 @@ class BackupPanel(QDialog):
         self._update_progress(task)
         self._update_details(task)
 
-        if self._terminal_state_shown:
-            return
-
+        backup_done = False
+        backup_error: str | None = None
         if task.status is BackupStatus.SUCCEEDED:
-            self._show_success()
+            backup_done = True
+            self._progress_bar.setRange(0, 100)
+            self._progress_bar.setValue(100)
+            self._status_label.setText("Backup succeeded. Waiting for other tasks.")
         elif task.status in {
             BackupStatus.PARTIALLY_SUCCEEDED,
             BackupStatus.FAILED,
         }:
-            self._show_failure(_task_failure_message(task))
+            backup_done = True
+            backup_error = _task_failure_message(task)
+            self._status_label.setText("Backup requires attention")
         elif not self._runner.is_monitoring:
             error = self._runner.error
-            message = (
+            backup_done = True
+            backup_error = (
                 str(error)
                 if error is not None
                 else "Backup monitoring stopped before the task completed."
             )
-            self._show_failure(message)
+            self._status_label.setText("Backup requires attention")
+
+        panel_task_done, panel_task_error = self._update_panel_task()
+        if self._terminal_state_shown or not backup_done or not panel_task_done:
+            return
+
+        errors = [error for error in (backup_error, panel_task_error) if error]
+        if errors:
+            self._show_failure("\n".join(errors))
+        else:
+            self._show_success()
+
+    def _update_panel_task(self) -> tuple[bool, str | None]:
+        runner = self._task_runner
+        if runner is None:
+            return True, None
+
+        label = runner.task.label
+        match runner.status:
+            case _PanelTaskStatus.RUNNING:
+                frame = _SPINNER_FRAMES[self._spinner_index % len(_SPINNER_FRAMES)]
+                self._spinner_index += 1
+                self._task_status_label.setStyleSheet("")
+                self._task_status_label.setText(f"{frame} {label}: In progress")
+                return False, None
+            case _PanelTaskStatus.SUCCEEDED:
+                self._task_status_label.setStyleSheet(
+                    "color: #2E7D32; font-weight: bold;"
+                )
+                self._task_status_label.setText(f"✓ {label}: Done")
+                return True, None
+            case _PanelTaskStatus.SKIPPED:
+                self._task_status_label.setStyleSheet("color: #666666;")
+                self._task_status_label.setText(f"{label}: Skipped")
+                return True, None
+            case _PanelTaskStatus.FAILED:
+                error = runner.error
+                message = str(error) if error is not None else f"{label} failed."
+                self._task_status_label.setStyleSheet(
+                    "color: #C62828; font-weight: bold;"
+                )
+                self._task_status_label.setText(f"✕ {label}: Failed")
+                self._task_error_label.setText(message)
+                self._task_error_label.show()
+                return True, message
 
     def _update_progress(self, task: BackupTask) -> None:
         progress = _task_progress_percent(task)
