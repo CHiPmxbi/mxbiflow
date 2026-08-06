@@ -12,6 +12,7 @@ from ..scene import SceneManager
 from ..utils.logger import logger
 from .detector_bridge import DetectorBridge
 from .scheduler import Scheduler
+from .shortcuts import ShortcutRegistry, register_default_shortcuts
 
 
 class Game:
@@ -41,6 +42,14 @@ class Game:
 
         self._detector_binder = detector_bridge
         self._detector_binder.start()
+
+        self._shortcuts = ShortcutRegistry()
+        register_default_shortcuts(
+            self._shortcuts,
+            on_quit=self._request_quit,
+            on_capture=self._capture_screen,
+            detector_bridge=self._detector_binder,
+        )
 
         self._scheduler = Scheduler(self._session, self._scene_manager)
 
@@ -81,7 +90,6 @@ class Game:
                 self._handle_event(event)
                 self._scheduler.handle_event(event)
                 self._scene_manager.handle_event(event)
-                self._detector_binder.handle_event(event)
 
             self._scene_manager.update(dt)
             self._aplayer.update()
@@ -113,15 +121,10 @@ class Game:
                 pass
 
     def _handle_keyboard_event(self, event: Event) -> None:
-        match event.key:
-            case pygame.K_ESCAPE:
-                self._running = False
-            case pygame.K_q:
-                self._running = False
-            case pygame.K_c:
-                self._capture_screen()
-            case _:
-                pass
+        self._shortcuts.handle_event(event)
+
+    def _request_quit(self) -> None:
+        self._running = False
 
     def _capture_screen(self) -> None:
         screenshot_dir = self._session.absolute_screenshot_data_path

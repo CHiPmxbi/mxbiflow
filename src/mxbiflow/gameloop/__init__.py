@@ -10,6 +10,7 @@ from .settlement import (
     settle_by_count,
     settle_by_rate,
 )
+from .shortcuts import ShortcutRegistry, register_default_shortcuts
 
 __all__ = [
     "EVT_DETECTOR",
@@ -22,6 +23,8 @@ __all__ = [
     "RateSettlementResult",
     "Scheduler",
     "SettlementAction",
+    "ShortcutRegistry",
+    "register_default_shortcuts",
     "settle_by_count",
     "settle_by_rate",
 ]
