@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from queue import Empty, SimpleQueue
 
 import pygame
-from pygame import Event, event
+from pygame import event
 
 from mxbiflow.driver.detector import MockDetector
 from mxbiflow.driver.detector.detector import DetectionResult, Detector, DetectorEvent
@@ -81,25 +81,14 @@ class DetectorBridge:
             else:
                 self._detector.animal_present(animal_id)
 
+    def manual_emit_by_index(self, index: int) -> None:
+        """Simulate the animal at *index* in the animal map entering."""
+        rfid_key = self._rfid_key_at(index)
+        if rfid_key is not None:
+            self.manual_emit(rfid_key)
+
     def _rfid_key_at(self, index: int) -> str | None:
         keys = list(self._animals_map.keys())
         if index < len(keys):
             return keys[index]
         return None
-
-    def handle_event(self, event: Event) -> None:
-        if event.type == pygame.KEYDOWN:
-            key_map = {
-                pygame.K_0: 0,
-                pygame.K_1: 1,
-                pygame.K_2: 2,
-                pygame.K_3: 3,
-                pygame.K_4: 4,
-                pygame.K_5: 5,
-            }
-            if event.key in key_map:
-                rfid_key = self._rfid_key_at(key_map[event.key])
-                if rfid_key is not None:
-                    self.manual_emit(rfid_key)
-            elif event.key == pygame.K_l:
-                self.manual_emit()
