@@ -175,6 +175,18 @@ class SessionModelTests(unittest.TestCase):
                 }
             )
 
+    def test_animal_config_stage_order_roundtrip(self) -> None:
+        config = AnimalConfig(
+            name="animal-1",
+            stage="stage_a",
+            stage_order=("stage_a", "stage_b"),
+        )
+
+        parsed = AnimalConfig.model_validate_json(config.model_dump_json())
+
+        self.assertEqual(parsed.stage_order, ("stage_a", "stage_b"))
+        self.assertEqual(AnimalConfig().stage_order, ())
+
     def test_bootstrap_reuses_animal_config(self) -> None:
         animal_config = AnimalConfig(
             rfid_id="rfid-1",
@@ -277,6 +289,7 @@ class SessionModelTests(unittest.TestCase):
                 "name": "animal-1",
                 "stage": "vocalization_discriminate",
                 "level": 2,
+                "stage_order": [],
             },
         )
         self.assertEqual(animal["rfid_id"], "rfid-1")
@@ -545,6 +558,121 @@ class SessionModelTests(unittest.TestCase):
             ),
             ExampleContext(value=4),
         )
+
+
+class StageNavigationTests(unittest.TestCase):
+    @staticmethod
+    def _make_session(
+        *,
+        stage: str = "stage_a",
+        stage_order: tuple[str, ...] = (),
+    ) -> tuple[Session, Animal]:
+        animal_config = AnimalConfig(
+            name="animal-1",
+            stage=stage,
+            stage_order=stage_order,
+        )
+        animal = Animal(
+            config=animal_config,
+            current_stage_name=stage,
+            stages={stage: StageState(stage_name=stage)},
+        )
+        session = Session(
+            config=SessionConfig(
+                unknown_animal_as=animal_config.name,
+                animals=(animal_config,),
+            ),
+            mxbi_config=MXBIModel(
+                backup_source_root_id="source",
+                backup_destination_root_id="destination",
+            ),
+            state=SessionState(animals={animal.name: animal}),
+        )
+        return session, animal
+
+    def test_adjacent_stages_are_none_without_current_animal(self) -> None:
+        session, _animal = self._make_session(
+            stage_order=("stage_a", "stage_b"),
+        )
+
+        self.assertIsNone(session.next_stage)
+        self.assertIsNone(session.prev_stage)
+        self.assertIsNone(session.go_next_stage())
+        self.assertIsNone(session.go_prev_stage())
+
+    def test_adjacent_stages_are_none_when_stage_order_is_empty(self) -> None:
+        session, animal = self._make_session()
+        session.set_current_animal("animal-1")
+
+        self.assertIsNone(session.next_stage)
+        self.assertIsNone(session.prev_stage)
+        self.assertIsNone(session.go_next_stage())
+        self.assertIsNone(session.go_prev_stage())
+        self.assertEqual(animal.current_stage_name, "stage_a")
+
+    def test_adjacent_stages_are_none_when_current_stage_not_in_order(self) -> None:
+        session, animal = self._make_session(
+            stage="other",
+            stage_order=("stage_a", "stage_b"),
+        )
+        session.set_current_animal("animal-1")
+
+        self.assertIsNone(session.next_stage)
+        self.assertIsNone(session.prev_stage)
+        self.assertIsNone(session.go_next_stage())
+        self.assertIsNone(session.go_prev_stage())
+        self.assertEqual(animal.current_stage_name, "other")
+
+    def test_adjacent_stages_clamp_at_ends(self) -> None:
+        first_session, first_animal = self._make_session(
+            stage="stage_a",
+            stage_order=("stage_a", "stage_b", "stage_c"),
+        )
+        first_session.set_current_animal("animal-1")
+
+        self.assertEqual(first_session.next_stage, "stage_b")
+        self.assertIsNone(first_session.prev_stage)
+        self.assertIsNone(first_session.go_prev_stage())
+        self.assertEqual(first_animal.current_stage_name, "stage_a")
+
+        last_session, last_animal = self._make_session(
+            stage="stage_c",
+            stage_order=("stage_a", "stage_b", "stage_c"),
+        )
+        last_session.set_current_animal("animal-1")
+
+        self.assertEqual(last_session.prev_stage, "stage_b")
+        self.assertIsNone(last_session.next_stage)
+        self.assertIsNone(last_session.go_next_stage())
+        self.assertEqual(last_animal.current_stage_name, "stage_c")
+
+    def test_go_next_stage_moves_to_next_configured_stage(self) -> None:
+        session, animal = self._make_session(
+            stage="stage_a",
+            stage_order=("stage_a", "stage_b", "stage_c"),
+        )
+        session.set_current_animal("animal-1")
+
+        self.assertEqual(session.next_stage, "stage_b")
+        result = session.go_next_stage()
+
+        self.assertEqual(result, "stage_b")
+        self.assertEqual(animal.current_stage_name, "stage_b")
+        self.assertIn("stage_b", animal.stages)
+
+    def test_go_prev_stage_moves_to_previous_configured_stage(self) -> None:
+        session, animal = self._make_session(
+            stage="stage_b",
+            stage_order=("stage_a", "stage_b", "stage_c"),
+        )
+        session.set_current_animal("animal-1")
+
+        self.assertEqual(session.prev_stage, "stage_a")
+        result = session.go_prev_stage()
+
+        self.assertEqual(result, "stage_a")
+        self.assertEqual(animal.current_stage_name, "stage_a")
+        self.assertIn("stage_a", animal.stages)
 
 
 if __name__ == "__main__":

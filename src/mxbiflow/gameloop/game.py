@@ -43,15 +43,16 @@ class Game:
         self._detector_binder = detector_bridge
         self._detector_binder.start()
 
+        self._scheduler = Scheduler(self._session, self._scene_manager)
+
         self._shortcuts = ShortcutRegistry()
         register_default_shortcuts(
             self._shortcuts,
             on_quit=self._request_quit,
             on_capture=self._capture_screen,
             detector_bridge=self._detector_binder,
+            manual_control=self._scheduler,
         )
-
-        self._scheduler = Scheduler(self._session, self._scene_manager)
 
         self._mxbiflow = MXBIFlow(self._session, self._mxbi)
 

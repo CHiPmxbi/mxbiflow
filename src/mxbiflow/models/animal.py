@@ -40,6 +40,8 @@ class AnimalConfig(BaseModel):
     name: str = "mock"
     stage: str = "idle"
     level: int = Field(default=0, ge=0)
+    # Ordered stage names for manual next/prev navigation; empty disables it.
+    stage_order: tuple[str, ...] = ()
 
 
 class AnimalBaseInfo(BaseModel):

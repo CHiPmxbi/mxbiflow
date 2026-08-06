@@ -29,6 +29,7 @@ class AnimalCard(CardFrame):
         self.customContextMenuRequested.connect(self._on_context_menu)
 
         self._stage_level_tables = stage_level_tables
+        self._stage_order: tuple[str, ...] = ()
 
         items = list(animals.items())
         self._animal_ids = [animal_id for animal_id, _name in items]
@@ -105,6 +106,7 @@ class AnimalCard(CardFrame):
         menu.exec(self.mapToGlobal(pos))
 
     def load_config(self, config: AnimalConfig) -> None:
+        self._stage_order = config.stage_order
         self.combo_animal_name.setCurrentText(config.name)
         self.combo_stage.setCurrentText(config.stage)
         self.combo_level.setCurrentText(str(config.level))
@@ -118,4 +120,5 @@ class AnimalCard(CardFrame):
             level=int(self.combo_level.currentText())
             if self.combo_level.currentText()
             else 0,
+            stage_order=self._stage_order,
         )

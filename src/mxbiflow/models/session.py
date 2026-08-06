@@ -408,6 +408,49 @@ class Session(BaseModel):
         animal.stages.setdefault(stage.stage_name, stage)
         self.checkpoint()
 
+    @property
+    def next_stage(self) -> str | None:
+        """Return the next stage name for the current animal, if any."""
+        return self._adjacent_stage(1)
+
+    @property
+    def prev_stage(self) -> str | None:
+        """Return the previous stage name for the current animal, if any."""
+        return self._adjacent_stage(-1)
+
+    def go_next_stage(self) -> str | None:
+        """Move the current animal to the next configured stage, if any."""
+        return self._go_to_adjacent_stage(1)
+
+    def go_prev_stage(self) -> str | None:
+        """Move the current animal to the previous configured stage, if any."""
+        return self._go_to_adjacent_stage(-1)
+
+    def _adjacent_stage(self, delta: int) -> str | None:
+        animal = self.current_animal
+        if animal is None:
+            return None
+
+        stage_order = animal.config.stage_order
+        if not stage_order:
+            return None
+        try:
+            index = stage_order.index(animal.current_stage_name)
+        except ValueError:
+            return None
+
+        target_index = index + delta
+        if target_index < 0 or target_index >= len(stage_order):
+            return None
+        return stage_order[target_index]
+
+    def _go_to_adjacent_stage(self, delta: int) -> str | None:
+        target = self._adjacent_stage(delta)
+        if target is None:
+            return None
+        self.set_current_stage(target)
+        return target
+
     def add_trial(self) -> None:
         animal = self.require_current_animal()
         animal_session = animal.current_animal_session

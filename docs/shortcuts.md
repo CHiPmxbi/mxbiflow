@@ -11,6 +11,10 @@ All shortcuts are registered centrally in
 | `c` | Capture a screenshot | Saved to the session screenshot directory. |
 | `0` – `5` | Simulate the RFID animal at the corresponding index entering | Index follows the configured animal map order; only effective with a mock detector. |
 | `l` | Simulate the current animal leaving | Only effective with a mock detector. |
+| `[` | Level down | Manually decreases the current animal's current stage level; requires a current animal. |
+| `]` | Level up | Manually increases the current animal's current stage level; requires a current animal. |
+| `,` | Previous stage | Moves to the previous stage in the current animal's configured `stage_order` list; no-op when unavailable. |
+| `.` | Next stage | Moves to the next stage in the current animal's configured `stage_order` list; no-op when unavailable. |
 
 ## Adding a new shortcut
 
