@@ -31,11 +31,11 @@ class TargetStage(Scene):
 
 class SchedulerTests(unittest.TestCase):
     def test_unknown_animal_uses_configured_animal_stage(self) -> None:
-        animal_config = AnimalConfig(name="fallback", stage="targetstage")
+        animal_config = AnimalConfig(name="fallback", stage="target_stage")
         animal = Animal(
             config=animal_config,
-            current_stage_name="targetstage",
-            stages={"targetstage": StageState(stage_name="targetstage")},
+            current_stage_name="target_stage",
+            stages={"target_stage": StageState(stage_name="target_stage")},
         )
         session = Session(
             config=SessionConfig(
@@ -50,6 +50,7 @@ class SchedulerTests(unittest.TestCase):
         )
         scene_manager = SceneManager()
         scene_manager.register([TargetStage])
+        self.assertIs(scene_manager.scenes["target_stage"], TargetStage)
         scheduler = Scheduler(session, scene_manager)
 
         scheduler.handle_event(

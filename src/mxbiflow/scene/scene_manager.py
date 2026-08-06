@@ -25,7 +25,7 @@ class SceneManager:
             self._scenes.update(scene)
         else:
             for s in scene:
-                self._scenes[s.__name__.lower()] = s
+                self._scenes[s.name()] = s
 
     @property
     def scenes(self) -> dict[str, type[Scene]]:

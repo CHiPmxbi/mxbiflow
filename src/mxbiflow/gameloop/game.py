@@ -68,9 +68,7 @@ class Game:
         self._scene_manager.init()
 
         if self._scene_manager.current is not None:
-            self._session.set_current_scene(
-                type(self._scene_manager.current).__name__.lower()
-            )
+            self._session.set_current_scene(type(self._scene_manager.current).name())
         self._session.start(get_data_dir_path())
 
     def play(self) -> None:
@@ -98,7 +96,7 @@ class Game:
                 and self._scene_manager.current is not None
             ):
                 self._session.set_current_scene(
-                    type(self._scene_manager.current).__name__.lower()
+                    type(self._scene_manager.current).name()
                 )
 
             pygame.display.flip()
