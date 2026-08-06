@@ -99,7 +99,7 @@ class Scheduler:
 
         if animal is None:
             if not isinstance(self._scene_manager.current, IDLE):
-                self._scene_manager.switch(self._scenes[IDLE.__name__.lower()])
+                self._scene_manager.switch(self._scenes[IDLE.name()])
             return
 
         stage = animal.current_stage.stage_name
