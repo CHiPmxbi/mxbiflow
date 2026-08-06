@@ -16,6 +16,18 @@ class ManualEmitter(Protocol):
     def manual_emit_by_index(self, index: int) -> None: ...
 
 
+class ManualControl(Protocol):
+    """Minimal interface used by the manual level/stage shortcut handlers."""
+
+    def level_up(self) -> None: ...
+
+    def level_down(self) -> None: ...
+
+    def next_stage(self) -> None: ...
+
+    def prev_stage(self) -> None: ...
+
+
 @dataclass(frozen=True)
 class ShortcutBinding:
     """A single registered shortcut binding."""
@@ -62,8 +74,9 @@ def register_default_shortcuts(
     on_quit: Callable[[], None],
     on_capture: Callable[[], None],
     detector_bridge: ManualEmitter,
+    manual_control: ManualControl,
 ) -> None:
-    """Register the built-in game and detector shortcuts."""
+    """Register the built-in game, detector, and manual control shortcuts."""
     registry.register(pygame.K_ESCAPE, "Quit the game", lambda _event: on_quit())
     registry.register(pygame.K_q, "Quit the game", lambda _event: on_quit())
     registry.register(pygame.K_c, "Capture a screenshot", lambda _event: on_capture())
@@ -77,4 +90,24 @@ def register_default_shortcuts(
         pygame.K_l,
         "Simulate RFID animal leaving",
         lambda _event: detector_bridge.manual_emit(),
+    )
+    registry.register(
+        pygame.K_LEFTBRACKET,
+        "Level down",
+        lambda _event: manual_control.level_down(),
+    )
+    registry.register(
+        pygame.K_RIGHTBRACKET,
+        "Level up",
+        lambda _event: manual_control.level_up(),
+    )
+    registry.register(
+        pygame.K_COMMA,
+        "Previous stage",
+        lambda _event: manual_control.prev_stage(),
+    )
+    registry.register(
+        pygame.K_PERIOD,
+        "Next stage",
+        lambda _event: manual_control.next_stage(),
     )

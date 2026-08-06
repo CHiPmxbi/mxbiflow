@@ -35,12 +35,42 @@ class Scheduler:
         self._session.clear_current_animal()
         self._mark_refresh()
 
-    def _set_next_stage(self, stage: str) -> None:
+    def level_up(self) -> None:
+        """Manually increase the current animal's current stage level."""
         if self._session.current_animal is None:
             return
+        self._session.level_up()
+        self._mark_refresh()
 
-        self._session.set_current_stage(stage)
-        self._need_refresh = True
+    def level_down(self) -> None:
+        """Manually decrease the current animal's current stage level."""
+        animal = self._session.current_animal
+        if animal is None or animal.current_stage.level == 0:
+            return
+        self._session.level_down()
+        self._mark_refresh()
+
+    def next_stage(self) -> None:
+        """Manually move the current animal to the next configured stage."""
+        target = self._session.next_stage
+        if target is None:
+            return
+        if target not in self._scenes:
+            logger.debug("manual stage target not registered: %s", target)
+            return
+        self._session.go_next_stage()
+        self._mark_refresh()
+
+    def prev_stage(self) -> None:
+        """Manually move the current animal to the previous configured stage."""
+        target = self._session.prev_stage
+        if target is None:
+            return
+        if target not in self._scenes:
+            logger.debug("manual stage target not registered: %s", target)
+            return
+        self._session.go_prev_stage()
+        self._mark_refresh()
 
     def _handle_fault_event(self) -> None:
         fallback = self._scene_manager.fault_fallback

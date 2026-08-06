@@ -7,6 +7,23 @@ from mxbiflow.gameloop.detector_bridge import DetectorBridge
 from mxbiflow.gameloop.shortcuts import ShortcutRegistry, register_default_shortcuts
 
 
+class FakeManualControl:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def level_up(self) -> None:
+        self.calls.append("level_up")
+
+    def level_down(self) -> None:
+        self.calls.append("level_down")
+
+    def next_stage(self) -> None:
+        self.calls.append("next_stage")
+
+    def prev_stage(self) -> None:
+        self.calls.append("prev_stage")
+
+
 class ShortcutRegistryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.registry = ShortcutRegistry()
@@ -55,6 +72,7 @@ class RegisterDefaultShortcutsTests(unittest.TestCase):
         registry = ShortcutRegistry()
         quits: list[bool] = []
         captures: list[bool] = []
+        manual = FakeManualControl()
         detector = MockDetector()
         bridge = DetectorBridge(detector, {"rfid-a": "animal-a", "rfid-b": "animal-b"})
 
@@ -63,6 +81,7 @@ class RegisterDefaultShortcutsTests(unittest.TestCase):
             on_quit=lambda: quits.append(True),
             on_capture=lambda: captures.append(True),
             detector_bridge=bridge,
+            manual_control=manual,
         )
 
         registry.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
@@ -73,10 +92,22 @@ class RegisterDefaultShortcutsTests(unittest.TestCase):
         registry.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_1))
         self.assertEqual(detector.current_animal, "rfid-b")
         registry.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_l))
+        registry.handle_event(
+            pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LEFTBRACKET)
+        )
+        registry.handle_event(
+            pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHTBRACKET)
+        )
+        registry.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_COMMA))
+        registry.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_PERIOD))
 
         self.assertEqual(quits, [True, True])
         self.assertEqual(captures, [True])
         self.assertIsNone(detector.current_animal)
+        self.assertEqual(
+            manual.calls,
+            ["level_down", "level_up", "prev_stage", "next_stage"],
+        )
 
     def test_default_bindings_are_exposed(self) -> None:
         registry = ShortcutRegistry()
@@ -85,6 +116,7 @@ class RegisterDefaultShortcutsTests(unittest.TestCase):
             on_quit=lambda: None,
             on_capture=lambda: None,
             detector_bridge=DetectorBridge(MockDetector(), {}),
+            manual_control=FakeManualControl(),
         )
 
         expected_keys = {
@@ -93,6 +125,10 @@ class RegisterDefaultShortcutsTests(unittest.TestCase):
             pygame.K_c,
             *range(pygame.K_0, pygame.K_0 + 6),
             pygame.K_l,
+            pygame.K_LEFTBRACKET,
+            pygame.K_RIGHTBRACKET,
+            pygame.K_COMMA,
+            pygame.K_PERIOD,
         }
         self.assertEqual(set(registry.bindings), expected_keys)
 
