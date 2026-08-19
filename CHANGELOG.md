@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.18](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.17...v0.3.18) (2026-08-19)
+
+
+### Features
+
+* **backup:** :sparkles: add session backup workflow ([#126](https://github.com/CHiPmxbi/mxbiflow/issues/126)) ([5b36c95](https://github.com/CHiPmxbi/mxbiflow/commit/5b36c953de7eb3432f997c2f174da6eed93a2bb0))
+* **crash-report:** :sparkles: add crash report delivery ([#129](https://github.com/CHiPmxbi/mxbiflow/issues/129)) ([928b67f](https://github.com/CHiPmxbi/mxbiflow/commit/928b67ffd54540184ec6bdf29f63396b83a6d8e2))
+* **gameloop:** :sparkles: add manual level and stage navigation shortcuts ([#133](https://github.com/CHiPmxbi/mxbiflow/issues/133)) ([44e962b](https://github.com/CHiPmxbi/mxbiflow/commit/44e962bb86cacf66c286222146cfc816735e60a0))
+* **gameloop:** :sparkles: centralize keyboard shortcuts ([#132](https://github.com/CHiPmxbi/mxbiflow/issues/132)) ([8c210e0](https://github.com/CHiPmxbi/mxbiflow/commit/8c210e086c2d103abea9bbf53faaab9190c6656e))
+* **logging:** :sparkles: add default log file handling ([#130](https://github.com/CHiPmxbi/mxbiflow/issues/130)) ([4fb79f5](https://github.com/CHiPmxbi/mxbiflow/commit/4fb79f57a4a47b8c2c6ad5555a13ed7a063ad1e0))
+* **post-processing:** :sparkles: add sequential session post-processing ([#128](https://github.com/CHiPmxbi/mxbiflow/issues/128)) ([6a7fb18](https://github.com/CHiPmxbi/mxbiflow/commit/6a7fb182a2d37309e1d49a8a641645a2e72beaae))
+* **scene:** :sparkles: standardize scene names as snake case ([#131](https://github.com/CHiPmxbi/mxbiflow/issues/131)) ([26353c4](https://github.com/CHiPmxbi/mxbiflow/commit/26353c45a1a95e5f9f6f1c5c22907d768308d67b))
+
 ## [0.3.17](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.16...v0.3.17) (2026-08-05)
 
 
