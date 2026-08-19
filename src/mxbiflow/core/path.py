@@ -7,7 +7,6 @@ CONFIG_SESSION_FILENAME = "session.json"
 DATABASE_FILENAME = "db.json"
 MXBI_CONFIG_FILENAME = "mxbi.json"
 MXBI_PANEL_CONFIG_FILENAME = "mxbi_panel.json"
-CROSS_MODAL_CONFIG_FILENAME = "config_cross_modal.json"
 DEFAULT_LOG_FILENAME = "mxbi.log"
 
 
@@ -40,10 +39,6 @@ def get_config_session_path() -> Path:
 
 def get_database_path() -> Path:
     return Path(os.environ["HOME"]) / ".config" / "mxbi" / DATABASE_FILENAME
-
-
-def get_cross_modal_config_path() -> Path:
-    return get_config_dir_path() / CROSS_MODAL_CONFIG_FILENAME
 
 
 def get_data_dir_path() -> Path:
