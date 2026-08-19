@@ -557,7 +557,7 @@ wheels = [
 
 [[package]]
 name = "mxbiflow"
-version = "0.3.16"
+version = "0.3.17"
 source = { editable = "." }
 dependencies = [
     { name = "gpiozero" },
@@ -611,7 +611,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pygame-ce", specifier = ">=2.5.6" },
     { name = "pyglet", specifier = ">=2.1.13" },
-    { name = "pymotego", editable = "/Users/ccccr/repo/projects/cogmote/cogmote/pymoteGO" },
+    { name = "pymotego", specifier = ">=0.1.6" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyside6", specifier = ">=6.10.1" },
     { name = "qtawesome", specifier = ">=1.4.1" },
@@ -841,24 +841,15 @@ wheels = [
 [[package]]
 name = "pymotego"
 version = "0.1.6"
-source = { editable = "/Users/ccccr/repo/projects/cogmote/cogmote/pymoteGO" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx", extra = ["http2"] },
     { name = "pydantic" },
     { name = "pyzmq" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
-    { name = "pydantic", specifier = ">=2.13.4,<3" },
-    { name = "pyzmq", specifier = ">=27.0.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pyright", specifier = ">=1.1.411" },
-    { name = "ruff", specifier = ">=0.16.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/6e/6d/2d8581a5167b94a2f4c29b928733e13d140cd0d2d4fdb80269f91f210498/pymotego-0.1.6.tar.gz", hash = "sha256:0773ccde422f5f8c8e45033f12c429e3ce409ad08c269fab0a502c8915a8d87e", size = 5587, upload-time = "2026-07-31T14:58:08.809Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/e0/9494226538838a3ed790ce377a03518eeb8206775a985d033235c75ee550/pymotego-0.1.6-py3-none-any.whl", hash = "sha256:7162051fce03788d1829399869f0d60e855ef71be69f4f64c86e4db640fc654a", size = 7540, upload-time = "2026-07-31T14:58:07.94Z" },
 ]
 
 [[package]]

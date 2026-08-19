@@ -34,9 +34,6 @@ dependencies = [
 # Batteries-included logging: enables mxbiflow.utils.logger.setup_logging().
 log = ["loguru>=0.7.3"]
 
-[tool.uv.sources]
-pymotego = { path = "/Users/ccccr/repo/projects/cogmote/cogmote/pymoteGO", editable = true }
-
 [tool.pyright]
 include = ["src/mxbiflow", "tests"]
 exclude = ["src/mxbiflow/tasks"]
