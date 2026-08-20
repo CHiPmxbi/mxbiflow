@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.19](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.18...v0.3.19) (2026-08-20)
+
+
+### Bug Fixes
+
+* **mxbi:** :bug: allow default MXBI config without backup root ids ([#137](https://github.com/CHiPmxbi/mxbiflow/issues/137)) ([8885cbb](https://github.com/CHiPmxbi/mxbiflow/commit/8885cbbf2614aac9e2f434725719fcec53de9353))
+
 ## [0.3.18](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.17...v0.3.18) (2026-08-19)
 
 
