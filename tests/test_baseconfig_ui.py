@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from pydantic import ValidationError
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel
@@ -95,9 +94,22 @@ class BaseConfigTests(unittest.TestCase):
         self.assertEqual(saved.backup_destination_root_id, "updated-destination")
         panel.close()
 
-    def test_backup_root_ids_are_required(self) -> None:
-        with self.assertRaises(ValidationError):
-            MXBIModel.model_validate({})
+    def test_backup_root_ids_default_to_empty(self) -> None:
+        model = MXBIModel()
+        self.assertEqual(model.backup_source_root_id, "")
+        self.assertEqual(model.backup_destination_root_id, "")
+
+    def test_missing_mxbi_config_creates_default(self) -> None:
+        # Regression: on a fresh machine without config/mxbi.json, the
+        # wizard must be able to generate a default config instead of
+        # crashing on required fields.
+        panel = MXBIPanel()
+        config_path = get_mxbi_config_path()
+        self.assertTrue(config_path.is_file())
+        saved = MXBIModel.model_validate_json(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved.backup_source_root_id, "")
+        self.assertEqual(saved.backup_destination_root_id, "")
+        panel.close()
 
     def test_legacy_mxbis_option_is_ignored_and_not_exported(self) -> None:
         database = MXBIDatabase.model_validate(
