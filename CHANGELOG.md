@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.20](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.19...v0.3.20) (2026-08-21)
+
+
+### Features
+
+* **detector:** ✨ add configurable beam-break filtering ([33c840f](https://github.com/CHiPmxbi/mxbiflow/commit/33c840f9f277e02979bc4184bb73c823f6afa943))
+
 ## [0.3.19](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.18...v0.3.19) (2026-08-20)
 
 
