@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 _base_path: Path | None = None
@@ -38,7 +37,7 @@ def get_config_session_path() -> Path:
 
 
 def get_database_path() -> Path:
-    return Path(os.environ["HOME"]) / ".config" / "mxbi" / DATABASE_FILENAME
+    return Path.home() / ".config" / "mxbi" / DATABASE_FILENAME
 
 
 def get_data_dir_path() -> Path:

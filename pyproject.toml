@@ -6,28 +6,28 @@ readme = "README.md"
 authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
-    "gpiozero>=2.0.1",
+    "gpiozero>=2.0.1.post3",
     "inflection>=0.5.1",
     "jinja2>=3.1.6",
-    "keyring>=25.6.0",
-    "matplotlib>=3.10.6",
-    "mss>=10.1.0",
-    "numpy>=2.4.1",
-    "pandas>=2.3.2",
-    "pillow>=11.3.0",
-    "pydantic>=2.12.5",
-    "pygame-ce>=2.5.6",
-    "pyglet>=2.1.13",
+    "keyring>=25.7.0",
+    "matplotlib>=3.11.1",
+    "mss>=10.2.0",
+    "numpy>=2.5.2",
+    "pandas>=3.0.5",
+    "pillow>=12.3.0",
+    "pydantic>=2.13.4",
+    "pygame-ce>=2.5.8",
+    "pyglet>=2.1.16",
     "pymotego>=0.1.6",
     "pyserial>=3.5",
-    "pyside6>=6.10.1",
-    "qtawesome>=1.4.1",
-    "rich>=14.1.0",
-    "sounddevice>=0.5.3",
-    "soundfile>=0.13.1",
+    "pyside6>=6.11.2",
+    "qtawesome>=1.4.2",
+    "rich>=15.0.0",
+    "sounddevice>=0.5.6",
+    "soundfile>=0.14.0",
     "stamina>=26.1.0",
-    "typer>=0.21.1",
-    "varname>=0.15.0",
+    "typer>=0.27.1",
+    "varname>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -36,13 +36,10 @@ log = ["loguru>=0.7.3"]
 
 [tool.pyright]
 include = ["src/mxbiflow", "tests"]
-exclude = ["src/mxbiflow/tasks"]
 extraPaths = ["src"]
 typeCheckingMode = "basic"
 reportPrivateUsage = "error"
 
-[tool.ruff]
-extend-exclude = ["src/mxbiflow/tasks"]
 
 [project.scripts]
 mxbi = "mxbi:main"
@@ -53,8 +50,4 @@ requires = ["uv_build>=0.12.0,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = [
-    "loguru>=0.7.3",
-    "pyright>=1.1.411",
-    "ruff>=0.16.0",
-]
+dev = ["loguru>=0.7.3", "pyright>=1.1.411", "ruff>=0.16.4"]

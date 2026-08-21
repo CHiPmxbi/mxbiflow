@@ -1,4 +1,3 @@
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,7 +12,7 @@ class DatabaseTests(unittest.TestCase):
     def test_database_path_uses_home_instead_of_base_path(self) -> None:
         with tempfile.TemporaryDirectory() as home:
             set_base_path("/unrelated/project")
-            with patch.dict(os.environ, {"HOME": home}):
+            with patch("mxbiflow.core.path.Path.home", return_value=Path(home)):
                 self.assertEqual(
                     get_database_path(),
                     Path(home) / ".config" / "mxbi" / "db.json",
@@ -22,7 +21,7 @@ class DatabaseTests(unittest.TestCase):
     def test_missing_database_is_created_with_empty_data(self) -> None:
         with (
             tempfile.TemporaryDirectory() as home,
-            patch.dict(os.environ, {"HOME": home}),
+            patch("mxbiflow.core.path.Path.home", return_value=Path(home)),
         ):
             path = get_database_path()
             database = ConfigStore(path, MXBIDatabase).value
@@ -33,10 +32,6 @@ class DatabaseTests(unittest.TestCase):
                 MXBIDatabase.model_validate_json(path.read_text(encoding="utf-8")),
                 database,
             )
-
-    def test_database_path_requires_home(self) -> None:
-        with patch.dict(os.environ, {}, clear=True), self.assertRaises(KeyError):
-            get_database_path()
 
 
 if __name__ == "__main__":
