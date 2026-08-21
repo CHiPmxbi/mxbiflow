@@ -18,7 +18,12 @@ from ..card import CardFrame
 class DeviceCard[T](CardFrame):
     remove_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        mount_base_fields: bool = True,
+    ) -> None:
         super().__init__(parent=parent, object_name="card")
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -39,13 +44,14 @@ class DeviceCard[T](CardFrame):
         self.lable_enabled = QLabel("Enabled:")
         self.checkbox_enabled = QCheckBox()
         self.checkbox_enabled.setChecked(False)
-        self.layout_config.addRow(self.lable_enabled, self.checkbox_enabled)
 
         self.label_id = QLabel("Device ID:")
         self.line_device_id = QLineEdit("0")
         self.int_validator = QIntValidator(0, 1000, self)
         self.line_device_id.setValidator(self.int_validator)
-        self.layout_config.addRow(self.label_id, self.line_device_id)
+        if mount_base_fields:
+            self.layout_config.addRow(self.lable_enabled, self.checkbox_enabled)
+            self.layout_config.addRow(self.label_id, self.line_device_id)
 
     def _open_menu(self, position: QPoint) -> None:
         menu = QMenu(self)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from enum import Enum, auto
 from threading import Event, Lock, Thread
-from time import sleep, time
+from time import monotonic, sleep, time
 from typing import NamedTuple
 
 from mxbiflow.driver.peripheral.beam_break_sensor.beam_break_sensor import (
@@ -77,7 +77,8 @@ class FusionContinuousDetector:
       ``UNKNOWN_ANIMAL_ENTERED`` with ``animal_id=None`` and ``error=True``
       (unknown animal).
     * **Falling edge** (beam restored — animal leaves): emit ``ANIMAL_LEFT``
-      immediately — no recent RFID result is required.
+      after the optional beam-break filter confirms a stable clear state. No
+      recent RFID result is required.
     """
 
     # ---- construction ----------------------------------------------------
@@ -88,11 +89,18 @@ class FusionContinuousDetector:
         beam_break_sensor: BeamBreakSensor,
         poll_interval: float = _POLL_INTERVAL_S,
         rfid_timeout: float = _RFID_TIMEOUT_S,
+        beam_break_filter_enabled: bool = False,
+        beam_break_filter_duration: float = 0.2,
     ) -> None:
+        if beam_break_filter_duration <= 0:
+            raise ValueError("beam_break_filter_duration must be greater than 0")
+
         self._rfid_reader = rfid_reader
         self._beam_break_sensor = beam_break_sensor
         self._poll_interval = poll_interval
         self._rfid_timeout = rfid_timeout
+        self._beam_break_filter_enabled = beam_break_filter_enabled
+        self._beam_break_filter_duration = beam_break_filter_duration
 
         # Event callbacks: DetectorEvent -> list of subscribers
         self._callbacks: dict[
@@ -102,6 +110,7 @@ class FusionContinuousDetector:
         # State-machine bookkeeping
         self._state: _State = _State.IDLE
         self._prev_beam: bool = False
+        self._beam_clear_since: float | None = None
         self._edge_time: float = 0.0
         self._last_tag: RFIDTag | None = None
         self._current_animal: str | None = None
@@ -186,7 +195,7 @@ class FusionContinuousDetector:
             events: list[_Event] = []
 
             # 1. Edge detection (beam break sensor)
-            edge = self._detect_edge()
+            edge = self._detect_edge(monotonic())
             if edge is not None:
                 events.append(edge)
 
@@ -211,18 +220,34 @@ class FusionContinuousDetector:
 
     # ---- internal: sensor helpers ----------------------------------------
 
-    def _detect_edge(self) -> _Event | None:
+    def _detect_edge(self, now: float) -> _Event | None:
         """Read beam sensor and return a rising / falling edge or *None*."""
         current = self._beam_break_sensor.read()
-        edge: _Event | None = None
 
-        if current and not self._prev_beam:
-            edge = _Event.RISING_EDGE
-        elif not current and self._prev_beam:
-            edge = _Event.FALLING_EDGE
+        if current:
+            self._beam_clear_since = None
+            if not self._prev_beam:
+                self._prev_beam = True
+                return _Event.RISING_EDGE
+            return None
 
-        self._prev_beam = current
-        return edge
+        if not self._prev_beam:
+            return None
+
+        if not self._beam_break_filter_enabled:
+            self._prev_beam = False
+            return _Event.FALLING_EDGE
+
+        if self._beam_clear_since is None:
+            self._beam_clear_since = now
+            return None
+
+        if now - self._beam_clear_since < self._beam_break_filter_duration:
+            return None
+
+        self._prev_beam = False
+        self._beam_clear_since = None
+        return _Event.FALLING_EDGE
 
     def _try_read_rfid(self, now: float) -> _Event | None:
         """Read RFID on-demand and return ``RFID_READ`` if a valid tag is available.

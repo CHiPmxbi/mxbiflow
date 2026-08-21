@@ -65,6 +65,8 @@ class FusionContinuousDetectorModel(BaseModel):
 
     poll_interval: float = 10.0
     rfid_timeout: float = 0.05
+    beam_break_filter_enabled: bool = False
+    beam_break_filter_duration: float = Field(default=0.2, gt=0)
 
     @property
     def device_type(self) -> str:
