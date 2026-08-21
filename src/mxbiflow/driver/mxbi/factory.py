@@ -93,6 +93,8 @@ def _make_detector(config: DetectorModel) -> Detector:
                 sensor,
                 poll_interval=config.poll_interval,
                 rfid_timeout=config.rfid_timeout,
+                beam_break_filter_enabled=config.beam_break_filter_enabled,
+                beam_break_filter_duration=config.beam_break_filter_duration,
             )
 
         case _:

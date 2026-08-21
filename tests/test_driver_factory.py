@@ -37,6 +37,15 @@ class DetectorModelTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.adapter.validate_python({"type": "standard_gate"})
 
+    def test_fusion_filter_defaults_and_validation(self) -> None:
+        model = FusionContinuousDetectorModel()
+
+        self.assertFalse(model.beam_break_filter_enabled)
+        self.assertEqual(model.beam_break_filter_duration, 0.2)
+
+        with self.assertRaises(ValidationError):
+            FusionContinuousDetectorModel(beam_break_filter_duration=0)
+
 
 class DetectorFactoryTests(unittest.TestCase):
     def test_builds_mock_detector(self) -> None:
@@ -81,6 +90,8 @@ class DetectorFactoryTests(unittest.TestCase):
             pin=17,
             poll_interval=0.5,
             rfid_timeout=0.1,
+            beam_break_filter_enabled=True,
+            beam_break_filter_duration=0.3,
         )
 
         result = _make_detector(config)
@@ -92,6 +103,8 @@ class DetectorFactoryTests(unittest.TestCase):
             sensor_type.return_value,
             poll_interval=0.5,
             rfid_timeout=0.1,
+            beam_break_filter_enabled=True,
+            beam_break_filter_duration=0.3,
         )
         self.assertIs(result, detector_type.return_value)
 
