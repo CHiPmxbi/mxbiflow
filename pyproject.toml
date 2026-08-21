@@ -1,6 +1,6 @@
 [project]
 name = "mxbiflow"
-version = "0.3.20"
+version = "0.3.21"
 description = "Framework and hardware drivers for MXBI behavioral experiments"
 readme = "README.md"
 authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]

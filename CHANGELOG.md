@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.21](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.20...v0.3.21) (2026-08-21)
+
+
+### Bug Fixes
+
+* **core:** :bug: support cross-platform home paths ([#141](https://github.com/CHiPmxbi/mxbiflow/issues/141)) ([97a8b2a](https://github.com/CHiPmxbi/mxbiflow/commit/97a8b2a124531a33a08f41b9d9972f434de5fc0e))
+
 ## [0.3.20](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.19...v0.3.20) (2026-08-21)
 
 
