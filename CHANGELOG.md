@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.23](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.22...v0.3.23) (2026-08-27)
+
+
+### Features
+
+* **idle:** :sparkles: add manual control buttons ([#145](https://github.com/CHiPmxbi/mxbiflow/issues/145)) ([91113f7](https://github.com/CHiPmxbi/mxbiflow/commit/91113f7e55f324a2a4ab09b6a85c058993b21f08))
+
 ## [0.3.22](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.21...v0.3.22) (2026-08-27)
 
 
