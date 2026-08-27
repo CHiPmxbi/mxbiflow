@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 from pydantic import (
     BaseModel,
@@ -48,6 +49,21 @@ class SessionConfig(BaseModel):
 
     animals: tuple[AnimalConfig, ...] = ()
 
+    def with_animals(self, animals: tuple[AnimalConfig, ...]) -> SessionConfig:
+        return SessionConfig(
+            experimenter=self.experimenter,
+            reward_type=self.reward_type,
+            send_email=self.send_email,
+            sync_data=self.sync_data,
+            note=self.note,
+            default_scene=self.default_scene,
+            unknown_animal_as=self.unknown_animal_as,
+            fault_fallback=self.fault_fallback,
+            hide_cursor=self.hide_cursor,
+            fullscreen=self.fullscreen,
+            animals=animals,
+        )
+
     @model_validator(mode="after")
     def _validate_unknown_animal_as(self) -> SessionConfig:
         if not self.animals:
@@ -62,6 +78,13 @@ class SessionConfig(BaseModel):
         if self.unknown_animal_as not in animal_names:
             raise ValueError("unknown_animal_as must match a configured animal name")
         return self
+
+
+class SessionConfigStore(Protocol):
+    @property
+    def value(self) -> SessionConfig: ...
+
+    def save(self, data: SessionConfig | None = None) -> None: ...
 
 
 class SessionState(ContextState):
@@ -173,6 +196,7 @@ class Session(BaseModel):
     state: SessionState
 
     _session_store: RuntimeStateStore | None = PrivateAttr(default=None)
+    _config_store: SessionConfigStore | None = PrivateAttr(default=None)
     _snapshot_store: SessionSnapshotStore | None = PrivateAttr(default=None)
     _animal_snapshot_stores: dict[str, SessionSnapshotStore] = PrivateAttr(
         default_factory=dict
@@ -315,6 +339,9 @@ class Session(BaseModel):
     def set_session_store(self, store: RuntimeStateStore) -> None:
         self._session_store = store
 
+    def set_config_store(self, store: SessionConfigStore) -> None:
+        self._config_store = store
+
     def set_snapshot_store(self, store: SessionSnapshotStore) -> None:
         self._snapshot_store = store
 
@@ -406,6 +433,7 @@ class Session(BaseModel):
 
         animal.current_stage_name = stage.stage_name
         animal.stages.setdefault(stage.stage_name, stage)
+        self._persist_animal_progress(animal)
         self.checkpoint()
 
     @property
@@ -470,9 +498,12 @@ class Session(BaseModel):
         animal: str | None = None,
         stage: str | None = None,
     ) -> int:
+        animal_state = self._resolve_animal(animal)
         stage_state = self._resolve_stage(animal=animal, stage=stage)
         stage_state.level_trial_id = 0
         stage_state.level += 1
+        if stage_state is animal_state.current_stage:
+            self._persist_animal_progress(animal_state)
         self.checkpoint()
         return stage_state.level
 
@@ -482,14 +513,33 @@ class Session(BaseModel):
         animal: str | None = None,
         stage: str | None = None,
     ) -> int:
+        animal_state = self._resolve_animal(animal)
         stage_state = self._resolve_stage(animal=animal, stage=stage)
         if stage_state.level == 0:
             raise ValueError("level cannot be less than 0")
 
         stage_state.level_trial_id = 0
         stage_state.level -= 1
+        if stage_state is animal_state.current_stage:
+            self._persist_animal_progress(animal_state)
         self.checkpoint()
         return stage_state.level
+
+    def _persist_animal_progress(self, animal: Animal) -> None:
+        store = self._config_store
+        if store is None:
+            return
+
+        updated_animals = tuple(
+            animal_config.with_progress(
+                stage=animal.current_stage_name,
+                level=animal.current_stage.level,
+            )
+            if animal_config.name == animal.name
+            else animal_config
+            for animal_config in store.value.animals
+        )
+        store.save(store.value.with_animals(updated_animals))
 
     def get_context[T: BaseModel](self, key: str, context_type: type[T]) -> T | None:
         return self.state.get_context(key, context_type)

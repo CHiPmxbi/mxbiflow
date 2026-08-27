@@ -43,6 +43,15 @@ class AnimalConfig(BaseModel):
     # Ordered stage names for manual next/prev navigation; empty disables it.
     stage_order: tuple[str, ...] = ()
 
+    def with_progress(self, *, stage: str, level: int) -> AnimalConfig:
+        return AnimalConfig(
+            rfid_id=self.rfid_id,
+            name=self.name,
+            stage=stage,
+            level=level,
+            stage_order=self.stage_order,
+        )
+
 
 class AnimalBaseInfo(BaseModel):
     animal: str
