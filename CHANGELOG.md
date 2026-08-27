@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.22](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.21...v0.3.22) (2026-08-27)
+
+
+### Bug Fixes
+
+* **session:** :bug: persist animal training progress ([#143](https://github.com/CHiPmxbi/mxbiflow/issues/143)) ([6265ff4](https://github.com/CHiPmxbi/mxbiflow/commit/6265ff454beccef3f5d8c0c68fe72f482c028da8))
+
 ## [0.3.21](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.20...v0.3.21) (2026-08-21)
 
 
