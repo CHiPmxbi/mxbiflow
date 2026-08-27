@@ -8,6 +8,7 @@ from unittest.mock import patch
 from pydantic import BaseModel, ValidationError
 
 from mxbiflow.bootstrap import init_session
+from mxbiflow.core.config_store import ConfigStore
 from mxbiflow.driver import MXBIModel
 from mxbiflow.models.animal import Animal, AnimalConfig, StageSnapshot, StageState
 from mxbiflow.models.session import (
@@ -33,6 +34,18 @@ class RecordingSnapshotStore(SessionSnapshotStore):
 
     def save(self, snapshot: Mapping[str, object]) -> None:
         self.snapshots.append(dict(snapshot))
+
+
+class RecordingConfigStore:
+    def __init__(self, config: SessionConfig) -> None:
+        self.value = config
+        self.saved: list[SessionConfig] = []
+
+    def save(self, data: SessionConfig | None = None) -> None:
+        if data is None:
+            return
+        self.value = data
+        self.saved.append(data)
 
 
 def make_session() -> Session:
@@ -164,6 +177,43 @@ class SessionModelTests(unittest.TestCase):
         )
         self.assertEqual(config.unknown_animal_as, animal.name)
 
+    def test_session_config_with_animals_returns_validated_copy(self) -> None:
+        animal = AnimalConfig(name="animal-1")
+        replacement = animal.with_progress(stage="stage_b", level=3)
+        config = SessionConfig(
+            experimenter="tester",
+            send_email=True,
+            sync_data=True,
+            note="note",
+            default_scene="default",
+            unknown_animal_as=animal.name,
+            fault_fallback="fallback",
+            hide_cursor=True,
+            fullscreen=True,
+            animals=(animal,),
+        )
+
+        updated = config.with_animals((replacement,))
+
+        self.assertEqual(updated.animals, (replacement,))
+        self.assertEqual(updated.experimenter, config.experimenter)
+        self.assertEqual(updated.reward_type, config.reward_type)
+        self.assertEqual(updated.send_email, config.send_email)
+        self.assertEqual(updated.sync_data, config.sync_data)
+        self.assertEqual(updated.note, config.note)
+        self.assertEqual(updated.default_scene, config.default_scene)
+        self.assertEqual(updated.unknown_animal_as, config.unknown_animal_as)
+        self.assertEqual(updated.fault_fallback, config.fault_fallback)
+        self.assertEqual(updated.hide_cursor, config.hide_cursor)
+        self.assertEqual(updated.fullscreen, config.fullscreen)
+        self.assertEqual(config.animals, (animal,))
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            "unknown_animal_as must match",
+        ):
+            config.with_animals((AnimalConfig(name="animal-2"),))
+
     def test_legacy_unknown_animal_field_does_not_configure_mapping(self) -> None:
         animal = AnimalConfig(name="animal-1")
 
@@ -186,6 +236,28 @@ class SessionModelTests(unittest.TestCase):
 
         self.assertEqual(parsed.stage_order, ("stage_a", "stage_b"))
         self.assertEqual(AnimalConfig().stage_order, ())
+
+    def test_animal_config_with_progress_returns_validated_copy(self) -> None:
+        config = AnimalConfig(
+            rfid_id="rfid-1",
+            name="animal-1",
+            stage="stage_a",
+            level=2,
+            stage_order=("stage_a", "stage_b"),
+        )
+
+        updated = config.with_progress(stage="stage_b", level=3)
+
+        self.assertEqual(updated.stage, "stage_b")
+        self.assertEqual(updated.level, 3)
+        self.assertEqual(updated.rfid_id, config.rfid_id)
+        self.assertEqual(updated.name, config.name)
+        self.assertEqual(updated.stage_order, config.stage_order)
+        self.assertEqual(config.stage, "stage_a")
+        self.assertEqual(config.level, 2)
+
+        with self.assertRaises(ValidationError):
+            config.with_progress(stage="stage_b", level=-1)
 
     def test_bootstrap_reuses_animal_config(self) -> None:
         animal_config = AnimalConfig(
@@ -558,6 +630,86 @@ class SessionModelTests(unittest.TestCase):
             ),
             ExampleContext(value=4),
         )
+
+    def test_current_stage_progress_is_persisted_across_sessions(self) -> None:
+        with TemporaryDirectory() as directory:
+            config_path = Path(directory) / "config" / "session.json"
+            animal_config = AnimalConfig(
+                rfid_id="rfid-1",
+                name="animal-1",
+                stage="stage_a",
+                level=2,
+                stage_order=("stage_a", "stage_b"),
+            )
+            other_config = AnimalConfig(name="animal-2", stage="other", level=4)
+            config = SessionConfig(
+                unknown_animal_as=animal_config.name,
+                animals=(animal_config, other_config),
+            )
+            config_store = ConfigStore(config_path, SessionConfig)
+            config_store.save(config)
+            mxbi_config = MXBIModel(
+                backup_source_root_id="source",
+                backup_destination_root_id="destination",
+            )
+
+            with patch(
+                "mxbiflow.bootstrap.get_runtime_state_path",
+                return_value=Path(directory) / "runtime.json",
+            ):
+                session = init_session(
+                    config_store.value,
+                    mxbi_config,
+                    config_store=config_store,
+                )
+                session.set_current_animal("animal-1")
+                session.level_up()
+
+                persisted = ConfigStore(config_path, SessionConfig).value
+                self.assertEqual(persisted.animals[0].stage, "stage_a")
+                self.assertEqual(persisted.animals[0].level, 3)
+                self.assertEqual(persisted.animals[0].rfid_id, "rfid-1")
+                self.assertEqual(persisted.animals[0].stage_order, ("stage_a", "stage_b"))
+                self.assertEqual(persisted.animals[1], other_config)
+
+                session.go_next_stage()
+                session.level_up()
+
+                reloaded_store = ConfigStore(config_path, SessionConfig)
+                restarted = init_session(
+                    reloaded_store.value,
+                    mxbi_config,
+                    config_store=reloaded_store,
+                )
+
+            restarted_animal = restarted.animals["animal-1"]
+            self.assertEqual(restarted_animal.current_stage_name, "stage_b")
+            self.assertEqual(restarted_animal.current_stage.level, 1)
+
+    def test_only_successful_current_progress_changes_are_persisted(self) -> None:
+        session = make_session()
+        store = RecordingConfigStore(session.config)
+        session.set_config_store(store)
+        session.set_current_animal("animal-1")
+        animal = session.require_current_animal()
+        animal.stages["historical"] = StageState(
+            stage_name="historical",
+            initial_level=4,
+            level=4,
+        )
+
+        session.level_up(animal="animal-1", stage="historical")
+        self.assertEqual(store.saved, [])
+
+        animal.current_stage.level = 0
+        with self.assertRaisesRegex(ValueError, "less than 0"):
+            session.level_down()
+        self.assertEqual(store.saved, [])
+
+        session.level_up()
+        self.assertEqual(len(store.saved), 1)
+        self.assertEqual(store.value.animals[0].stage, animal.current_stage_name)
+        self.assertEqual(store.value.animals[0].level, 1)
 
 
 class StageNavigationTests(unittest.TestCase):
