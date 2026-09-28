@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.24](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.23...v0.3.24) (2026-09-28)
+
+
+### Features
+
+* **eyetracker:** :sparkles: add py-mx-eye eyetracker driver ([#149](https://github.com/CHiPmxbi/mxbiflow/issues/149)) ([eb8dc7a](https://github.com/CHiPmxbi/mxbiflow/commit/eb8dc7ac90b95abc328b8707283339b9e4991e7d))
+
 ## [0.3.23](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.22...v0.3.23) (2026-08-27)
 
 
