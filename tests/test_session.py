@@ -669,7 +669,9 @@ class SessionModelTests(unittest.TestCase):
                 self.assertEqual(persisted.animals[0].stage, "stage_a")
                 self.assertEqual(persisted.animals[0].level, 3)
                 self.assertEqual(persisted.animals[0].rfid_id, "rfid-1")
-                self.assertEqual(persisted.animals[0].stage_order, ("stage_a", "stage_b"))
+                self.assertEqual(
+                    persisted.animals[0].stage_order, ("stage_a", "stage_b")
+                )
                 self.assertEqual(persisted.animals[1], other_config)
 
                 session.go_next_stage()

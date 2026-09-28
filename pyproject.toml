@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=2.5.2",
     "pandas>=3.0.5",
     "pillow>=12.3.0",
+    "py-mx-eye",
     "pydantic>=2.13.4",
     "pygame-ce>=2.5.8",
     "pyglet>=2.1.16",
@@ -39,6 +40,9 @@ include = ["src/mxbiflow", "tests"]
 extraPaths = ["src"]
 typeCheckingMode = "basic"
 reportPrivateUsage = "error"
+
+[tool.uv.sources]
+py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye" }
 
 
 [project.scripts]

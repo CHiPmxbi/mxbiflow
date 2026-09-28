@@ -110,7 +110,20 @@ Hardware interfaces and drivers are available under `mxbiflow.driver`:
 ```python
 from mxbiflow.driver import MXBI, MXBIModel
 from mxbiflow.driver.detector import DetectorEvent
+from mxbiflow.driver.eyetracker import Eyetracker, MxEyeEyetracker
 ```
+
+An `eyetracker` is configured through the optional `eyetrackers` list of
+`config/mxbi.json` (for example `{"type": "mx_eye", "id": 0, "enabled": true}`)
+and read at runtime through `get_mxbiflow().mxbi.eyetracker`, which is `None`
+when no eyetracker is configured. The `mx_eye` backend streams through
+py-mx-eye; until that tracker reports a screen-space mapping, its samples carry
+the pupil centre in source-image pixels.
+
+Scenes consume gaze once per frame through `get_mxbiflow().eye_sample`, which
+is `None` when no usable sample is available. See
+[docs/eyetracking.md](docs/eyetracking.md) for the data flow, the `None`
+semantics and a per-frame example.
 
 The former `pymxbi` package is now part of mxbiflow. Replace imports such as
 `pymxbi.detector` with `mxbiflow.driver.detector`; no compatibility namespace
