@@ -16,6 +16,16 @@ def main() -> None:
         RFIDContinuousDetector,
         RFIDContinuousDetectorModel,
     )
+    from mxbiflow.driver.eyetracker import (  # noqa: F401
+        EyeSample,
+        Eyetracker,
+        EyetrackerEnum,
+        EyetrackerModel,
+        MockEyetracker,
+        MockEyetrackerModel,
+        MxEyeEyetracker,
+        MxEyeEyetrackerModel,
+    )
     from mxbiflow.driver.mxbi import (  # noqa: F401
         MXBI,
         MXBIModel,

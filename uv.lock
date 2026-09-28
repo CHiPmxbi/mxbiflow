@@ -544,8 +544,16 @@ wheels = [
 ]
 
 [[package]]
+name = "mx-eye-protocol"
+version = "0.1.0"
+source = { git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fprotocol#6aab61eb4dbb186b8e32008848039dec86e362a4" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[[package]]
 name = "mxbiflow"
-version = "0.3.21"
+version = "0.3.23"
 source = { editable = "." }
 dependencies = [
     { name = "gpiozero" },
@@ -557,6 +565,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "pillow" },
+    { name = "py-mx-eye" },
     { name = "pydantic" },
     { name = "pygame-ce" },
     { name = "pyglet" },
@@ -596,6 +605,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.2" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "pillow", specifier = ">=12.3.0" },
+    { name = "py-mx-eye", git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fpy-mx-eye" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pygame-ce", specifier = ">=2.5.8" },
     { name = "pyglet", specifier = ">=2.1.16" },
@@ -765,6 +775,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/18/f0/a5595c1e8c3ae44b9828cb2f0fa8155e5095ef04d6327b8f61cf44a3df85/pillow-12.3.0-cp315-cp315t-win32.whl", hash = "sha256:1657923d2d45afb66526e5b933e5b3052e6bdea196c90d3abb2424e18c77dae8", size = 6474384, upload-time = "2026-07-01T11:56:18.855Z" },
     { url = "https://files.pythonhosted.org/packages/e4/04/62bcd9f844984c5938d3b05264a61d797a29d3e0812341a8204af70bbdee/pillow-12.3.0-cp315-cp315t-win_amd64.whl", hash = "sha256:8cd2f7bdda092d99c9fc2fb7391354f306d01443d22785d0cbfafa2e2c8bb418", size = 7243537, upload-time = "2026-07-01T11:56:21.214Z" },
     { url = "https://files.pythonhosted.org/packages/3d/68/1f3066acedf37673694a7141381d8f811ae97f30d34413d236abe7d489f1/pillow-12.3.0-cp315-cp315t-win_arm64.whl", hash = "sha256:06ff022112bc9cbf83b60f8e028d94ad87b60621706487e65f673de61610ab59", size = 2567491, upload-time = "2026-07-01T11:56:23.506Z" },
+]
+
+[[package]]
+name = "py-mx-eye"
+version = "0.1.0"
+source = { git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fpy-mx-eye#6aab61eb4dbb186b8e32008848039dec86e362a4" }
+dependencies = [
+    { name = "mx-eye-protocol" },
+    { name = "pydantic" },
 ]
 
 [[package]]

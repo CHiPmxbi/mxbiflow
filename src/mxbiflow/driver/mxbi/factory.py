@@ -1,3 +1,4 @@
+from py_mx_eye import MxEye, MxEyeConfig
 from pydantic import BaseModel, Field
 
 from ..detector import (
@@ -8,6 +9,13 @@ from ..detector import (
     FusionContinuousDetector,
     MockDetector,
     RFIDContinuousDetector,
+)
+from ..eyetracker import (
+    Eyetracker,
+    EyetrackerEnum,
+    EyetrackerModel,
+    MockEyetracker,
+    MxEyeEyetracker,
 )
 from ..peripheral.beam_break_sensor import RPIIRBreakBeamSensor
 from ..peripheral.rfid import DorsetLID665v42
@@ -28,6 +36,7 @@ class MXBIModel(BaseModel):
     backup_destination_root_id: str = Field(default="")
     rewarders: list[RewarderModel] = Field(default_factory=list)
     detectors: list[DetectorModel] = Field(default_factory=list)
+    eyetrackers: list[EyetrackerModel] = Field(default_factory=list)
 
 
 def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
@@ -35,6 +44,7 @@ def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
         config.screen_size,
         _build_rewarders(config.rewarders, logger),
         _build_detectors(config.detectors),
+        _build_eyetrackers(config.eyetrackers),
     )
 
 
@@ -99,3 +109,32 @@ def _make_detector(config: DetectorModel) -> Detector:
 
         case _:
             raise ValueError(f"Unknown detector type: {config.type}")
+
+
+def _build_eyetrackers(configs: list[EyetrackerModel]) -> dict[int, Eyetracker]:
+    return {c.id: _make_eyetracker(c) for c in configs if c.enabled}
+
+
+def _make_eyetracker(config: EyetrackerModel) -> Eyetracker:
+    match config.type:
+        case EyetrackerEnum.MOCK:
+            return MockEyetracker()
+
+        case EyetrackerEnum.MX_EYE:
+            client = MxEye(
+                MxEyeConfig(
+                    host=config.host,
+                    data_port=config.data_port,
+                    control_port=config.control_port,
+                    timeout=config.timeout,
+                )
+            )
+            return MxEyeEyetracker(
+                client,
+                poll_timeout=config.poll_timeout,
+                max_age_ms=config.max_age_ms,
+                start_acquisition=config.start_acquisition,
+            )
+
+        case _:
+            raise ValueError(f"Unknown eyetracker type: {config.type}")
