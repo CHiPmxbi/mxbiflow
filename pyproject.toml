@@ -42,7 +42,10 @@ typeCheckingMode = "basic"
 reportPrivateUsage = "error"
 
 [tool.uv.sources]
-py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye" }
+# Pinned to the mx_eye commit that changed the py-mx-eye SDK contract
+# (PJendritza/mx_eye#29). There is no compatibility layer, so the driver and
+# the tracker have to be updated together.
+py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "5ed95e97532af4c6c93715c7a55dbbd412cdfff9" }
 
 
 [project.scripts]

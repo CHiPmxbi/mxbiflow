@@ -82,11 +82,10 @@ class MxEyeEyetracker:
     def begin(self) -> None:
         """Connect to the tracker and start the background reader thread.
 
-        Raises
-        ------
-        RuntimeError
-            If the tracker is not publishing its sample stream, in which case
-            no reader thread is started.
+        The SDK subscribes asynchronously, so an offline or not-yet-publishing
+        tracker is not an error here: :meth:`sample` keeps returning ``None``
+        until samples arrive. Only a local socket-setup failure propagates, and
+        in that case no reader thread is started.
         """
         if self._thread is not None:
             return
@@ -124,12 +123,12 @@ class MxEyeEyetracker:
         ):
             return None
 
-        payload = sample.frame.payload
-        x, y = payload.pupil_x, payload.pupil_y
+        frame = sample.frame
+        x, y = frame.pupil_x, frame.pupil_y
         if not (math.isfinite(x) and math.isfinite(y)):
             return None
 
-        return EyeSample(timestamp_ns=payload.acquisition_ns, x=x, y=y)
+        return EyeSample(timestamp_ns=frame.acquisition_ns, x=x, y=y)
 
     def _read_loop(self) -> None:
         """Drain the sample stream until stopped or the stream breaks."""
