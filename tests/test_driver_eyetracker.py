@@ -8,8 +8,9 @@ from collections.abc import Callable
 from threading import Event
 from typing import cast
 
-from mx_eye_protocol.data_frame import DataFrame, TrackingPayload
-from py_mx_eye import MxEye, Sample
+import zmq
+from mx_eye_protocol.data_frame import DataFrame
+from py_mx_eye import MxEye, MxEyeConfig, Sample
 
 from mxbiflow.driver.detector.detector import DetectionResult, DetectorEvent
 from mxbiflow.driver.eyetracker import (
@@ -22,16 +23,20 @@ from mxbiflow.driver.mxbi.mxbi import MXBI
 _LOGGER_NAME = "mxbiflow"
 
 
-def _make_sample(
+def _make_frame(
     *,
     pupil_x: float = 100.0,
     pupil_y: float = 50.0,
     acquisition_ns: int | None = None,
     sequence: int = 1,
-) -> Sample:
-    """Build a real py-mx-eye sample carrying the given pupil centre."""
+) -> DataFrame:
+    """Build one real py-mx-eye tracking frame carrying the given pupil centre.
+
+    ``flags`` stays at ``NONE``: the driver reads the pupil centre and passes
+    ``require_valid=False``, so an uncalibrated tracker still reports.
+    """
     now = time.time_ns() if acquisition_ns is None else acquisition_ns
-    payload = TrackingPayload(
+    return DataFrame(
         session=1,
         sequence=sequence,
         frame=sequence,
@@ -49,7 +54,25 @@ def _make_sample(
         pupil_area=1000.0,
         template_ncc=float("nan"),
     )
-    return Sample(frame=DataFrame.from_payload(payload), receive_ns=time.time_ns())
+
+
+def _make_sample(
+    *,
+    pupil_x: float = 100.0,
+    pupil_y: float = 50.0,
+    acquisition_ns: int | None = None,
+    sequence: int = 1,
+) -> Sample:
+    """Build a real py-mx-eye sample carrying the given pupil centre."""
+    return Sample(
+        frame=_make_frame(
+            pupil_x=pupil_x,
+            pupil_y=pupil_y,
+            acquisition_ns=acquisition_ns,
+            sequence=sequence,
+        ),
+        receive_ns=time.time_ns(),
+    )
 
 
 def _wait_until(predicate, timeout: float = 2.0, interval: float = 0.005) -> bool:
@@ -146,7 +169,7 @@ class MxEyeEyetrackerTests(unittest.TestCase):
         assert result is not None
         self.assertEqual(result.x, 321.5)
         self.assertEqual(result.y, 123.25)
-        self.assertEqual(result.timestamp_ns, sample.frame.payload.acquisition_ns)
+        self.assertEqual(result.timestamp_ns, sample.frame.acquisition_ns)
 
     def test_read_uses_configured_filters(self) -> None:
         fake = _FakeMxEye()
@@ -213,9 +236,19 @@ class MxEyeEyetrackerTests(unittest.TestCase):
 
         self.assertEqual(fake.calls.count("connect"), 1)
 
-    def test_begin_propagates_connect_failure(self) -> None:
+    def test_begin_succeeds_without_a_publisher(self) -> None:
         fake = _FakeMxEye()
-        fake.connect_error = RuntimeError("no tracker publishing")
+
+        tracker = self._start(fake)
+
+        self.assertIn("connect", fake.calls)
+        # The reader thread drains the stream while the tracker is silent.
+        self.assertTrue(_wait_until(lambda: bool(fake.read_kwargs)))
+        self.assertIsNone(tracker.sample())
+
+    def test_begin_propagates_socket_setup_failure(self) -> None:
+        fake = _FakeMxEye()
+        fake.connect_error = RuntimeError("cannot set up the sample socket")
         tracker = MxEyeEyetracker(_client(fake), poll_timeout=0.01)
         self.addCleanup(tracker.quit)
 
@@ -223,6 +256,9 @@ class MxEyeEyetrackerTests(unittest.TestCase):
             tracker.begin()
 
         self.assertIsNone(tracker.sample())
+        self.assertFalse(
+            any(thread.name == "mx-eye-reader" for thread in threading.enumerate())
+        )
 
     def test_non_finite_pupil_is_not_reported(self) -> None:
         fake = _FakeMxEye([[_make_sample()]])
@@ -256,6 +292,51 @@ class MxEyeEyetrackerTests(unittest.TestCase):
         self.assertTrue(_wait_until(lambda: tracker.sample() is None))
         self.assertIn("tracker went away", self.warnings.records[0].getMessage())
         self.assertGreaterEqual(self.warnings.records[0].levelno, logging.WARNING)
+
+
+class MxEyeEyetrackerStreamTests(unittest.TestCase):
+    """End-to-end test against the real SDK and a local ZeroMQ publisher.
+
+    The fake client replays hand-built samples, so only this test covers the
+    wire format, the SDK's subscription path and its session/sequence policy.
+    """
+
+    def setUp(self) -> None:
+        self.context = zmq.Context()
+        self.addCleanup(self.context.term)
+        self.publisher = self.context.socket(zmq.PUB)
+        self.addCleanup(self.publisher.close, 0)
+        self.port = self.publisher.bind_to_random_port("tcp://127.0.0.1")
+
+    def test_reports_sample_published_over_the_wire(self) -> None:
+        tracker = MxEyeEyetracker(
+            MxEye(MxEyeConfig(host="127.0.0.1", data_port=self.port)),
+            poll_timeout=0.05,
+            max_age_ms=1000.0,
+        )
+        self.addCleanup(tracker.quit)
+
+        tracker.begin()
+
+        # ZeroMQ PUB drops messages until the SUB subscription has propagated
+        # and the receiver keeps only strictly newer sequence numbers, so keep
+        # publishing fresh frames until the backend reports one.
+        published: list[int] = []
+        sample = None
+        sequence = 0
+        deadline = time.monotonic() + 5.0
+        while sample is None and time.monotonic() < deadline:
+            sequence += 1
+            frame = _make_frame(pupil_x=321.5, pupil_y=123.25, sequence=sequence)
+            published.append(frame.acquisition_ns)
+            self.publisher.send(frame.encode())
+            sample = tracker.sample()
+            time.sleep(0.02)
+
+        self.assertIsNotNone(sample)
+        assert sample is not None
+        self.assertEqual((sample.x, sample.y), (321.5, 123.25))
+        self.assertIn(sample.timestamp_ns, published)
 
 
 class MockEyetrackerTests(unittest.TestCase):

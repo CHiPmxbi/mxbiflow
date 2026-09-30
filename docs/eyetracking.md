@@ -22,6 +22,11 @@ pulling rather than by posting a pygame event per sample: a 60–100 Hz stream
 turned into events would flood the event queue, while sparse device events
 (see `DetectorBridge`) exist for state transitions.
 
+The SDK subscribes asynchronously, so starting before the tracker publishes is
+not an error: gaze simply stays `None` until samples arrive. It has no
+compatibility layer, so `py-mx-eye` is pinned in `pyproject.toml` to the SDK
+contract this driver consumes.
+
 ## Consuming gaze per frame
 
 Scenes read `MXBIFlow.eye_sample` from `update(dt_s)`. The value is `None`
@@ -32,6 +37,7 @@ whenever there is no usable gaze for that frame:
 | No `eyetracker` configured (or `enabled: false`) | `None` |
 | Tracker running, pupil detected | The latest `EyeSample` |
 | No sample yet | `None` |
+| Tracker configured but not publishing (offline, or acquisition stopped) | `None` |
 | Latest sample older than `max_age_ms` | `None` |
 | Sample stream stopped or tracker unreachable | `None` |
 | Pupil not detected in the frame (NaN coordinates) | `None` |
