@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.25](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.24...v0.3.25) (2026-09-30)
+
+
+### Bug Fixes
+
+* **eyetracker:** :alien: update py-mx-eye driver for the reworked SDK ([#153](https://github.com/CHiPmxbi/mxbiflow/issues/153)) ([25371f0](https://github.com/CHiPmxbi/mxbiflow/commit/25371f09a13bb5fb7d50b0cb0a315a3591e550ce))
+
 ## [0.3.24](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.23...v0.3.24) (2026-09-28)
 
 
