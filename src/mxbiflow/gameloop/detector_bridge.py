@@ -6,6 +6,7 @@ from pygame import event
 
 from mxbiflow.driver.detector import MockDetector
 from mxbiflow.driver.detector.detector import DetectionResult, Detector, DetectorEvent
+from mxbiflow.utils.logger import rfid_logger
 
 EVT_DETECTOR = pygame.USEREVENT + 1
 
@@ -37,14 +38,14 @@ class DetectorBridge:
             return
         self._started = True
 
-        self._detector.begin()
-
         # fmt: off
         self._detector.register_event(DetectorEvent.ANIMAL_ENTERED, self._on_animal_entered)
+        self._detector.register_event(DetectorEvent.ANIMAL_IDENTIFIED, self._on_animal_identified)
         self._detector.register_event(DetectorEvent.ANIMAL_LEFT, self._on_animal_left)
         self._detector.register_event(DetectorEvent.UNKNOWN_ANIMAL_ENTERED, self._on_unknown_animal_entered)
         self._detector.register_event(DetectorEvent.FAULT_DETECTED, self._on_fault_detected)
         # fmt: on
+        self._detector.begin()
 
     def _enqueue(self, kind: DetectorEvent, animal: str | None) -> None:
         self._q.put(DetectorMsg(kind=kind, animal=animal))
@@ -58,6 +59,16 @@ class DetectorBridge:
 
     def _on_animal_left(self, result: DetectionResult) -> None:
         self._enqueue(DetectorEvent.ANIMAL_LEFT, self._resolve_animal(result.animal_id))
+
+    def _on_animal_identified(self, result: DetectionResult) -> None:
+        name = self._resolve_animal(result.animal_id)
+        if name is None:
+            rfid_logger.warning(
+                "Identified RFID tag has no configured animal mapping",
+                extra={"animal_id": result.animal_id},
+            )
+            return
+        self._enqueue(DetectorEvent.ANIMAL_IDENTIFIED, name)
 
     def _on_unknown_animal_entered(self, result: DetectionResult) -> None:
         self._enqueue(DetectorEvent.UNKNOWN_ANIMAL_ENTERED, result.animal_id)

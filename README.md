@@ -96,6 +96,19 @@ Because loguru's logger is a global singleton, the `logger` you import
 above is the configured one — no instance is returned. The CLI
 (`python -m mxbiflow`) enables this setup automatically.
 
+RFID tags, errors, and identity changes also go to a separate `rfid.log`
+beside the main log, with the same rotation and retention settings. Pass
+`rfid_log_file="log/custom-rfid.log"` to choose its location or
+`rfid_log_file=None` to disable it. With `log_file=None`, no RFID file is
+created unless an explicit RFID path is supplied.
+
+The fusion detector waits for RFID after the beam is broken (defaults:
+50 ms polling, 10 s timeout). After the timeout it reports an unknown
+animal and keeps scanning until identification or departure. A late
+identification emits `ANIMAL_IDENTIFIED`; the scheduler applies the new
+identity after the current trial ends. Existing trial data stays with
+the previous animal. The first confirmed identity is fixed until departure.
+
 Without loguru, the library stays silent: you can handle mxbiflow's
 records with your own standard-library handlers instead.
 

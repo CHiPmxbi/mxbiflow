@@ -22,6 +22,8 @@ class DetectorEvent(StrEnum):
         The animal is no longer detected.
     UNKNOWN_ANIMAL_ENTERED
         An animal was detected but could not be identified.
+    ANIMAL_IDENTIFIED
+        A previously unknown animal has been identified while still present.
     FAULT_DETECTED
         A fault occurred while reading sensor inputs.
     """
@@ -29,6 +31,7 @@ class DetectorEvent(StrEnum):
     ANIMAL_ENTERED = auto()
     ANIMAL_LEFT = auto()
     UNKNOWN_ANIMAL_ENTERED = auto()
+    ANIMAL_IDENTIFIED = auto()
     FAULT_DETECTED = auto()
 
 
