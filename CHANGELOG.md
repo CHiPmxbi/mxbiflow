@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.26](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.25...v0.3.26) (2026-10-06)
+
+
+### Features
+
+* **detector:** :sparkles: identify unknown animals after RFID timeout ([#156](https://github.com/CHiPmxbi/mxbiflow/issues/156)) ([cddd5aa](https://github.com/CHiPmxbi/mxbiflow/commit/cddd5aa86d287f4d3c83c6e0fbafff1f2a06a3d9))
+
 ## [0.3.25](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.24...v0.3.25) (2026-09-30)
 
 
