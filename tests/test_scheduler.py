@@ -214,5 +214,113 @@ class ManualControlTests(unittest.TestCase):
         self.assertEqual(session.current_animal.current_stage_name, "stage_a")
 
 
+class IdentityUpdateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        configs = (
+            AnimalConfig(name="fallback", stage="stage_a"),
+            AnimalConfig(name="identified", stage="stage_b"),
+        )
+        animals = {
+            config.name: Animal(
+                config=config,
+                current_stage_name=config.stage,
+                stages={config.stage: StageState(stage_name=config.stage)},
+            )
+            for config in configs
+        }
+        self.session = Session(
+            config=SessionConfig(unknown_animal_as="fallback", animals=configs),
+            mxbi_config=MXBIModel(
+                backup_source_root_id="source",
+                backup_destination_root_id="destination",
+            ),
+            state=SessionState(animals=animals),
+        )
+        self.manager = SceneManager()
+        self.manager.register([StageA, StageB, StageC])
+        self.manager.register({"idle": StageC})
+        self.manager.fault_fallback = "stage_c"
+        self.scheduler = Scheduler(self.session, self.manager)
+        self.send(DetectorEvent.UNKNOWN_ANIMAL_ENTERED)
+        self.scheduler.update()
+        self.manager.apply_pending()
+
+    def send(self, kind: DetectorEvent, animal: str | None = None) -> None:
+        self.scheduler.handle_event(
+            Event(
+                EVT_DETECTOR,
+                msg=DetectorMsg(kind=kind, animal=animal),
+            )
+        )
+
+    def test_waits_for_trial_end_and_preserves_previous_trial_ownership(self) -> None:
+        fallback = self.session.require_current_animal()
+        previous_session = fallback.current_animal_session
+        assert previous_session is not None
+        self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertEqual(self.session.require_current_animal().name, "fallback")
+        self.assertIsInstance(self.manager.current, StageA)
+        self.session.add_trial()
+        assert self.manager.current is not None
+        self.manager.current.quit()
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertEqual(self.session.require_current_animal().name, "identified")
+        self.assertIsInstance(self.manager.current, StageB)
+        self.assertEqual(fallback.trial_id, 1)
+        self.assertIsNotNone(previous_session.end_at)
+        self.assertEqual(previous_session.trial_id, 1)
+        self.assertEqual(self.session.require_current_animal().trial_id, 0)
+
+    def test_same_fallback_identity_does_not_restart_session_or_scene(self) -> None:
+        animal = self.session.require_current_animal()
+        previous_session = animal.current_animal_session
+        scene = self.manager.current
+        self.send(DetectorEvent.ANIMAL_IDENTIFIED, "fallback")
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertIs(animal.current_animal_session, previous_session)
+        self.assertIs(self.manager.current, scene)
+
+    def test_applies_identity_when_no_trial_is_running(self) -> None:
+        self.manager.current = None
+        self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertEqual(self.session.require_current_animal().name, "identified")
+        self.assertIsInstance(self.manager.current, StageB)
+
+    def test_leave_cancels_pending_identity(self) -> None:
+        self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
+        self.send(DetectorEvent.ANIMAL_LEFT)
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertIsNone(self.session.current_animal)
+        self.assertEqual(
+            len(self.session.state.animals["identified"].animal_sessions), 0
+        )
+
+    def test_new_entry_cancels_pending_identity(self) -> None:
+        self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
+        self.send(DetectorEvent.UNKNOWN_ANIMAL_ENTERED)
+        assert self.manager.current is not None
+        self.manager.current.quit()
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertEqual(self.session.require_current_animal().name, "fallback")
+
+    def test_fault_cancels_pending_identity(self) -> None:
+        self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
+        self.send(DetectorEvent.FAULT_DETECTED)
+        self.manager.apply_pending()
+        assert self.manager.current is not None
+        self.manager.current.quit()
+        self.scheduler.update()
+        self.manager.apply_pending()
+        self.assertEqual(self.session.require_current_animal().name, "fallback")
+
+
 if __name__ == "__main__":
     unittest.main()

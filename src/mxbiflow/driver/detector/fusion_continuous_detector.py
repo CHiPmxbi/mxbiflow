@@ -12,6 +12,7 @@ from mxbiflow.driver.peripheral.beam_break_sensor.beam_break_sensor import (
     BeamBreakSensor,
 )
 from mxbiflow.driver.peripheral.rfid.rfid import RFIDReader, RFIDTag
+from mxbiflow.utils.logger import rfid_logger
 
 from .detector import DetectionResult, DetectorEvent
 
@@ -24,7 +25,7 @@ class _State(Enum):
     """Internal states of the fusion detector."""
 
     IDLE = auto()  # Beam clear, no animal
-    ANIMAL_PRESENT = auto()  # Beam broken, waiting for RFID (within 10 s)
+    ANIMAL_PRESENT = auto()  # Beam broken, within the initial RFID window
     ANIMAL_CONFIRMED = auto()  # Beam broken and RFID matched
     ANIMAL_UNCONFIRMED = auto()  # Beam broken, RFID timed out (unknown animal)
 
@@ -34,15 +35,16 @@ class _Event(Enum):
 
     RISING_EDGE = auto()  # Beam just broken  (animal enters)
     FALLING_EDGE = auto()  # Beam just restored (animal leaves)
-    RFID_READ = auto()  # Valid RFID tag obtained within window
-    TIMEOUT = auto()  # 10 s elapsed without RFID while beam broken
+    RFID_READ = auto()  # Fresh RFID tag obtained during this presence
+    TIMEOUT = auto()  # Initial RFID waiting window elapsed while beam broken
 
 
 # ---------------------------------------------------------------------------
 # Transition-table type
 # ---------------------------------------------------------------------------
 
-_Action = Callable[[], None]
+_Notification = tuple[DetectorEvent, DetectionResult]
+_Action = Callable[[], _Notification | None]
 
 
 class _Transition(NamedTuple):
@@ -70,12 +72,15 @@ class FusionContinuousDetector:
 
     Detection logic
     ---------------
-    * **Rising edge** (beam broken — animal arrives): start a 10 s window to
-      acquire an RFID tag.  If a tag whose ``detect_time`` falls within the
-      window is read, emit ``ANIMAL_ENTERED`` with the animal's identity.
+    * **Rising edge** (beam broken — animal arrives): start an RFID window
+      controlled by ``rfid_timeout``. If a fresh tag captured after this edge
+      is read, emit ``ANIMAL_ENTERED`` with the animal's identity.
       If the window expires without a valid tag, emit
       ``UNKNOWN_ANIMAL_ENTERED`` with ``animal_id=None`` and ``error=True``
       (unknown animal).
+      Continue scanning while the animal remains present and emit
+      ``ANIMAL_IDENTIFIED`` on the first valid tag after becoming unknown.
+      The confirmed identity stays fixed until the animal leaves.
     * **Falling edge** (beam restored — animal leaves): emit ``ANIMAL_LEFT``
       after the optional beam-break filter confirms a stable clear state. No
       recent RFID result is required.
@@ -142,7 +147,7 @@ class FusionContinuousDetector:
             # -- ANIMAL_UNCONFIRMED (beam broken, RFID timed out) ----------
             (_State.ANIMAL_UNCONFIRMED, _Event.RISING_EDGE):  _Transition(_State.ANIMAL_UNCONFIRMED, noop),
             (_State.ANIMAL_UNCONFIRMED, _Event.FALLING_EDGE): _Transition(_State.IDLE, self._on_left_unconfirmed),
-            (_State.ANIMAL_UNCONFIRMED, _Event.RFID_READ):    _Transition(_State.ANIMAL_UNCONFIRMED, noop),
+            (_State.ANIMAL_UNCONFIRMED, _Event.RFID_READ):    _Transition(_State.ANIMAL_CONFIRMED, self._on_identified),
             (_State.ANIMAL_UNCONFIRMED, _Event.TIMEOUT):      _Transition(_State.ANIMAL_UNCONFIRMED, noop),
         }
         # fmt: on
@@ -191,32 +196,23 @@ class FusionContinuousDetector:
     def _worker(self) -> None:
         """Background loop: poll beam sensor, drive state machine."""
         while not self._stop_event.is_set():
-            now = time()
-            events: list[_Event] = []
-
-            # 1. Edge detection (beam break sensor)
-            edge = self._detect_edge(monotonic())
-            if edge is not None:
-                events.append(edge)
-
-            # 2. RFID read — the reader has its own background thread;
-            #    we just grab the latest result and let the state table
-            #    decide whether the event is relevant.
-            rfid = self._try_read_rfid(now)
-            if rfid is not None:
-                events.append(rfid)
-
-            # 3. Timeout check
-            timeout = self._check_timeout(now)
-            if timeout is not None:
-                events.append(timeout)
-
-            # 4. Dispatch all collected events (priority: edge > rfid > timeout)
-            with self._lock:
-                for evt in events:
-                    self._dispatch(evt)
-
+            self._poll_once()
             sleep(self._poll_interval)
+
+    def _poll_once(self) -> None:
+        """Process the beam edge before RFID, then check the waiting timeout."""
+        edge = self._detect_edge(monotonic())
+        if edge is not None:
+            self._dispatch(edge)
+
+        now = time()
+        rfid = self._try_read_rfid(now)
+        if rfid is not None:
+            self._dispatch(rfid)
+
+        timeout = self._check_timeout(now)
+        if timeout is not None:
+            self._dispatch(timeout)
 
     # ---- internal: sensor helpers ----------------------------------------
 
@@ -258,10 +254,25 @@ class FusionContinuousDetector:
         tag = self._rfid_reader.read()
         if tag is None:
             return None
-        if now - tag.detect_time <= self._rfid_timeout:
-            self._last_tag = tag
-            return _Event.RFID_READ
-        return None
+        if self._state == _State.ANIMAL_CONFIRMED:
+            if tag.animal_id != self._current_animal:
+                rfid_logger.info(
+                    "Ignoring RFID identity change while animal remains present",
+                    extra={
+                        "animal_id": tag.animal_id,
+                        "current_animal": self._current_animal,
+                    },
+                )
+            return None
+        if self._state not in (_State.ANIMAL_PRESENT, _State.ANIMAL_UNCONFIRMED):
+            return None
+        if not (
+            self._edge_time <= tag.detect_time <= now
+            and now - tag.detect_time <= self._rfid_timeout
+        ):
+            return None
+        self._last_tag = tag
+        return _Event.RFID_READ
 
     def _check_timeout(self, now: float) -> _Event | None:
         """Return ``TIMEOUT`` when the RFID window has expired."""
@@ -276,12 +287,14 @@ class FusionContinuousDetector:
     # ---- internal: state-machine dispatch --------------------------------
 
     def _dispatch(self, event: _Event) -> None:
-        transition = self._table.get((self._state, event))
-        if transition is None:
-            return
-
-        transition.action()
-        self._state = transition.next_state
+        with self._lock:
+            transition = self._table.get((self._state, event))
+            if transition is None:
+                return
+            notification = transition.action()
+            self._state = transition.next_state
+        if notification is not None:
+            self._emit(*notification)
 
     # ---- internal: result helpers ----------------------------------------
 
@@ -311,42 +324,44 @@ class FusionContinuousDetector:
         """Beam broken — start RFID acquisition window."""
         self._edge_time = time()
 
-    def _on_entered_confirmed(self) -> None:
+    def _on_entered_confirmed(self) -> _Notification | None:
         """RFID read while beam is broken — identified animal entered."""
+        return self._confirm_identity(DetectorEvent.ANIMAL_ENTERED)
+
+    def _on_identified(self) -> _Notification | None:
+        """RFID resolved the identity of an animal already reported as unknown."""
+        return self._confirm_identity(DetectorEvent.ANIMAL_IDENTIFIED)
+
+    def _confirm_identity(self, event: DetectorEvent) -> _Notification | None:
         if self._last_tag is None:
             return
         animal_id = self._last_tag.animal_id
         self._current_animal = animal_id
-        self._emit(
-            DetectorEvent.ANIMAL_ENTERED,
-            self._make_result(animal_id=animal_id),
+        rfid_logger.info(
+            "Animal identity confirmed",
+            extra={"animal_id": animal_id, "detector_event": event.value},
         )
+        return event, self._make_result(animal_id=animal_id)
 
-    def _on_entered_unknown(self) -> None:
+    def _on_entered_unknown(self) -> _Notification:
         """RFID window expired — unknown animal entered."""
         self._current_animal = None
-        self._emit(
-            DetectorEvent.UNKNOWN_ANIMAL_ENTERED,
-            self._make_result(error=True),
-        )
+        rfid_logger.info("RFID waiting window expired; continuing identity scan")
+        return DetectorEvent.UNKNOWN_ANIMAL_ENTERED, self._make_result(error=True)
 
-    def _on_left_confirmed(self) -> None:
+    def _on_left_confirmed(self) -> _Notification:
         """Beam restored after RFID confirmation — animal left."""
-        animal_id = self._last_tag.animal_id if self._last_tag else self._current_animal
-        self._emit(
-            DetectorEvent.ANIMAL_LEFT,
-            self._make_result(animal_id=animal_id),
-        )
-        self._current_animal = None
-        self._last_tag = None
-        self._edge_time = 0.0
+        result = self._make_result(animal_id=self._current_animal)
+        self._clear_presence()
+        return DetectorEvent.ANIMAL_LEFT, result
 
-    def _on_left_unconfirmed(self) -> None:
+    def _on_left_unconfirmed(self) -> _Notification:
         """Beam restored before RFID arrived — animal left without ID."""
-        self._emit(
-            DetectorEvent.ANIMAL_LEFT,
-            self._make_result(),
-        )
+        result = self._make_result()
+        self._clear_presence()
+        return DetectorEvent.ANIMAL_LEFT, result
+
+    def _clear_presence(self) -> None:
         self._current_animal = None
         self._last_tag = None
         self._edge_time = 0.0

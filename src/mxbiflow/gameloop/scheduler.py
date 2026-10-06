@@ -5,7 +5,7 @@ from mxbiflow.driver.detector.detector import DetectorEvent
 from ..models.session import Session
 from ..scene import SceneManager
 from ..scene.idle.idle import IDLE
-from ..utils.logger import logger
+from ..utils.logger import logger, rfid_logger
 from .detector_bridge import EVT_DETECTOR, DetectorMsg
 
 
@@ -20,6 +20,7 @@ class Scheduler:
         self._scenes = self._scene_manager.scenes
 
         self._need_refresh = False
+        self._pending_animal: str | None = None
 
     def _mark_refresh(self) -> None:
         self._need_refresh = True
@@ -93,17 +94,24 @@ class Scheduler:
 
         match msg.kind:
             case DetectorEvent.FAULT_DETECTED:
+                self._pending_animal = None
                 self._handle_fault_event()
 
             case DetectorEvent.ANIMAL_ENTERED:
+                self._pending_animal = None
                 if msg.animal is None:
                     return
                 self._set_current_animal(msg.animal)
 
             case DetectorEvent.UNKNOWN_ANIMAL_ENTERED:
+                self._pending_animal = None
                 self._handle_unknown_animal()
 
+            case DetectorEvent.ANIMAL_IDENTIFIED:
+                self._pending_animal = msg.animal
+
             case DetectorEvent.ANIMAL_LEFT:
+                self._pending_animal = None
                 self._clear_current_animal()
 
     def _shoud_refresh(self) -> bool:
@@ -115,6 +123,7 @@ class Scheduler:
         )
 
     def update(self) -> None:
+        self._apply_pending_identity()
         if self._shoud_refresh():
             self._mark_refresh()
 
@@ -123,6 +132,25 @@ class Scheduler:
 
         self._need_refresh = False
         self._refresh_by_state()
+
+    def _apply_pending_identity(self) -> None:
+        animal = self._pending_animal
+        if animal is None:
+            return
+        current = self._session.current_animal
+        if current is not None and current.name == animal:
+            self._pending_animal = None
+            return
+        scene = self._scene_manager.current
+        if scene is not None and not isinstance(scene, IDLE) and scene.running:
+            return
+        self._pending_animal = None
+        previous = current.name if current is not None else None
+        self._set_current_animal(animal)
+        rfid_logger.info(
+            "Applied identified animal at trial boundary",
+            extra={"previous_animal": previous, "animal": animal},
+        )
 
     def _refresh_by_state(self) -> None:
         animal = self._session.current_animal

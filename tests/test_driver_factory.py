@@ -54,6 +54,8 @@ class DetectorModelTests(unittest.TestCase):
     def test_fusion_filter_defaults_and_validation(self) -> None:
         model = FusionContinuousDetectorModel()
 
+        self.assertEqual(model.poll_interval, 0.05)
+        self.assertEqual(model.rfid_timeout, 10.0)
         self.assertFalse(model.beam_break_filter_enabled)
         self.assertEqual(model.beam_break_filter_duration, 0.2)
 

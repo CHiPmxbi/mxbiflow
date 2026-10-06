@@ -63,8 +63,8 @@ class FusionContinuousDetectorModel(BaseModel):
     port: str = Field(default="/dev/ttyUSB0")
     baudrate: int = Field(default=57600, ge=1)
 
-    poll_interval: float = 10.0
-    rfid_timeout: float = 0.05
+    poll_interval: float = 0.05
+    rfid_timeout: float = 10.0
     beam_break_filter_enabled: bool = False
     beam_break_filter_duration: float = Field(default=0.2, gt=0)
 

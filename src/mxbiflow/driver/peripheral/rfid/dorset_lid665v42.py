@@ -7,6 +7,8 @@ from threading import Lock, Thread
 
 from serial import EIGHTBITS, PARITY_NONE, STOPBITS_ONE, Serial, SerialException
 
+from mxbiflow.utils.logger import rfid_logger
+
 
 class ProtocolState(StrEnum):
     """Internal parser states for the Dorset frame protocol."""
@@ -62,11 +64,12 @@ class Result:
 class _LID665v42FrameParser:
     """State machine that understands the Dorset LID665v42 frame structure."""
 
-    def __init__(self) -> None:
+    def __init__(self, port: str | None = None) -> None:
         self._state = ProtocolState.WAIT_FOR_START
         self._frame_buffer = bytearray()
         self._frame_started_at = 0.0
         self._last_error: str = ""
+        self._port = port
 
     def reset(self) -> None:
         self._state = ProtocolState.WAIT_FOR_START
@@ -80,6 +83,7 @@ class _LID665v42FrameParser:
     def record_error(self, message: str) -> None:
         """Save an error message for later inspection via `last_error`."""
         self._last_error = message
+        rfid_logger.warning("RFID error: %s", message, extra={"port": self._port})
 
     def feed(self, byte: bytes) -> Result | None:
         """Consume a single byte and return a parsed `Result` when a frame completes."""
@@ -96,7 +100,7 @@ class _LID665v42FrameParser:
             case ProtocolState.AWAIT_TRAILER:
                 return self._handle_trailer(byte)
             case _:
-                self._last_error = f"Unhandled protocol state: {self._state}"
+                self.record_error(f"Unhandled protocol state: {self._state}")
                 self.reset()
                 return None
 
@@ -107,7 +111,7 @@ class _LID665v42FrameParser:
             self._frame_buffer.extend(byte)
             self._state = ProtocolState.IN_FRAME
         else:
-            self._last_error = f"Expected {START!r} but received {byte!r}"
+            self.record_error(f"Expected {START!r} but received {byte!r}")
 
     def _handle_in_frame(self, byte: bytes) -> None:
         if byte == DLE:
@@ -138,7 +142,7 @@ class _LID665v42FrameParser:
             self._last_error = ""
             return result
         except ValueError as e:
-            self._last_error = str(e)
+            self.record_error(str(e))
             return None
         finally:
             self.reset()
@@ -235,18 +239,24 @@ class DorsetLID665v42:
         SerialException
             If the serial port cannot be configured.
         """
-        self._serial = Serial(
-            port,
-            baudrate,
-            parity=PARITY_NONE,
-            stopbits=STOPBITS_ONE,
-            bytesize=EIGHTBITS,
-            timeout=1,
-        )
+        try:
+            self._serial = Serial(
+                port,
+                baudrate,
+                parity=PARITY_NONE,
+                stopbits=STOPBITS_ONE,
+                bytesize=EIGHTBITS,
+                timeout=1,
+            )
+        except SerialException, OSError:
+            rfid_logger.exception(
+                "RFID serial initialization failed", extra={"port": port}
+            )
+            raise
         self._unit = unit
         self._host = host
 
-        self._parser = _LID665v42FrameParser()
+        self._parser = _LID665v42FrameParser(port)
 
         self._reader_thread: Thread | None = None
 
@@ -291,7 +301,13 @@ class DorsetLID665v42:
         :raises SerialException: If opening the serial port fails.
         """
         if not self._serial.is_open:
-            self._serial.open()
+            try:
+                self._serial.open()
+            except SerialException, OSError:
+                rfid_logger.exception(
+                    "RFID serial open failed", extra={"port": self._serial.port}
+                )
+                raise
 
     def close(self) -> None:
         """Close the serial port if it is open."""
@@ -313,6 +329,14 @@ class DorsetLID665v42:
 
             frame = self._parser.feed(byte)
             if frame is not None:
+                rfid_logger.info(
+                    "RFID tag parsed",
+                    extra={
+                        "port": self._serial.port,
+                        "animal_id": frame.animal_id,
+                        "detect_time": frame.detect_time,
+                    },
+                )
                 with self._current_result_lock:
                     self._current_result = frame
 

@@ -29,6 +29,12 @@ from ..core.path import get_default_log_file_path
 #: the host application remains free to add its own handlers.
 logger = logging.getLogger("mxbiflow")
 logger.addHandler(logging.NullHandler())
+rfid_logger = logging.getLogger("mxbiflow.rfid")
+
+_LOG_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__) | {
+    "message",
+    "asctime",
+}
 
 
 class _DefaultLogFile:
@@ -60,12 +66,20 @@ class InterceptHandler(logging.Handler):
 
         # Find the caller frame where the logged message originated.
         frame = logging.currentframe()
-        depth = 2
-        while frame is not None and frame.f_code.co_filename == logging.__file__:
+        depth = 0
+        while frame is not None:
+            if depth > 0 and frame.f_code.co_filename != logging.__file__:
+                break
             frame = frame.f_back
             depth += 1
 
-        loguru_logger.opt(depth=depth, exception=record.exc_info).log(
+        extra = {
+            key: value
+            for key, value in record.__dict__.items()
+            if key not in _LOG_RECORD_FIELDS
+        }
+        extra["logger_name"] = record.name
+        loguru_logger.bind(**extra).opt(depth=depth, exception=record.exc_info).log(
             level,
             record.getMessage(),
         )
@@ -75,6 +89,7 @@ def setup_logging(
     *,
     level: str | int = "DEBUG",
     log_file: str | Path | None | _DefaultLogFile = _DEFAULT_LOG_FILE,
+    rfid_log_file: str | Path | None | _DefaultLogFile = _DEFAULT_LOG_FILE,
     rotation: str = "10 MB",
     retention: str = "7 days",
     compression: str = "zip",
@@ -90,6 +105,8 @@ def setup_logging(
     - resets loguru's global configuration and adds a stderr sink;
     - adds a rotating file sink at mxbiflow's default log path unless
       ``log_file=None`` explicitly disables it.
+    - adds an RFID-only file beside the main log by default; use
+      ``rfid_log_file=None`` to disable it or a path to override it.
 
     After calling this, ``from loguru import logger`` gives you the
     configured logger — loguru's logger is a global singleton, so no
@@ -133,5 +150,25 @@ def setup_logging(
             serialize=serialize,
         )
 
+    if isinstance(rfid_log_file, _DefaultLogFile):
+        resolved_rfid_log_file = (
+            Path(resolved_log_file).with_name("rfid.log")
+            if resolved_log_file is not None
+            else None
+        )
+    else:
+        resolved_rfid_log_file = rfid_log_file
+    if resolved_rfid_log_file is not None:
+        loguru_logger.add(
+            str(resolved_rfid_log_file),
+            filter=lambda record: record["extra"].get("logger_name") == "mxbiflow.rfid",
+            rotation=rotation,
+            retention=retention,
+            compression=compression,
+            encoding="utf-8",
+            level=level,
+            serialize=serialize,
+        )
 
-__all__ = ["InterceptHandler", "logger", "setup_logging"]
+
+__all__ = ["InterceptHandler", "logger", "rfid_logger", "setup_logging"]
