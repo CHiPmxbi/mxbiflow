@@ -45,7 +45,7 @@ reportPrivateUsage = "error"
 # Pinned to the mx_eye commit that changed the py-mx-eye SDK contract
 # (PJendritza/mx_eye#29). There is no compatibility layer, so the driver and
 # the tracker have to be updated together.
-py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "fa6a83c9c50049601c56eda286924edeab3ee18d" }
+py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "1280fbaa4073b39e2d2ad2db4aaf9a05924b7480" }
 
 
 [project.scripts]
