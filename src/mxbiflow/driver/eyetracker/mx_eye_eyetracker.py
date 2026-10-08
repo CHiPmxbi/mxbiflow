@@ -7,12 +7,9 @@ through the ``py_mx_eye`` SDK.
 
 Coordinates
 -----------
-py-mx-eye reports uncalibrated source-image coordinates and does not yet
-deliver a mapping into screen space, so :meth:`MxEyeEyetracker.sample` fills
-:class:`~mxbiflow.driver.eyetracker.eyetracker.EyeSample` ``x``/``y``
-with the pupil centre (``pupil_x``/``pupil_y``) instead. Once the tracker
-provides that mapping, only this method changes: it should return the mapped
-gaze coordinates and may pass ``require_valid=True`` to the SDK.
+The SDK frame's ``x``/``y`` fields are the gaze coordinates intended for
+behavioral use. Raw pupil and corneal-reflection coordinates remain available
+separately on the frame for diagnostics and offline calibration.
 """
 
 import math
@@ -111,8 +108,7 @@ class MxEyeEyetracker:
     def sample(self) -> EyeSample | None:
         """Return the latest fresh sample, or ``None`` when there is none.
 
-        See the module docstring for the pupil-coordinate placeholder used as
-        ``x``/``y`` until py-mx-eye exposes a screen-space mapping.
+        The returned coordinates are the gaze output supplied by mx-eye.
         """
         with self._lock:
             sample = self._latest
@@ -124,7 +120,7 @@ class MxEyeEyetracker:
             return None
 
         frame = sample.frame
-        x, y = frame.pupil_x, frame.pupil_y
+        x, y = frame.x, frame.y
         if not (math.isfinite(x) and math.isfinite(y)):
             return None
 

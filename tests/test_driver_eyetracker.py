@@ -27,14 +27,12 @@ def _make_frame(
     *,
     pupil_x: float = 100.0,
     pupil_y: float = 50.0,
+    output_x: float | None = None,
+    output_y: float | None = None,
     acquisition_ns: int | None = None,
     sequence: int = 1,
 ) -> DataFrame:
-    """Build one real py-mx-eye tracking frame carrying the given pupil centre.
-
-    ``flags`` stays at ``NONE``: the driver reads the pupil centre and passes
-    ``require_valid=False``, so an uncalibrated tracker still reports.
-    """
+    """Build one real py-mx-eye tracking frame."""
     now = time.time_ns() if acquisition_ns is None else acquisition_ns
     return DataFrame(
         session=1,
@@ -45,8 +43,8 @@ def _make_frame(
         tracking_end_ns=now,
         send_ns=now,
         media_ns=-1,
-        x=pupil_x,
-        y=pupil_y,
+        x=pupil_x if output_x is None else output_x,
+        y=pupil_y if output_y is None else output_y,
         pupil_x=pupil_x,
         pupil_y=pupil_y,
         cr_x=float("nan"),
@@ -60,14 +58,18 @@ def _make_sample(
     *,
     pupil_x: float = 100.0,
     pupil_y: float = 50.0,
+    output_x: float | None = None,
+    output_y: float | None = None,
     acquisition_ns: int | None = None,
     sequence: int = 1,
 ) -> Sample:
-    """Build a real py-mx-eye sample carrying the given pupil centre."""
+    """Build a real py-mx-eye sample."""
     return Sample(
         frame=_make_frame(
             pupil_x=pupil_x,
             pupil_y=pupil_y,
+            output_x=output_x,
+            output_y=output_y,
             acquisition_ns=acquisition_ns,
             sequence=sequence,
         ),
@@ -157,8 +159,13 @@ class MxEyeEyetrackerTests(unittest.TestCase):
         tracker.begin()
         return tracker
 
-    def test_reports_pupil_coordinates_of_received_sample(self) -> None:
-        sample = _make_sample(pupil_x=321.5, pupil_y=123.25)
+    def test_reports_gaze_coordinates_of_received_sample(self) -> None:
+        sample = _make_sample(
+            pupil_x=321.5,
+            pupil_y=123.25,
+            output_x=800,
+            output_y=450,
+        )
         fake = _FakeMxEye([[sample]])
 
         tracker = self._start(fake)
@@ -167,8 +174,8 @@ class MxEyeEyetrackerTests(unittest.TestCase):
         self.assertTrue(_wait_until(lambda: tracker.sample() is not None))
         result = tracker.sample()
         assert result is not None
-        self.assertEqual(result.x, 321.5)
-        self.assertEqual(result.y, 123.25)
+        self.assertEqual(result.x, 800)
+        self.assertEqual(result.y, 450)
         self.assertEqual(result.timestamp_ns, sample.frame.acquisition_ns)
 
     def test_read_uses_configured_filters(self) -> None:

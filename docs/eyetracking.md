@@ -72,12 +72,12 @@ same data through `get_mxbiflow().mxbi.eyetracker.sample()`, which returns
 
 ## Coordinates
 
-`EyeSample.x`/`y` are meant to be screen-space gaze coordinates, but py-mx-eye
-does not deliver that mapping yet: the `mx_eye` backend currently reports the
-pupil centre in source-image pixels (`pupil_x`/`pupil_y`). Do not implement
-target hit-testing on those values — they are only useful for relative pupil
-displacement or dwell on raw movement. When the tracker exposes screen-space
-coordinates, the change stays inside `MxEyeEyetracker.sample()`.
+`EyeSample.x`/`y` carry the gaze output supplied in the mx-eye SDK frame's
+`x`/`y` fields. The frame's separate `pupil_x`/`pupil_y` and `cr_x`/`cr_y`
+fields remain raw diagnostic measurements and are not substituted into the
+behavioral gaze signal. When mx-eye applies a screen calibration, scenes
+therefore receive the calibrated screen coordinates without calibration logic
+inside mxbiflow.
 
 ## Not supported yet
 
