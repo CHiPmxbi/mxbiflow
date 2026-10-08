@@ -28,9 +28,9 @@ class EyeSample:
 
     Notes
     -----
-    ``x``/``y`` are meant to be screen-space gaze coordinates. py-mx-eye does
-    not deliver that mapping yet, so :class:`MxEyeEyetracker` currently fills
-    them with the pupil centre in source-image pixels.
+    ``x``/``y`` carry the gaze coordinates supplied by the configured tracker.
+    For mx-eye, these come from the SDK frame's gaze-output fields rather than
+    its separate raw pupil or corneal-reflection coordinates.
     """
 
     timestamp_ns: int
