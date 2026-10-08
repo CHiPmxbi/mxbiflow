@@ -546,7 +546,7 @@ wheels = [
 [[package]]
 name = "mx-eye-protocol"
 version = "0.1.0"
-source = { git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fprotocol&rev=1280fbaa4073b39e2d2ad2db4aaf9a05924b7480#1280fbaa4073b39e2d2ad2db4aaf9a05924b7480" }
+source = { git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fprotocol&rev=44b684b56a413ba776aa8bea511c3864f7e36e0c#44b684b56a413ba776aa8bea511c3864f7e36e0c" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -605,7 +605,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.2" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "pillow", specifier = ">=12.3.0" },
-    { name = "py-mx-eye", git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fpy-mx-eye&rev=1280fbaa4073b39e2d2ad2db4aaf9a05924b7480" },
+    { name = "py-mx-eye", git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fpy-mx-eye&rev=44b684b56a413ba776aa8bea511c3864f7e36e0c" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pygame-ce", specifier = ">=2.5.8" },
     { name = "pyglet", specifier = ">=2.1.16" },
@@ -780,7 +780,7 @@ wheels = [
 [[package]]
 name = "py-mx-eye"
 version = "0.1.0"
-source = { git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fpy-mx-eye&rev=1280fbaa4073b39e2d2ad2db4aaf9a05924b7480#1280fbaa4073b39e2d2ad2db4aaf9a05924b7480" }
+source = { git = "https://github.com/PJendritza/mx_eye.git?subdirectory=packages%2Fpy-mx-eye&rev=44b684b56a413ba776aa8bea511c3864f7e36e0c#44b684b56a413ba776aa8bea511c3864f7e36e0c" }
 dependencies = [
     { name = "mx-eye-protocol" },
     { name = "pydantic" },
