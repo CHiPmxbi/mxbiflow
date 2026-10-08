@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.27](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.26...v0.3.27) (2026-10-08)
+
+
+### Bug Fixes
+
+* **eyetracker:** consume mx-eye gaze coordinates ([#160](https://github.com/CHiPmxbi/mxbiflow/issues/160)) ([9d7ee59](https://github.com/CHiPmxbi/mxbiflow/commit/9d7ee593ff379382805b86838a6995bc35a769f8))
+
 ## [0.3.26](https://github.com/CHiPmxbi/mxbiflow/compare/v0.3.25...v0.3.26) (2026-10-06)
 
 
