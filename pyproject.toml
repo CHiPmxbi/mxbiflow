@@ -49,12 +49,16 @@ pymotego = { git = "https://github.com/cagelab/pymoteGO.git", rev = "f4e6348dfa1
 
 
 [project.scripts]
-mxbi = "mxbi:main"
-main = "mxbiflow.main:main"
+mxbiflow = "mxbiflow.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = ["loguru>=0.7.3", "pyright>=1.1.411", "ruff>=0.16.4"]
+dev = [
+    "loguru>=0.7.3",
+    "prompt-toolkit>=3.0.53",
+    "pyright>=1.1.411",
+    "ruff>=0.16.4",
+]

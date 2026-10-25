@@ -178,7 +178,7 @@ class ManualControlTests(unittest.TestCase):
 
         scheduler.next_stage()
 
-        self.assertEqual(session.current_animal.current_stage_name, "stage_b")
+        self.assertEqual(session.require_current_animal().current_stage_name, "stage_b")
         scheduler.update()
         scene_manager.apply_pending()
         self.assertIsInstance(scene_manager.current, StageB)
@@ -193,7 +193,7 @@ class ManualControlTests(unittest.TestCase):
 
         scheduler.prev_stage()
 
-        self.assertEqual(session.current_animal.current_stage_name, "stage_a")
+        self.assertEqual(session.require_current_animal().current_stage_name, "stage_a")
 
     def test_manual_stage_navigation_noop_when_target_not_registered(self) -> None:
         session, _animal = self._make_session(
@@ -205,7 +205,7 @@ class ManualControlTests(unittest.TestCase):
 
         scheduler.next_stage()
 
-        self.assertEqual(session.current_animal.current_stage_name, "stage_a")
+        self.assertEqual(session.require_current_animal().current_stage_name, "stage_a")
 
 
 class IdentityUpdateTests(unittest.TestCase):
