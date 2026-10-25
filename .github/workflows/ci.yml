@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install system libraries for Qt and PortAudio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libportaudio2 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Grant read access to private git dependencies
+        env:
+          CAGELAB_READ_TOKEN: ${{ secrets.CAGELAB_READ_TOKEN }}
+        run: >-
+          git config --global
+          url."https://x-access-token:${CAGELAB_READ_TOKEN}@github.com/cagelab/".insteadOf
+          "https://github.com/cagelab/"
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+      - run: uv run pyright
+      - run: uv run python -m unittest discover -s tests
