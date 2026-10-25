@@ -18,11 +18,12 @@ jobs:
       SDL_AUDIODRIVER: dummy
     steps:
       - uses: actions/checkout@v7
-      - name: Install system libraries for Qt and PortAudio
+      - name: Install system libraries for Qt, PortAudio and a virtual display
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libportaudio2 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+            libportaudio2 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
+            xvfb
       - name: Grant read access to private git dependencies
         env:
           CAGELAB_READ_TOKEN: ${{ secrets.CAGELAB_READ_TOKEN }}
@@ -33,4 +34,5 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
       - run: uv sync --locked
       - run: uv run pyright
-      - run: uv run python -m unittest discover -s tests
+      # pyglet reads the screen sizes from an X display.
+      - run: xvfb-run -a uv run python -m unittest discover -s tests
