@@ -8,7 +8,6 @@ requires-python = ">=3.14"
 dependencies = [
     "gpiozero>=2.0.1.post3",
     "inflection>=0.5.1",
-    "jinja2>=3.1.6",
     "keyring>=25.7.0",
     "matplotlib>=3.11.1",
     "mss>=10.2.0",
@@ -19,7 +18,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pygame-ce>=2.5.8",
     "pyglet>=2.1.16",
-    "pymotego>=0.1.6",
+    "pymotego",
     "pyserial>=3.5",
     "pyside6>=6.11.2",
     "qtawesome>=1.4.2",
@@ -46,6 +45,7 @@ reportPrivateUsage = "error"
 # (PJendritza/mx_eye#29). There is no compatibility layer, so the driver and
 # the tracker have to be updated together.
 py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "44b684b56a413ba776aa8bea511c3864f7e36e0c" }
+pymotego = { git = "https://github.com/cagelab/pymoteGO.git", rev = "f4e6348dfa11b53de9691b0e5e377f6d41e879b9" }
 
 
 [project.scripts]

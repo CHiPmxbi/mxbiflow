@@ -32,8 +32,6 @@ from .mxbi import MXBI
 class MXBIModel(BaseModel):
     mxbi_id: str = Field(default="debug")
     screen_size: tuple[int, int] = Field(default=(1024, 600))
-    backup_source_root_id: str = Field(default="")
-    backup_destination_root_id: str = Field(default="")
     rewarders: list[RewarderModel] = Field(default_factory=list)
     detectors: list[DetectorModel] = Field(default_factory=list)
     eyetrackers: list[EyetrackerModel] = Field(default_factory=list)

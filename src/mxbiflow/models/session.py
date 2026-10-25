@@ -37,7 +37,6 @@ class SessionConfig(BaseModel):
     experimenter: str = "auto"
     reward_type: RewardEnum = RewardEnum.AGUM_ONE_FIFTH
     send_email: bool = False
-    sync_data: bool = False
     note: str = Field(default="", max_length=1000)
 
     default_scene: str = ""
@@ -54,7 +53,6 @@ class SessionConfig(BaseModel):
             experimenter=self.experimenter,
             reward_type=self.reward_type,
             send_email=self.send_email,
-            sync_data=self.sync_data,
             note=self.note,
             default_scene=self.default_scene,
             unknown_animal_as=self.unknown_animal_as,
@@ -109,13 +107,8 @@ class SessionRuntimeState(BaseModel):
     last_session_id: int = Field(default=0, ge=0)
 
 
-class EmailRuntimeState(BaseModel):
-    message_id: str = ""
-
-
 class RuntimeState(BaseModel):
     session: SessionRuntimeState = Field(default_factory=SessionRuntimeState)
-    email: EmailRuntimeState = Field(default_factory=EmailRuntimeState)
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -171,15 +164,6 @@ class RuntimeStateStore:
         self._save(state)
         return state.session.last_session_id
 
-    @property
-    def email_message_id(self) -> str:
-        return self._load().email.message_id
-
-    def save_email_message_id(self, message_id: str) -> None:
-        state = self._load()
-        state.email.message_id = message_id
-        self._save(state)
-
 
 @dataclass
 class SessionSnapshotStore:
@@ -214,10 +198,6 @@ class Session(BaseModel):
     @property
     def send_email(self) -> bool:
         return self.config.send_email
-
-    @property
-    def sync_data(self) -> bool:
-        return self.config.sync_data
 
     @property
     def note(self) -> str:

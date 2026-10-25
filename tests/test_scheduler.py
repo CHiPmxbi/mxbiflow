@@ -67,10 +67,7 @@ class SchedulerTests(unittest.TestCase):
                 unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
-            mxbi_config=MXBIModel(
-                backup_source_root_id="source",
-                backup_destination_root_id="destination",
-            ),
+            mxbi_config=MXBIModel(),
             state=SessionState(animals={animal.name: animal}),
         )
         scene_manager = SceneManager()
@@ -118,10 +115,7 @@ class ManualControlTests(unittest.TestCase):
                 unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
-            mxbi_config=MXBIModel(
-                backup_source_root_id="source",
-                backup_destination_root_id="destination",
-            ),
+            mxbi_config=MXBIModel(),
             state=SessionState(animals={animal.name: animal}),
         )
         return session, animal
@@ -230,10 +224,7 @@ class IdentityUpdateTests(unittest.TestCase):
         }
         self.session = Session(
             config=SessionConfig(unknown_animal_as="fallback", animals=configs),
-            mxbi_config=MXBIModel(
-                backup_source_root_id="source",
-                backup_destination_root_id="destination",
-            ),
+            mxbi_config=MXBIModel(),
             state=SessionState(animals=animals),
         )
         self.manager = SceneManager()

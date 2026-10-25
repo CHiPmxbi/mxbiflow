@@ -27,10 +27,7 @@ def make_session(*, session_id: int = 7) -> Session:
             unknown_animal_as=animal_config.name,
             animals=(animal_config,),
         ),
-        mxbi_config=MXBIModel(
-            backup_source_root_id="source",
-            backup_destination_root_id="destination",
-        ),
+        mxbi_config=MXBIModel(),
         state=SessionState(
             session_id=session_id,
             animals={

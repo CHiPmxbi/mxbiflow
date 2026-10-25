@@ -4,11 +4,10 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from pymotego import EmailAttachment
-
 from mxbiflow.core.path import set_base_path
 from mxbiflow.driver import MXBIModel
 from mxbiflow.infra import build_crash_report, send_crash_report
+from mxbiflow.infra.notify import MAX_BODY_BYTES
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 
 
@@ -17,8 +16,6 @@ def _make_session() -> Session:
         config=SessionConfig(),
         mxbi_config=MXBIModel(
             mxbi_id="mxbi5",
-            backup_source_root_id="source",
-            backup_destination_root_id="destination",
         ),
         state=SessionState(),
     )
@@ -32,17 +29,15 @@ class BuildCrashReportTests(unittest.TestCase):
             report = build_crash_report(exc, _make_session())
 
         self.assertEqual(report.subject, "mxbi5 Crash Report")
-        self.assertIn("Crash Report - mxbi5", report.html_body)
-        self.assertIn("mxbi5", report.html_body)
-        self.assertIn("Crash Time", report.html_body)
-        self.assertIn("ValueError", report.html_body)
-        self.assertIn("boom", report.html_body)
-        self.assertIn("test_contains_exception_info_and_traceback", report.html_body)
-        self.assertIn("no animals configured", report.html_body)
-        self.assertIn("Python:", report.html_body)
-        self.assertIn("mxbiflow:", report.html_body)
+        self.assertIn("Crash Report - mxbi5", report.body)
+        self.assertIn("Crash time:", report.body)
+        self.assertIn("ValueError: boom", report.body)
+        self.assertIn("test_contains_exception_info_and_traceback", report.body)
+        self.assertIn("no animals configured", report.body)
+        self.assertIn("Python:", report.body)
+        self.assertIn("mxbiflow:", report.body)
 
-    def test_attaches_log_file_when_present(self) -> None:
+    def test_appends_log_tail_when_present(self) -> None:
         with TemporaryDirectory() as tmp:
             set_base_path(Path(tmp))
             log_file = Path(tmp) / "log" / "mxbi.log"
@@ -51,35 +46,41 @@ class BuildCrashReportTests(unittest.TestCase):
 
             report = build_crash_report(ValueError("x"), _make_session(), log_file)
 
-            self.assertEqual(len(report.attachments), 1)
-            attachment = report.attachments[0]
-            self.assertIsInstance(attachment, EmailAttachment)
-            self.assertEqual(attachment.filename, "mxbi.log")
-            self.assertEqual(attachment.content, b"session log line")
+            self.assertTrue(
+                report.body.endswith("Log tail (mxbi.log):\nsession log line")
+            )
 
-    def test_escapes_html_in_exception_message(self) -> None:
-        exc = ValueError("<script>alert('x')</script>")
-        report = build_crash_report(exc, _make_session())
+    def test_log_tail_keeps_whole_last_lines_within_limit(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_file = Path(tmp) / "mxbi.log"
+            lines = [f"line {i:05d}" for i in range(5000)]
+            log_file.write_text("\n".join(lines), encoding="utf-8")
 
-        self.assertIn("&lt;script&gt;", report.html_body)
-        self.assertNotIn("<script>alert", report.html_body)
+            report = build_crash_report(ValueError("x"), _make_session(), log_file)
+
+            self.assertLessEqual(len(report.body.encode()), MAX_BODY_BYTES)
+            tail = report.body.split("Log tail (mxbi.log):\n")[1]
+            self.assertTrue(tail.startswith("line "))
+            self.assertTrue(tail.endswith("line 04999"))
+
+    def test_missing_log_file_is_skipped(self) -> None:
+        report = build_crash_report(
+            ValueError("x"), _make_session(), Path("/nonexistent/mxbi.log")
+        )
+
+        self.assertNotIn("Log tail", report.body)
 
 
 class SendCrashReportTests(unittest.TestCase):
-    @patch("mxbiflow.infra.crash_report.EmailClient")
+    @patch("mxbiflow.infra.crash_report.notify")
     @patch("mxbiflow.infra.crash_report.build_crash_report")
     def test_sends_built_report(
         self,
         build_report: Mock,
-        email_client_cls: Mock,
+        notify: Mock,
     ) -> None:
-        report = SimpleNamespace(
-            subject="mxbi5 Crash Report",
-            html_body="<html>boom</html>",
-            attachments=(),
-        )
+        report = SimpleNamespace(subject="mxbi5 Crash Report", body="boom")
         build_report.return_value = report
-        email_client = email_client_cls.return_value.__enter__.return_value
         error = RuntimeError("boom")
         session = _make_session()
         log_file = Path("mxbi.log")
@@ -87,19 +88,15 @@ class SendCrashReportTests(unittest.TestCase):
         send_crash_report(error, session, log_file)
 
         build_report.assert_called_once_with(error, session, log_file)
-        email_client.send.assert_called_once_with(
-            subject=report.subject,
-            html_body=report.html_body,
-            attachments=report.attachments,
-        )
+        notify.assert_called_once_with(report.subject, report.body, severity="critical")
 
     @patch("mxbiflow.infra.crash_report.get_default_log_file_path")
-    @patch("mxbiflow.infra.crash_report.EmailClient")
+    @patch("mxbiflow.infra.crash_report.notify")
     @patch("mxbiflow.infra.crash_report.build_crash_report")
     def test_uses_default_log_file_when_omitted(
         self,
         build_report: Mock,
-        _email_client_cls: Mock,
+        _notify: Mock,
         get_default_log_file_path: Mock,
     ) -> None:
         error = RuntimeError("boom")
@@ -111,12 +108,12 @@ class SendCrashReportTests(unittest.TestCase):
         build_report.assert_called_once_with(error, session, Path("log/mxbi.log"))
 
     @patch("mxbiflow.infra.crash_report.get_default_log_file_path")
-    @patch("mxbiflow.infra.crash_report.EmailClient")
+    @patch("mxbiflow.infra.crash_report.notify")
     @patch("mxbiflow.infra.crash_report.build_crash_report")
     def test_explicit_none_disables_log_attachment(
         self,
         build_report: Mock,
-        _email_client_cls: Mock,
+        _notify: Mock,
         get_default_log_file_path: Mock,
     ) -> None:
         error = RuntimeError("boom")
@@ -127,12 +124,12 @@ class SendCrashReportTests(unittest.TestCase):
         get_default_log_file_path.assert_not_called()
         build_report.assert_called_once_with(error, session, None)
 
-    @patch("mxbiflow.infra.crash_report.EmailClient", side_effect=RuntimeError)
+    @patch("mxbiflow.infra.crash_report.notify", side_effect=RuntimeError)
     @patch("mxbiflow.infra.crash_report.build_crash_report", return_value=Mock())
     def test_send_failure_is_suppressed(
         self,
         _build_report: Mock,
-        _email_client_cls: Mock,
+        _notify: Mock,
     ) -> None:
         send_crash_report(ValueError("original"), _make_session())
 

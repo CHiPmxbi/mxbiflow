@@ -2,19 +2,16 @@ from collections.abc import Callable, Mapping
 from enum import StrEnum, auto
 from threading import Lock, Thread
 
-from pymotego import BackupDestination, BackupSource, BackupStatus, BackupTask
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
-    QProgressBar,
     QPushButton,
     QVBoxLayout,
 )
 
-from ..infra.backup import BackupTaskRunner
 from ..infra.post_processing import StagePostProcessor, send_session_report
 from ..models.session import Session
 from .application import require_application
@@ -72,7 +69,7 @@ def run_session_post_processing(
     session: Session,
     stage_post_processors: Mapping[str, StagePostProcessor],
 ) -> None:
-    """Run backup and daily-report delivery for a completed session."""
+    """Send the daily report for a completed session."""
     _application = require_application()
     PostProcessingPanel(session, stage_post_processors).exec()
 
@@ -83,21 +80,10 @@ class PostProcessingPanel(QDialog):
         session: Session,
         stage_post_processors: Mapping[str, StagePostProcessor],
         *,
-        poll_interval_s: float = 1.0,
-        max_attempts: int = 3,
         refresh_interval_ms: int = _REFRESH_INTERVAL_MS,
         success_auto_close_ms: int = _SUCCESS_AUTO_CLOSE_MS,
     ) -> None:
         super().__init__()
-        self._session = session
-        self._backup_runner = BackupTaskRunner(
-            poll_interval_s=poll_interval_s,
-            max_attempts=max_attempts,
-        )
-        self._backup_status = (
-            _StepStatus.PENDING if session.sync_data else _StepStatus.SKIPPED
-        )
-        self._backup_error: str | None = None
         self._report_runner = _ActionRunner(
             lambda: send_session_report(session, stage_post_processors),
             enabled=session.send_email,
@@ -122,38 +108,15 @@ class PostProcessingPanel(QDialog):
         self._auto_close_timer.setSingleShot(True)
         self._auto_close_timer.timeout.connect(self.accept)
 
-        self._start_backup()
+        self._report_runner.start()
         self._refresh()
         self._refresh_timer.start()
-
-    def _start_backup(self) -> None:
-        if self._backup_status is _StepStatus.SKIPPED:
-            return
-
-        entries = tuple(
-            path.as_posix() for path in self._session.participant_data_paths
-        )
-        if not entries:
-            self._backup_status = _StepStatus.FAILED
-            self._backup_error = "Session has no data available for backup"
-            return
-
-        self._backup_status = _StepStatus.RUNNING
-        self._backup_runner.start(
-            BackupSource(
-                root_id=self._session.mxbi_config.backup_source_root_id,
-                entries=entries,
-            ),
-            BackupDestination(
-                root_id=self._session.mxbi_config.backup_destination_root_id,
-            ),
-        )
 
     def _build_ui(self) -> None:
         self.setWindowTitle("Session Post-processing")
         self.setModal(True)
         self.setMinimumWidth(480)
-        self.resize(560, 280)
+        self.resize(560, 200)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -171,27 +134,7 @@ class PostProcessingPanel(QDialog):
         self._countdown_label.hide()
         layout.addWidget(self._countdown_label)
 
-        self._backup_status_label = QLabel("Backup: Waiting", self)
-        self._backup_status_label.setAccessibleName("Backup status")
-        layout.addWidget(self._backup_status_label)
-
-        self._progress_bar = QProgressBar(self)
-        self._progress_bar.setRange(0, 0)
-        self._progress_bar.setAccessibleName("Backup progress")
-        layout.addWidget(self._progress_bar)
-
-        self._details_label = QLabel("", self)
-        self._details_label.setWordWrap(True)
-        layout.addWidget(self._details_label)
-
-        self._path_label = QLabel("", self)
-        self._path_label.setWordWrap(True)
-        self._path_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        layout.addWidget(self._path_label)
-
-        self._report_status_label = QLabel("Daily report: Waiting for backup", self)
+        self._report_status_label = QLabel("Daily report: Waiting", self)
         self._report_status_label.setAccessibleName("Daily report status")
         layout.addWidget(self._report_status_label)
 
@@ -214,78 +157,25 @@ class PostProcessingPanel(QDialog):
         layout.addLayout(buttons)
 
     def _refresh(self) -> None:
-        self._refresh_backup()
-        if self._backup_status in {
-            _StepStatus.SUCCEEDED,
-            _StepStatus.FAILED,
-            _StepStatus.SKIPPED,
-        }:
-            self._report_runner.start()
         self._refresh_report()
 
-        if self._terminal_state_shown or not self._steps_are_done():
+        status = self._report_runner.status
+        if self._terminal_state_shown or status in {
+            _StepStatus.PENDING,
+            _StepStatus.RUNNING,
+        }:
             return
 
-        errors = [
-            error
-            for error in (self._backup_error, self._report_error())
-            if error is not None
-        ]
-        if errors:
-            self._show_failure("\n".join(errors))
+        error = self._report_runner.error
+        if error is not None:
+            self._show_failure(str(error))
         else:
             self._show_success()
-
-    def _refresh_backup(self) -> None:
-        if self._backup_status is _StepStatus.SKIPPED:
-            self._backup_status_label.setStyleSheet("color: #666666;")
-            self._backup_status_label.setText("Backup: Skipped")
-            self._progress_bar.setRange(0, 100)
-            self._progress_bar.setValue(0)
-            return
-        if self._backup_status is not _StepStatus.RUNNING:
-            return
-
-        task = self._backup_runner.latest_task
-        if task is None:
-            if self._backup_runner.is_monitoring:
-                self._set_running_label(self._backup_status_label, "Backup")
-                return
-            self._backup_status = _StepStatus.FAILED
-            error = self._backup_runner.error
-            self._backup_error = (
-                str(error) if error is not None else "Backup did not start."
-            )
-            self._set_failed_label(self._backup_status_label, "Backup")
-            return
-
-        self._update_progress(task)
-        self._update_details(task)
-        if task.status is BackupStatus.SUCCEEDED:
-            self._backup_status = _StepStatus.SUCCEEDED
-            self._progress_bar.setRange(0, 100)
-            self._progress_bar.setValue(100)
-            self._set_succeeded_label(self._backup_status_label, "Backup")
-        elif task.status in {BackupStatus.PARTIALLY_SUCCEEDED, BackupStatus.FAILED}:
-            self._backup_status = _StepStatus.FAILED
-            self._backup_error = _task_failure_message(task)
-            self._set_failed_label(self._backup_status_label, "Backup")
-        elif not self._backup_runner.is_monitoring:
-            self._backup_status = _StepStatus.FAILED
-            error = self._backup_runner.error
-            self._backup_error = (
-                str(error)
-                if error is not None
-                else "Backup monitoring stopped before the task completed."
-            )
-            self._set_failed_label(self._backup_status_label, "Backup")
-        else:
-            self._set_running_label(self._backup_status_label, "Backup")
 
     def _refresh_report(self) -> None:
         match self._report_runner.status:
             case _StepStatus.PENDING:
-                self._report_status_label.setText("Daily report: Waiting for backup")
+                self._report_status_label.setText("Daily report: Waiting")
             case _StepStatus.RUNNING:
                 self._set_running_label(self._report_status_label, "Daily report")
             case _StepStatus.SUCCEEDED:
@@ -311,38 +201,6 @@ class PostProcessingPanel(QDialog):
     def _set_failed_label(label: QLabel, name: str) -> None:
         label.setStyleSheet("color: #C62828; font-weight: bold;")
         label.setText(f"✕ {name}: Failed")
-
-    def _steps_are_done(self) -> bool:
-        terminal = {_StepStatus.SUCCEEDED, _StepStatus.FAILED, _StepStatus.SKIPPED}
-        return (
-            self._backup_status in terminal and self._report_runner.status in terminal
-        )
-
-    def _report_error(self) -> str | None:
-        error = self._report_runner.error
-        return str(error) if error is not None else None
-
-    def _update_progress(self, task: BackupTask) -> None:
-        progress = _task_progress_percent(task)
-        if progress is None:
-            self._progress_bar.setRange(0, 0)
-            return
-        self._progress_bar.setRange(0, 100)
-        self._progress_bar.setValue(progress)
-        self._progress_bar.setFormat("%p%")
-
-    def _update_details(self, task: BackupTask) -> None:
-        phase = task.phase.value.replace("_", " ").title()
-        self._details_label.setText(
-            f"Phase: {phase} · Files: {task.files_completed}/{task.files_total} · "
-            f"Transferred: {_format_bytes(task.bytes_transferred)}"
-            f"/{_format_bytes(task.bytes_total)}"
-        )
-        self._path_label.setText(
-            f"Current item: {task.current_path}"
-            if task.current_path
-            else "Current item: —"
-        )
 
     def _show_success(self) -> None:
         self._terminal_state_shown = True
@@ -394,41 +252,3 @@ class PostProcessingPanel(QDialog):
             event.ignore()
             return
         super().closeEvent(event)
-
-
-def _task_progress_percent(task: BackupTask) -> int | None:
-    if task.status is BackupStatus.SUCCEEDED:
-        return 100
-    if task.bytes_total > 0:
-        return _percent(task.bytes_transferred, task.bytes_total)
-    if task.files_total > 0:
-        return _percent(task.files_completed, task.files_total)
-    return None
-
-
-def _percent(completed: int, total: int) -> int:
-    return min(max(round(completed * 100 / total), 0), 100)
-
-
-def _format_bytes(value: int) -> str:
-    amount = float(value)
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
-        if abs(amount) < 1024 or unit == "TiB":
-            return f"{amount:.0f} {unit}" if unit == "B" else f"{amount:.1f} {unit}"
-        amount /= 1024
-    raise AssertionError("unreachable")
-
-
-def _task_failure_message(task: BackupTask) -> str:
-    if task.error:
-        return task.error
-    entry_errors = [
-        f"{entry.path}: {entry.error}"
-        for entry in task.entries
-        if entry.error is not None
-    ]
-    if entry_errors:
-        return "\n".join(entry_errors)
-    if task.status is BackupStatus.PARTIALLY_SUCCEEDED:
-        return "One or more backup entries failed."
-    return "The backup task failed."

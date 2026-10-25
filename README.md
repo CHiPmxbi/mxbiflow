@@ -78,7 +78,7 @@ setup, enable the optional `log` extra and call `setup_logging()` once,
 then use loguru directly:
 
 ```shell
-uv add mxbiflow[log]
+uv add "mxbiflow[log] @ git+https://github.com/CHiPmxbi/mxbiflow.git@<commit>"
 ```
 
 ```python
@@ -112,11 +112,25 @@ the previous animal. The first confirmed identity is fixed until departure.
 Without loguru, the library stays silent: you can handle mxbiflow's
 records with your own standard-library handlers instead.
 
+## Reports
+
+Crash reports (`mxbiflow.infra.send_crash_report`) and daily session reports
+(`mxbiflow.ui.run_session_post_processing`) are plain-text notifications sent
+through cogmoteGO's `POST /notifications`, which mails every user subscribed
+to the device. Bodies are cut to the 10 KB limit. Experiment data stays on the
+device.
+
 ## Installation
 
+mxbiflow is no longer published to PyPI; depend on it through a git source
+pinned to a commit:
+
 ```shell
-uv add mxbiflow
+uv add "mxbiflow @ git+https://github.com/CHiPmxbi/mxbiflow.git@<commit>"
 ```
+
+Some of its dependencies (pymoteGO, py-mx-eye) are private git repositories,
+so the installing machine needs read access to them.
 
 Hardware interfaces and drivers are available under `mxbiflow.driver`:
 

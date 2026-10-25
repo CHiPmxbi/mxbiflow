@@ -111,10 +111,7 @@ class PanelCountdownTests(unittest.TestCase):
         config_path = get_mxbi_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(
-            MXBIModel(
-                backup_source_root_id="source",
-                backup_destination_root_id="destination",
-            ).model_dump_json(indent=4),
+            MXBIModel().model_dump_json(indent=4),
             encoding="utf-8",
         )
 
