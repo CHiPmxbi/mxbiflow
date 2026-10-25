@@ -1,9 +1,11 @@
+from collections.abc import Mapping
 from pathlib import Path
 
 from mxbiflow.driver import MXBI
 from mxbiflow.driver.eyetracker.eyetracker import EyeSample
 
 from ..infra.timer import FrameTimer
+from ..infra.trial_status import TrialPublisher
 from ..models.session import Session
 from .path import get_data_dir_path
 
@@ -13,6 +15,7 @@ class MXBIFlow:
         self._session = session
         self._timer = FrameTimer()
         self._mxbi = mxbi
+        self._trial_publisher: TrialPublisher | None = None
 
     @property
     def session(self) -> Session:
@@ -43,8 +46,26 @@ class MXBIFlow:
     def data_dir(self) -> Path:
         return get_data_dir_path()
 
+    def publish_trial(
+        self, record: Mapping[str, object], *, correct: bool | None
+    ) -> None:
+        """Report a finished trial of the current animal to cogmoteGO.
+
+        Patches the device status (animal, ``stage@level``, trial count and
+        accuracy) and publishes ``record`` to the ``trials`` broadcast. Call it
+        once per trial; ``correct=None`` leaves the trial out of accuracy.
+        """
+        if self._trial_publisher is None:
+            self._trial_publisher = TrialPublisher(self._session)
+        self._trial_publisher.publish(record, correct=correct)
+
     def update(self) -> None:
         self._timer.update()
+
+    def close(self) -> None:
+        if self._trial_publisher is not None:
+            self._trial_publisher.close()
+            self._trial_publisher = None
 
 
 _current_mxbiflow: MXBIFlow | None = None
