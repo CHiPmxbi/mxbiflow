@@ -20,8 +20,8 @@ def main() -> None:
     try:
         if not run_wizard(scene_manager):
             return
-        session = get_mxbiflow().session
         game = init_gameloop(scene_manager)
+        session = get_mxbiflow().session
         game.play()
         run_session_post_processing(session, {})
     except Exception as exc:
