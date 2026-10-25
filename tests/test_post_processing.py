@@ -1,16 +1,17 @@
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from pymotego import EmailEmbed
-
 from mxbiflow.infra.post_processing import (
+    AnimalSummary,
     PostProcessingResult,
+    SessionSummary,
     StagePostProcessor,
+    StageSummary,
     build_session_report,
     send_session_report,
+    session_overview,
     summarize,
 )
 
@@ -51,25 +52,58 @@ class SummarizeTests(unittest.TestCase):
 
 
 class SessionReportTests(unittest.TestCase):
+    def test_overview_lists_animals_and_stage_levels(self) -> None:
+        summary = SessionSummary(
+            session_id=3,
+            start_at=None,
+            end_at=None,
+            duration_seconds=0,
+            experimenter="Alice",
+            reward_type="agum_one_fifth",
+            total_animals=1,
+            note="Calibration complete",
+            animals=[
+                AnimalSummary(
+                    name="m1",
+                    rfid_id="rfid-1",
+                    total_trials=12,
+                    animal_sessions=2,
+                    total_duration_seconds=125,
+                    stages=[
+                        StageSummary(
+                            name="detect", trials=12, initial_level=1, final_level=3
+                        ),
+                        StageSummary(
+                            name="hold", trials=0, initial_level=2, final_level=2
+                        ),
+                    ],
+                )
+            ],
+        )
+
+        text = session_overview(summary)
+
+        self.assertIn("Session #3", text)
+        self.assertIn("Note: Calibration complete", text)
+        self.assertIn("- m1 (rfid-1): 12 trials, 2 sessions, 2m 5s", text)
+        self.assertIn("  detect: 12 trials, level 1 -> 3 (+2)", text)
+        self.assertIn("  hold: 0 trials, level 2 (no change)", text)
+
     @patch("mxbiflow.infra.post_processing.session_overview", return_value="overview")
     @patch("mxbiflow.infra.post_processing.summarize")
     def test_build_dispatches_resolved_stage_paths(
         self,
-        summarize_mock: Mock,
+        _summarize: Mock,
         _overview: Mock,
     ) -> None:
-        summarize_mock.return_value = SimpleNamespace(session_id=2, start_at=None)
         session = Mock()
         session.data_root = Path("data")
         session.stage_data_paths = {"stage": {"m1": Path("m1/stage")}}
-        embed = EmailEmbed(content_id="plot", filename="plot.png", content=b"png")
-        processor = StubPostProcessor(PostProcessingResult("stage html", (embed,)))
+        processor = StubPostProcessor(PostProcessingResult("stage text"))
 
-        result = build_session_report(session, {"stage": processor})
+        report = build_session_report(session, {"stage": processor})
 
-        self.assertIn("overview", result.html)
-        self.assertIn("stage html", result.html)
-        self.assertEqual(result.embeds, (embed,))
+        self.assertEqual(report, "overview\n\nstage text")
         self.assertEqual(processor.calls, [(session, {"m1": Path("data/m1/stage")})])
 
     @patch("mxbiflow.infra.post_processing.logger.warning")
@@ -77,58 +111,40 @@ class SessionReportTests(unittest.TestCase):
     @patch("mxbiflow.infra.post_processing.summarize")
     def test_build_skips_unregistered_stage(
         self,
-        summarize_mock: Mock,
+        _summarize: Mock,
         _overview: Mock,
         warning: Mock,
     ) -> None:
-        summarize_mock.return_value = SimpleNamespace(session_id=2, start_at=None)
         session = Mock(data_root=Path("data"))
         session.stage_data_paths = {"future": {"m1": Path("m1/future")}}
 
-        result = build_session_report(session, {})
+        report = build_session_report(session, {})
 
-        self.assertEqual(result.embeds, ())
+        self.assertEqual(report, "overview")
         warning.assert_called_once_with(
             "skipping stage without post-processor: {}", "future"
         )
 
-    @patch("mxbiflow.infra.post_processing.get_runtime_state_path")
-    @patch("mxbiflow.infra.post_processing.RuntimeStateStore")
-    @patch("mxbiflow.infra.post_processing.EmailClient")
-    @patch("mxbiflow.infra.post_processing.build_session_report")
-    def test_send_uses_and_updates_email_thread(
-        self,
-        build_report: Mock,
-        email_client_cls: Mock,
-        runtime_store_cls: Mock,
-        _runtime_path: Mock,
-    ) -> None:
-        embed = EmailEmbed(content_id="plot", filename="plot.png", content=b"png")
-        build_report.return_value = PostProcessingResult(
-            "<html>report</html>", (embed,)
-        )
+    @patch("mxbiflow.infra.post_processing.notify")
+    @patch("mxbiflow.infra.post_processing.build_session_report", return_value="text")
+    def test_send_notifies_report(self, _build_report: Mock, notify: Mock) -> None:
         session = Mock(send_email=True, session_id=7)
         session.mxbi_config.mxbi_id = "mxbi-1"
-        runtime_store_cls.return_value.email_message_id = "previous"
-        email_client = email_client_cls.return_value.__enter__.return_value
-        email_client.send.return_value.message_id = "current"
 
         send_session_report(session, {})
 
-        email_client.send.assert_called_once_with(
-            subject="mxbi-1 Daily Report",
-            html_body="<html>report</html>",
-            embeds=[embed],
-            in_reply_to="previous",
-        )
-        runtime_store_cls.return_value.save_email_message_id.assert_called_once_with(
-            "current"
-        )
+        notify.assert_called_once_with("mxbi-1 Daily Report", "text")
 
-    @patch("mxbiflow.infra.post_processing.EmailClient")
-    def test_disabled_report_does_not_send(self, email_client_cls: Mock) -> None:
+    @patch("mxbiflow.infra.post_processing.notify", side_effect=RuntimeError("503"))
+    @patch("mxbiflow.infra.post_processing.build_session_report", return_value="text")
+    def test_send_failure_is_raised(self, _build_report: Mock, _notify: Mock) -> None:
+        with self.assertRaises(RuntimeError):
+            send_session_report(Mock(send_email=True), {})
+
+    @patch("mxbiflow.infra.post_processing.notify")
+    def test_disabled_report_does_not_send(self, notify: Mock) -> None:
         send_session_report(Mock(send_email=False), {})
-        email_client_cls.assert_not_called()
+        notify.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-"""Crash report generation for email notification.
+"""Crash reports sent through cogmoteGO notifications.
 
-Produces a self-contained HTML report (with an optional log-file
-attachment) for a raised exception, so host applications can send an
-expected crash-report email without duplicating context gathering.
+Produces a plain-text report for a raised exception, ending with as much
+of the log tail as fits, so host applications can notify the device's
+subscribers without duplicating context gathering.
 """
 
 import traceback
@@ -12,15 +12,11 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from platform import platform, python_version
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from loguru import logger
-from pymotego import EmailAttachment, EmailClient
 
 from ..core.path import get_default_log_file_path
 from ..models.session import Session
-
-_TEMPLATE_DIR = Path(__file__).parent / "templates"
-_MAX_LOG_BYTES = 512 * 1024
+from .notify import MAX_BODY_BYTES, notify
 
 
 class _DefaultLogFile:
@@ -32,18 +28,10 @@ _DEFAULT_LOG_FILE = _DefaultLogFile()
 
 @dataclass(frozen=True)
 class CrashReport:
-    """An email-ready crash report."""
+    """A notification-ready crash report."""
 
     subject: str
-    html_body: str
-    attachments: tuple[EmailAttachment, ...] = ()
-
-
-def _get_jinja_env() -> Environment:
-    return Environment(
-        loader=FileSystemLoader(_TEMPLATE_DIR),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
+    body: str
 
 
 def _package_version(package: str) -> str:
@@ -75,17 +63,19 @@ def _session_context(session: Session) -> str:
         return "unavailable"
 
 
-def _log_attachment(log_file: Path | None) -> EmailAttachment | None:
-    """Attach the tail of the given log file when it exists."""
-    if log_file is None or not log_file.exists():
+def _log_tail(log_file: Path | None, max_bytes: int) -> str | None:
+    """Return the last whole lines of ``log_file`` within ``max_bytes``."""
+    if log_file is None or max_bytes <= 0 or not log_file.exists():
         return None
     try:
         content = log_file.read_bytes()
-        if len(content) > _MAX_LOG_BYTES:
-            content = content[-_MAX_LOG_BYTES:]
-        return EmailAttachment(filename=log_file.name, content=content)
-    except Exception:  # noqa: BLE001 - best-effort attachment gathering
+    except Exception:  # noqa: BLE001 - best-effort log gathering
         return None
+    if len(content) > max_bytes:
+        content = content[-max_bytes:]
+        # Drop the partial first line.
+        _, _, content = content.partition(b"\n")
+    return content.decode(errors="replace")
 
 
 def build_crash_report(
@@ -93,47 +83,35 @@ def build_crash_report(
     session: Session,
     log_file: Path | None = None,
 ) -> CrashReport:
-    """Build an email-ready crash report for ``exc``. Never raises.
+    """Build a plain-text crash report for ``exc``. Never raises.
 
-    ``session`` provides the mxbi identifier and animal context;
-    ``log_file`` is attached to the email when it exists.
+    ``session`` provides the mxbi identifier and animal context; the tail
+    of ``log_file`` fills the space left under the notification size limit.
     """
-    # Imported lazily: post_processing imports core.context, which would
-    # form a circular import while infra/__init__ is still initializing.
-    from .post_processing import HtmlComposer
-
     now = datetime.now(UTC)
     mxbi_id = session.mxbi_config.mxbi_id
     traceback_text = "".join(
         traceback.format_exception(type(exc), exc, exc.__traceback__)
     )
 
-    section_html = (
-        _get_jinja_env()
-        .get_template("crash_report.html")
-        .render(
-            exception_type=f"{type(exc).__module__}.{type(exc).__qualname__}",
-            exception_message=str(exc) or "(no message)",
-            traceback_text=traceback_text,
-            environment=_environment_summary(),
-            session_context=_session_context(session),
-            crash_time=now.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
-            hostname=mxbi_id,
-        )
+    body = (
+        f"Crash Report - {mxbi_id}\n"
+        f"Crash time: {now.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}\n"
+        f"Exception: {type(exc).__module__}.{type(exc).__qualname__}: "
+        f"{str(exc) or '(no message)'}\n"
+        f"\nTraceback:\n{traceback_text.rstrip()}\n"
+        f"\nSession:\n{_session_context(session)}\n"
+        f"\nEnvironment:\n{_environment_summary()}\n"
     )
 
-    composer = HtmlComposer(
-        title=f"Crash Report - {mxbi_id}",
-        date=now.strftime("%Y-%m-%d"),
-    )
-    composer.add_section(section_html)
+    if log_file is not None:
+        heading = f"\nLog tail ({log_file.name}):\n"
+        budget = MAX_BODY_BYTES - len((body + heading).encode())
+        tail = _log_tail(log_file, budget)
+        if tail:
+            body += heading + tail
 
-    attachment = _log_attachment(log_file)
-    return CrashReport(
-        subject=f"{mxbi_id} Crash Report",
-        html_body=composer.html,
-        attachments=(attachment,) if attachment is not None else (),
-    )
+    return CrashReport(subject=f"{mxbi_id} Crash Report", body=body)
 
 
 def send_crash_report(
@@ -153,12 +131,7 @@ def send_crash_report(
             else log_file
         )
         report = build_crash_report(exc, session, resolved_log_file)
-        with EmailClient() as client:
-            client.send(
-                subject=report.subject,
-                html_body=report.html_body,
-                attachments=report.attachments,
-            )
+        notify(report.subject, report.body, severity="critical")
         logger.info("crash report sent: {}", report.subject)
     except Exception:  # noqa: BLE001 - never mask the original exception
-        logger.exception("failed to send crash report email")
+        logger.exception("failed to send crash report")

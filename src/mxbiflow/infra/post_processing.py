@@ -1,18 +1,15 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
-from typing import Self, TypedDict
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from loguru import logger
 from pydantic import BaseModel
-from pymotego import EmailClient, EmailEmbed
 
-from ..core.path import get_runtime_state_path
 from ..models.animal import AnimalSessionState
-from ..models.session import RuntimeStateStore, Session
+from ..models.session import Session
+from .notify import notify
 
 
 class StageSummary(BaseModel):
@@ -43,15 +40,11 @@ class SessionSummary(BaseModel):
     animals: list[AnimalSummary]
 
 
-class ReportImage(TypedDict):
-    cid: str
-    alt: str
-
-
 @dataclass(frozen=True)
 class PostProcessingResult:
-    html: str
-    embeds: tuple[EmailEmbed, ...] = ()
+    """One stage's section of the plain-text session report."""
+
+    text: str
 
 
 class StagePostProcessor(ABC):
@@ -83,22 +76,19 @@ def _format_duration(seconds: float) -> str:
     return f"{secs}s"
 
 
+def _format_level(stage: StageSummary) -> str:
+    change = stage.final_level - stage.initial_level
+    if change == 0:
+        return f"level {stage.initial_level} (no change)"
+    return f"level {stage.initial_level} -> {stage.final_level} ({change:+d})"
+
+
 def _calc_animal_duration(sessions: Sequence[AnimalSessionState]) -> float:
     total = 0.0
     for s in sessions:
         if s.start_at and s.end_at:
             total += (s.end_at - s.start_at).total_seconds()
     return total
-
-
-_TEMPLATE_DIR = Path(__file__).parent / "templates"
-
-
-def _get_jinja_env() -> Environment:
-    return Environment(
-        loader=FileSystemLoader(_TEMPLATE_DIR),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
 
 
 def summarize(session: Session) -> SessionSummary:
@@ -145,77 +135,38 @@ def summarize(session: Session) -> SessionSummary:
 
 
 def session_overview(summary: SessionSummary) -> str:
-    env = _get_jinja_env()
-    template = env.get_template("session_overview.html")
+    lines = [
+        f"Session #{summary.session_id}",
+        f"Start: {_format_timestamp(summary.start_at)}",
+        f"End: {_format_timestamp(summary.end_at)}",
+        f"Duration: {_format_duration(summary.duration_seconds)}",
+        f"Experimenter: {summary.experimenter}",
+        f"Reward type: {summary.reward_type}",
+    ]
+    if summary.note:
+        lines.append(f"Note: {summary.note}")
 
-    context: dict[str, object] = {
-        "session_id": summary.session_id,
-        "session_date": (
-            summary.start_at.astimezone().strftime("%Y-%m-%d")
-            if summary.start_at
-            else "N/A"
-        ),
-        "start_time": _format_timestamp(summary.start_at),
-        "end_time": _format_timestamp(summary.end_at),
-        "duration": _format_duration(summary.duration_seconds),
-        "reward_type": summary.reward_type,
-        "total_animals": summary.total_animals,
-        "animals": [
-            {
-                **a.model_dump(),
-                "duration": _format_duration(a.total_duration_seconds),
-            }
-            for a in summary.animals
-        ],
-    }
-
-    return template.render(**context)
-
-
-def render_image_section_report(section_title: str, images: list[ReportImage]) -> str:
-    env = _get_jinja_env()
-    template = env.get_template("section_report.html")
-    return template.render(section_title=section_title, images=images)
-
-
-class HtmlComposer:
-    def __init__(self, title: str, date: str) -> None:
-        self._title = title
-        self._date = date
-        self._sections: list[str] = []
-        self._env = _get_jinja_env()
-
-    def add_section(self, html: str) -> Self:
-        self._sections.append(html)
-        return self
-
-    @property
-    def html(self) -> str:
-        template = self._env.get_template("page_layout.html")
-        return template.render(
-            title=self._title,
-            date=self._date,
-            sections=self._sections,
+    lines += ["", f"Animals ({summary.total_animals})"]
+    for animal in summary.animals:
+        lines.append(
+            f"- {animal.name} ({animal.rfid_id}): {animal.total_trials} trials, "
+            f"{animal.animal_sessions} sessions, "
+            f"{_format_duration(animal.total_duration_seconds)}"
         )
-
-    def save(self, path: Path) -> None:
-        path.write_text(self.html, encoding="utf-8")
+        lines += [
+            f"  {stage.name}: {stage.trials} trials, {_format_level(stage)}"
+            for stage in animal.stages
+        ]
+    return "\n".join(lines)
 
 
 def build_session_report(
     session: Session,
     stage_post_processors: Mapping[str, StagePostProcessor],
-) -> PostProcessingResult:
-    summary = summarize(session)
-    date = (
-        summary.start_at.astimezone(UTC).strftime("%Y-%m-%d")
-        if summary.start_at is not None
-        else "N/A"
-    )
-    composer = HtmlComposer(title=f"Session #{summary.session_id}", date=date)
-    composer.add_section(session_overview(summary))
+) -> str:
+    """Build the plain-text session report from the summary and stage sections."""
+    sections = [session_overview(summarize(session))]
 
-    embeds: list[EmailEmbed] = []
     if session.data_root is not None:
         for stage_name, paths_by_animal in session.stage_data_paths.items():
             post_processor = stage_post_processors.get(stage_name)
@@ -227,33 +178,24 @@ def build_session_report(
                 animal: session.data_root / path
                 for animal, path in paths_by_animal.items()
             }
-            result = post_processor.process(session, stage_paths)
-            composer.add_section(result.html)
-            embeds.extend(result.embeds)
+            sections.append(post_processor.process(session, stage_paths).text)
 
-    return PostProcessingResult(html=composer.html, embeds=tuple(embeds))
+    return "\n\n".join(sections)
 
 
 def send_session_report(
     session: Session,
     stage_post_processors: Mapping[str, StagePostProcessor],
 ) -> None:
-    """Build and send the completed session report."""
+    """Build the completed session report and notify the device's subscribers."""
     if not session.send_email:
         return
 
     try:
-        report = build_session_report(session, stage_post_processors)
-        runtime_store = RuntimeStateStore(get_runtime_state_path())
-        previous_message_id = runtime_store.email_message_id
-        with EmailClient() as client:
-            result = client.send(
-                subject=f"{session.mxbi_config.mxbi_id} Daily Report",
-                html_body=report.html,
-                embeds=list(report.embeds),
-                in_reply_to=previous_message_id or None,
-            )
-        runtime_store.save_email_message_id(result.message_id)
+        notify(
+            f"{session.mxbi_config.mxbi_id} Daily Report",
+            build_session_report(session, stage_post_processors),
+        )
         logger.info("session report sent: session_id={}", session.session_id)
     except Exception:
         logger.exception("failed to send session report")

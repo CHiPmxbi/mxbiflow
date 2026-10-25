@@ -12,7 +12,6 @@ from mxbiflow.core.config_store import ConfigStore
 from mxbiflow.driver import MXBIModel
 from mxbiflow.models.animal import Animal, AnimalConfig, StageSnapshot, StageState
 from mxbiflow.models.session import (
-    EmailRuntimeState,
     RuntimeState,
     RuntimeStateStore,
     Session,
@@ -68,34 +67,27 @@ def make_session() -> Session:
     config = SessionConfig(
         experimenter="tester",
         send_email=True,
-        sync_data=True,
         unknown_animal_as=animal_config.name,
         animals=(animal_config,),
     )
     return Session(
         config=config,
-        mxbi_config=MXBIModel(
-            backup_source_root_id="source",
-            backup_destination_root_id="destination",
-        ),
+        mxbi_config=MXBIModel(),
         state=SessionState(animals={animal.name: animal}),
     )
 
 
 class RuntimeStateStoreTests(unittest.TestCase):
-    def test_domains_share_one_file_without_overwriting_each_other(self) -> None:
+    def test_session_ids_persist_in_one_file(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "state" / "runtime.json"
             store = RuntimeStateStore(path)
 
             self.assertEqual(store.session_id, 1)
-            store.save_email_message_id("message-1")
             self.assertEqual(store.session_id, 2)
 
             state = RuntimeState.model_validate_json(path.read_text(encoding="utf-8"))
             self.assertEqual(state.session.last_session_id, 2)
-            self.assertEqual(state.email.message_id, "message-1")
-            self.assertEqual(RuntimeStateStore(path).email_message_id, "message-1")
 
     def test_session_counter_resets_on_a_new_day(self) -> None:
         with TemporaryDirectory() as directory:
@@ -106,7 +98,6 @@ class RuntimeStateStoreTests(unittest.TestCase):
                         day="2000-01-01",
                         last_session_id=9,
                     ),
-                    email=EmailRuntimeState(message_id="message-1"),
                 ).model_dump_json(),
                 encoding="utf-8",
             )
@@ -114,17 +105,14 @@ class RuntimeStateStoreTests(unittest.TestCase):
             store = RuntimeStateStore(path)
 
             self.assertEqual(store.session_id, 1)
-            self.assertEqual(store.email_message_id, "message-1")
 
     def test_missing_or_invalid_file_uses_default_state(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "runtime.json"
             store = RuntimeStateStore(path)
-
-            self.assertEqual(store.email_message_id, "")
+            self.assertEqual(store.session_id, 1)
 
             path.write_text("invalid", encoding="utf-8")
-            self.assertEqual(store.email_message_id, "")
             self.assertEqual(store.session_id, 1)
 
     def test_legacy_state_files_are_ignored(self) -> None:
@@ -142,14 +130,12 @@ class RuntimeStateStoreTests(unittest.TestCase):
             runtime_path = state_dir / "runtime.json"
             store = RuntimeStateStore(runtime_path)
 
-            self.assertEqual(store.email_message_id, "")
             self.assertEqual(store.session_id, 1)
 
             state = RuntimeState.model_validate_json(
                 runtime_path.read_text(encoding="utf-8")
             )
             self.assertEqual(state.session.last_session_id, 1)
-            self.assertEqual(state.email.message_id, "")
 
 
 class SessionModelTests(unittest.TestCase):
@@ -183,7 +169,6 @@ class SessionModelTests(unittest.TestCase):
         config = SessionConfig(
             experimenter="tester",
             send_email=True,
-            sync_data=True,
             note="note",
             default_scene="default",
             unknown_animal_as=animal.name,
@@ -199,7 +184,6 @@ class SessionModelTests(unittest.TestCase):
         self.assertEqual(updated.experimenter, config.experimenter)
         self.assertEqual(updated.reward_type, config.reward_type)
         self.assertEqual(updated.send_email, config.send_email)
-        self.assertEqual(updated.sync_data, config.sync_data)
         self.assertEqual(updated.note, config.note)
         self.assertEqual(updated.default_scene, config.default_scene)
         self.assertEqual(updated.unknown_animal_as, config.unknown_animal_as)
@@ -266,10 +250,7 @@ class SessionModelTests(unittest.TestCase):
             stage="vocalization_discriminate",
             level=2,
         )
-        mxbi_config = MXBIModel(
-            backup_source_root_id="source",
-            backup_destination_root_id="destination",
-        )
+        mxbi_config = MXBIModel()
 
         with patch(
             "mxbiflow.bootstrap.get_runtime_state_path",
@@ -319,7 +300,6 @@ class SessionModelTests(unittest.TestCase):
         self.assertFalse(Session.model_computed_fields)
         self.assertEqual(session.experimenter, "tester")
         self.assertTrue(session.send_email)
-        self.assertTrue(session.sync_data)
         self.assertEqual(list(session.animals), ["animal-1"])
         self.assertIsNone(session.current_animal)
         with self.assertRaisesRegex(RuntimeError, "set_current_animal"):
@@ -648,10 +628,7 @@ class SessionModelTests(unittest.TestCase):
             )
             config_store = ConfigStore(config_path, SessionConfig)
             config_store.save(config)
-            mxbi_config = MXBIModel(
-                backup_source_root_id="source",
-                backup_destination_root_id="destination",
-            )
+            mxbi_config = MXBIModel()
 
             with patch(
                 "mxbiflow.bootstrap.get_runtime_state_path",
@@ -736,10 +713,7 @@ class StageNavigationTests(unittest.TestCase):
                 unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
-            mxbi_config=MXBIModel(
-                backup_source_root_id="source",
-                backup_destination_root_id="destination",
-            ),
+            mxbi_config=MXBIModel(),
             state=SessionState(animals={animal.name: animal}),
         )
         return session, animal

@@ -52,10 +52,6 @@ class ExperimentConfigGroup(QGroupBox):
         self.check_send_email = QCheckBox(self)
         layout.addWidget(self.check_send_email, 2, 1)
 
-        layout.addWidget(QLabel("sync data", self), 2, 2)
-        self.check_sync_data = QCheckBox(self)
-        layout.addWidget(self.check_sync_data, 2, 3)
-
         layout.addWidget(QLabel("notes", self), 3, 0)
         self.line_notes = QLineEdit(self)
         self.line_notes.setPlaceholderText("Notes")
@@ -75,7 +71,6 @@ class ExperimentConfigGroup(QGroupBox):
         self.check_hide_cursor.setChecked(config.hide_cursor)
         self.check_fullscreen.setChecked(config.fullscreen)
         self.check_send_email.setChecked(config.send_email)
-        self.check_sync_data.setChecked(config.sync_data)
 
     def result(self) -> SessionConfig:
         return SessionConfig(
@@ -85,7 +80,6 @@ class ExperimentConfigGroup(QGroupBox):
             hide_cursor=self.check_hide_cursor.isChecked(),
             fullscreen=self.check_fullscreen.isChecked(),
             send_email=self.check_send_email.isChecked(),
-            sync_data=self.check_sync_data.isChecked(),
         )
 
 
