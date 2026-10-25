@@ -112,6 +112,22 @@ the previous animal. The first confirmed identity is fixed until departure.
 Without loguru, the library stays silent: you can handle mxbiflow's
 records with your own standard-library handlers instead.
 
+## Trial status
+
+After each trial, a scene reports the result once:
+
+```python
+get_mxbiflow().publish_trial(result.model_dump(), correct=is_correct)
+```
+
+mxbiflow patches the device status in cogmoteGO (animal, `stage@level`,
+trial count and accuracy for this session) so the cogmote device page shows
+the run live, and publishes the record to the `trials` broadcast. Pass
+`correct=None` for trials that should not count toward accuracy. Requests
+run on a background thread; when cogmoteGO is unreachable they are logged
+and dropped, and the game loop carries on. The device goes back to `idle`
+when the game loop quits.
+
 ## Reports
 
 Crash reports (`mxbiflow.infra.send_crash_report`) and daily session reports

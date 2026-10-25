@@ -141,6 +141,7 @@ class Game:
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
         self._session.end()
+        self._mxbiflow.close()
         self._mxbi.quit()
         if pygame.display.get_init():
             pygame.display.quit()
