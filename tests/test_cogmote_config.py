@@ -9,9 +9,18 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from pydantic import ValidationError
 from PySide6.QtWidgets import QApplication
 
-from mxbiflow.core.path import set_base_path
+from mxbiflow.core.path import (
+    get_applied_cogmote_config_path,
+    get_config_session_path,
+    set_base_path,
+)
 from mxbiflow.gameloop.detector_bridge import DetectorBridge
-from mxbiflow.infra.cogmote_config import read_experiment_config
+from mxbiflow.infra.cogmote_config import (
+    CogmoteConfigError,
+    apply_cogmote_config,
+    read_experiment_config,
+    session_config_from_experiment,
+)
 from mxbiflow.models.animal import AnimalConfig
 from mxbiflow.models.experiment import ExperimentConfig
 from mxbiflow.models.session import SessionConfig
@@ -50,6 +59,117 @@ class ReadExperimentConfigTests(unittest.TestCase):
     def test_rejects_an_unreadable_experiment(self) -> None:
         with self.assertRaises(ValidationError):
             read_experiment_config(client({"experiment": {"animals": []}}))
+
+
+def experiment(stage: str = "detect", level: int = 1) -> ExperimentConfig:
+    return ExperimentConfig.model_validate(
+        {
+            "animals": [
+                {
+                    "id": "a1",
+                    "name": "Mira",
+                    "rfid_tags": ["t1"],
+                    "stage": stage,
+                    "level": level,
+                }
+            ],
+            "parameters": {"reward_type": "m_juice", "fullscreen": False},
+        }
+    )
+
+
+class SessionConfigFromExperimentTests(unittest.TestCase):
+    stages = ("idle", "detect", "discriminate")
+
+    def test_maps_animals_and_parameters(self) -> None:
+        config = session_config_from_experiment(experiment(), stages=self.stages)
+
+        [animal] = config.animals
+        self.assertEqual(
+            (
+                animal.cogmatrix_id,
+                animal.name,
+                animal.rfid_tags,
+                animal.stage,
+                animal.level,
+            ),
+            ("a1", "Mira", ("t1",), "detect", 1),
+        )
+        self.assertEqual(config.reward_type, "m_juice")
+        self.assertFalse(config.fullscreen)
+
+    def test_unknown_stages_are_rejected(self) -> None:
+        with self.assertRaisesRegex(CogmoteConfigError, "unknown stages typo"):
+            session_config_from_experiment(experiment("typo"), stages=self.stages)
+        bad_scene = experiment().model_copy(
+            update={
+                "parameters": experiment().parameters.model_copy(
+                    update={"default_scene": "nope"}
+                )
+            }
+        )
+        with self.assertRaisesRegex(CogmoteConfigError, "nope"):
+            session_config_from_experiment(bad_scene, stages=self.stages)
+
+    def test_local_progress_survives_until_the_operator_changes_it(self) -> None:
+        progressed = SessionConfig(
+            animals=(
+                AnimalConfig(
+                    cogmatrix_id="a1", name="Mira", stage="discriminate", level=4
+                ),
+            )
+        )
+
+        kept = session_config_from_experiment(
+            experiment(), stages=self.stages, previous=progressed, applied=experiment()
+        )
+        changed = session_config_from_experiment(
+            experiment(level=2),
+            stages=self.stages,
+            previous=progressed,
+            applied=experiment(),
+        )
+        first = session_config_from_experiment(
+            experiment(), stages=self.stages, previous=progressed
+        )
+
+        self.assertEqual(
+            (kept.animals[0].stage, kept.animals[0].level), ("discriminate", 4)
+        )
+        self.assertEqual(
+            (changed.animals[0].stage, changed.animals[0].level), ("detect", 2)
+        )
+        self.assertEqual(
+            (first.animals[0].stage, first.animals[0].level), ("detect", 1)
+        )
+
+
+class ApplyCogmoteConfigTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._temporary_directory = tempfile.TemporaryDirectory()
+        set_base_path(Path(self._temporary_directory.name))
+
+    def tearDown(self) -> None:
+        self._temporary_directory.cleanup()
+
+    def test_writes_the_session_config_and_remembers_the_applied_one(self) -> None:
+        fake = client({"experiment": experiment().model_dump(mode="json")})
+
+        apply_cogmote_config(("idle", "detect"), fake)
+
+        saved = SessionConfig.model_validate_json(
+            get_config_session_path().read_text(encoding="utf-8")
+        )
+        self.assertEqual(saved.animals[0].rfid_tags, ("t1",))
+        self.assertTrue(get_applied_cogmote_config_path().is_file())
+
+    def test_missing_or_unreachable_config_is_an_error(self) -> None:
+        with self.assertRaisesRegex(CogmoteConfigError, "no experiment"):
+            apply_cogmote_config(("idle",), client({}))
+        broken = Mock()
+        broken.get_config.side_effect = ConnectionError("refused")
+        with self.assertRaisesRegex(CogmoteConfigError, "refused"):
+            apply_cogmote_config(("idle",), broken)
 
 
 class DetectorBridgeTagTests(unittest.TestCase):

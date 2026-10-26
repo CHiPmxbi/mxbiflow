@@ -40,20 +40,25 @@ Implement your experiment as a set of scenes, register them, and launch:
 ```python
 from pathlib import Path
 
-from mxbiflow import SceneManager, init_gameloop, set_base_path
-from mxbiflow.ui import run_wizard
+from mxbiflow import SceneManager, set_base_path
+from mxbiflow.run import run_experiment
+from mxbiflow.utils.logger import setup_logging
 
 set_base_path(Path.cwd())
+setup_logging()
 
 scene_manager = SceneManager()
 scene_manager.register([IDLE, Detect, Discriminate])
 
-if not run_wizard(scene_manager):
-    raise SystemExit(0)
-
-game = init_gameloop(scene_manager, max_fps=120)
-game.play()
+run_experiment(scene_manager, post_processors=STAGE_POST_PROCESSORS, max_fps=120)
 ```
+
+`run_experiment` runs the wizard, plays the session, sends the daily report
+and reports crashes. With `--from-cogmote` on the command line
+(`uv run main.py --from-cogmote`, or `mxbiflow run --from-cogmote`) it starts
+from the cogmote configuration instead, without any dialog. The building
+blocks (`run_wizard`, `init_gameloop`, `run_session_post_processing`) stay
+available for custom flows.
 
 Each scene implements `SceneProtocol`:
 
@@ -141,6 +146,14 @@ The rig never queries CogMatrix for animals: the wizard offers the animals of
 this configuration, read from cogmoteGO with `get_config()`, with their RFID
 tags (`mxbiflow.infra.cogmote_config.read_experiment_config`). A tag of no
 configured animal is logged and starts no task.
+
+A headless run (`--from-cogmote`) is one session: it writes the session
+configuration from cogmote and starts the game loop, as the wizard does. An
+animal keeps its local stage and level from earlier runs until an operator
+changes them in cogmote. A configuration that cannot start, for example a stage
+the experiment does not register, is sent as a critical notification and the
+process exits with status 1. Run it as a systemd user service that cogmoteGO
+allows (`services` in its config), so Start and Stop in cogmote control it.
 
 ## Reports
 

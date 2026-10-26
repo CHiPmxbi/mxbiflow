@@ -306,6 +306,7 @@ class SessionModelTests(unittest.TestCase):
         self.assertEqual(
             config["animals"][0],
             {
+                "cogmatrix_id": "",
                 "rfid_tags": ["rfid-1"],
                 "name": "animal-1",
                 "stage": "vocalization_discriminate",

@@ -2,14 +2,11 @@ import argparse
 import json
 from pathlib import Path
 
-from . import get_mxbiflow, set_base_path
-from .bootstrap import init_gameloop
-from .infra import send_crash_report
+from . import set_base_path
 from .models.experiment import experiment_config_schema
-from .models.session import Session
+from .run import run_experiment
 from .scene import SceneManager
 from .scene.idle.idle import IDLE
-from .ui import run_session_post_processing, run_wizard
 from .utils.logger import setup_logging
 
 
@@ -19,7 +16,12 @@ def main(argv: list[str] | None = None) -> None:
     commands.add_parser(
         "schema", help="print the JSON Schema of the cogmote experiment configuration"
     )
-    args = parser.parse_args(argv)
+    commands.add_parser(
+        "run",
+        add_help=False,
+        help="run the experiment (the default); --from-cogmote skips the wizard",
+    )
+    args, rest = parser.parse_known_args(argv)
     if args.command == "schema":
         print(json.dumps(experiment_config_schema(), indent=2))
         return
@@ -29,17 +31,7 @@ def main(argv: list[str] | None = None) -> None:
 
     scene_manager = SceneManager()
     scene_manager.register([IDLE])
-    session: Session | None = None
-    try:
-        if not run_wizard(scene_manager):
-            return
-        game = init_gameloop(scene_manager)
-        session = get_mxbiflow().session
-        game.play()
-        run_session_post_processing(session, {})
-    except Exception as exc:
-        send_crash_report(exc, session)
-        raise
+    run_experiment(scene_manager, argv=rest)
 
 
 if __name__ == "__main__":
