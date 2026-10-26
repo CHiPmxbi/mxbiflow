@@ -17,6 +17,8 @@ class ExperimentConfigTests(unittest.TestCase):
         config = ExperimentConfig.model_validate(
             {
                 "experiment": "chip-std-task",
+                "protocol": {"id": "p1", "name": "Habituation"},
+                "repository": {"id": "r1"},
                 "animals": [
                     {
                         "id": "a1",
@@ -38,12 +40,19 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertTrue(config.parameters.hide_cursor)
 
     def test_rejects_invalid_configs(self) -> None:
+        refs = {"protocol": {"id": "p1"}, "repository": {"id": "r1"}}
         for data in [
-            {"animals": []},
-            {"animals": [{"id": "a1", "stage": ""}]},
-            {"animals": [{"id": "a1", "stage": "s", "level": -1}]},
-            {"animals": [{"id": "a1", "stage": "s"}, {"id": "a1", "stage": "t"}]},
+            {"animals": [{"id": "a1", "stage": "s"}]},
+            {**refs, "protocol": {"id": ""}, "animals": [{"id": "a1", "stage": "s"}]},
+            {**refs, "animals": []},
+            {**refs, "animals": [{"id": "a1", "stage": ""}]},
+            {**refs, "animals": [{"id": "a1", "stage": "s", "level": -1}]},
             {
+                **refs,
+                "animals": [{"id": "a1", "stage": "s"}, {"id": "a1", "stage": "t"}],
+            },
+            {
+                **refs,
                 "animals": [{"id": "a1", "stage": "s"}],
                 "parameters": {"reward_type": "x"},
             },
@@ -66,6 +75,12 @@ class ExperimentConfigTests(unittest.TestCase):
         reward = schema["properties"]["parameters"]["properties"]["reward_type"]
         self.assertEqual(reward["enum"], [member.value for member in RewardEnum])
         self.assertEqual(reward["default"], "agum_one_fifth")
+        self.assertEqual(schema["required"], ["protocol", "repository", "animals"])
+        self.assertEqual(schema["properties"]["protocol"]["x-cogmatrix"], "protocol")
+        self.assertEqual(
+            schema["properties"]["repository"]["x-cogmatrix"], "repository"
+        )
+        self.assertEqual(animal["properties"]["id"]["x-cogmatrix"], "animal")
 
     def test_cli_output_is_only_the_schema(self) -> None:
         result = subprocess.run(

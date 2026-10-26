@@ -1,5 +1,6 @@
 from .animal import Animal, AnimalBaseInfo
 from .experiment import (
+    CogMatrixRef,
     ExperimentAnimal,
     ExperimentConfig,
     ExperimentParameters,
@@ -9,6 +10,7 @@ from .experiment import (
 __all__ = [
     "Animal",
     "AnimalBaseInfo",
+    "CogMatrixRef",
     "ExperimentAnimal",
     "ExperimentConfig",
     "ExperimentParameters",
