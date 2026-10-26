@@ -68,7 +68,8 @@ type Command = Annotated[
     _SimpleCommand | _SwitchStage | _Reward, Field(discriminator="command")
 ]
 
-_command_adapter: TypeAdapter[Command] = TypeAdapter(Command)
+# pydantic resolves `type` aliases; its stubs do not accept them yet.
+_command_adapter: TypeAdapter[Command] = TypeAdapter(Command)  # pyright: ignore[reportArgumentType]
 
 
 def parse_command(body: JsonValue) -> Command:

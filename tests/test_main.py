@@ -33,9 +33,11 @@ class RunExperimentTests(unittest.TestCase):
                 "send_session_report": {},
                 "send_crash_report": {},
                 "notify": {},
+                "CogMatrixRecorder": {},
             }.items()
         }
         self.mocks = {name: p.start() for name, p in self.patches.items()}
+        self.recorder = self.mocks["CogMatrixRecorder"].return_value
 
     def tearDown(self) -> None:
         for p in self.patches.values():
@@ -45,6 +47,9 @@ class RunExperimentTests(unittest.TestCase):
         run.run_experiment(SceneManager(), argv=[])
 
         self.game.play.assert_called_once_with()
+        self.recorder.retry_pending.assert_called_once_with()
+        self.recorder.start.assert_called_once_with(self.session)
+        self.recorder.finish.assert_called_once_with(self.session)
         self.mocks["apply_cogmote_config"].assert_not_called()
         self.mocks["run_session_post_processing"].assert_called_once_with(
             self.session, {}
@@ -98,6 +103,7 @@ class RunExperimentTests(unittest.TestCase):
         error, session = self.mocks["send_crash_report"].call_args.args
         self.assertIsInstance(error, RuntimeError)
         self.assertIs(session, self.session)
+        self.recorder.finish.assert_called_once_with(self.session, aborted=True)
 
 
 class CliTests(unittest.TestCase):
