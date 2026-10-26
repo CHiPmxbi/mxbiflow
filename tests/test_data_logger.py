@@ -17,14 +17,13 @@ from mxbiflow.models.session import (
 
 def make_session(*, session_id: int = 7) -> Session:
     animal_config = AnimalConfig(
-        rfid_id="rfid-1",
+        rfid_tags=("rfid-1",),
         name="animal-1",
         stage="stage-1",
     )
     stage = StageState(stage_name="stage-1")
     return Session(
         config=SessionConfig(
-            unknown_animal_as=animal_config.name,
             animals=(animal_config,),
         ),
         mxbi_config=MXBIModel(),

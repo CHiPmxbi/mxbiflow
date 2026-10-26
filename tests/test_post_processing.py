@@ -65,7 +65,7 @@ class SessionReportTests(unittest.TestCase):
             animals=[
                 AnimalSummary(
                     name="m1",
-                    rfid_id="rfid-1",
+                    rfid_tags=("rfid-1",),
                     total_trials=12,
                     animal_sessions=2,
                     total_duration_seconds=125,

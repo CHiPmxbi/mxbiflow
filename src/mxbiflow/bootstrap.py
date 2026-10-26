@@ -45,7 +45,9 @@ def init_gameloop(scene_manager: SceneManager, max_fps: int = 60) -> Game:
     )
 
     animals_map = {
-        animal.config.rfid_id: animal.config.name for animal in session.animals.values()
+        tag: animal.config.name
+        for animal in session.animals.values()
+        for tag in animal.config.rfid_tags
     }
     detector_bridge = DetectorBridge(mxbi.detector, animals_map)
 

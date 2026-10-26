@@ -21,7 +21,7 @@ class StageSummary(BaseModel):
 
 class AnimalSummary(BaseModel):
     name: str
-    rfid_id: str
+    rfid_tags: tuple[str, ...] = ()
     total_trials: int
     animal_sessions: int
     total_duration_seconds: float
@@ -109,7 +109,7 @@ def summarize(session: Session) -> SessionSummary:
         animal_summaries.append(
             AnimalSummary(
                 name=name,
-                rfid_id=animal.config.rfid_id,
+                rfid_tags=animal.config.rfid_tags,
                 total_trials=animal.trial_id,
                 animal_sessions=len(animal.animal_sessions),
                 total_duration_seconds=_calc_animal_duration(animal.animal_sessions),
@@ -149,7 +149,7 @@ def session_overview(summary: SessionSummary) -> str:
     lines += ["", f"Animals ({summary.total_animals})"]
     for animal in summary.animals:
         lines.append(
-            f"- {animal.name} ({animal.rfid_id}): {animal.total_trials} trials, "
+            f"- {animal.name} ({', '.join(animal.rfid_tags) or 'no RFID'}): {animal.total_trials} trials, "
             f"{animal.animal_sessions} sessions, "
             f"{_format_duration(animal.total_duration_seconds)}"
         )

@@ -13,10 +13,13 @@ from ..core.path import (
     get_database_path,
     get_mxbi_panel_config_path,
 )
+from ..infra.cogmote_config import read_experiment_config
 from ..models.database import MXBIDatabase
+from ..models.experiment import ExperimentAnimal
 from ..models.panel import MXBIPanelConfig
 from ..models.session import SessionConfig
 from ..scene import SceneManager
+from ..utils.logger import logger
 from .components.countdown import AutoAcceptCountdown
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,
@@ -44,13 +47,12 @@ class ExperimentPanel(QDialog):
         self.group_scene = ExperimentSceneGroup(
             self,
             stages=list(self._stage_level_tables.keys()),
-            animals=self._fallback_animal_options(),
         )
         layout_main.addWidget(self.group_scene)
 
         self.group_animals = ExperimentAnimalsGroup(
             self,
-            animals=self._database.value.animals,
+            animals=_configured_animals(),
             stage_level_tables=self._stage_level_tables,
         )
         layout_main.addWidget(self.group_animals)
@@ -94,16 +96,10 @@ class ExperimentPanel(QDialog):
         data = session_config.model_dump()
         data.update(
             default_scene=scene_result.default_scene,
-            unknown_animal_as=scene_result.unknown_animal_as,
             fault_fallback=scene_result.fault_fallback,
             animals=self.group_animals.result(),
         )
         return SessionConfig.model_validate(data)
-
-    def _fallback_animal_options(self) -> list[str]:
-        names = list(self._database.value.animals.values())
-        names.extend(animal.name for animal in self._config.value.animals)
-        return list(dict.fromkeys(name for name in names if name))
 
     def _on_save(self) -> None:
         self._config.save(self._collect_result())
@@ -126,3 +122,18 @@ class ExperimentPanel(QDialog):
     def done(self, result: int) -> None:
         self._countdown.stop()
         super().done(result)
+
+
+def _configured_animals() -> tuple[ExperimentAnimal, ...]:
+    """The cage's animals from the cogmote configuration, with their RFID tags."""
+    try:
+        experiment = read_experiment_config()
+    except Exception as error:  # noqa: BLE001 - cogmoteGO may be absent; the wizard still opens
+        logger.warning("cannot read the cogmote experiment configuration: %s", error)
+        return ()
+    if experiment is None:
+        logger.warning(
+            "no experiment is configured in cogmote; the wizard has no animals"
+        )
+        return ()
+    return experiment.animals

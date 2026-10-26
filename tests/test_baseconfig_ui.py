@@ -73,7 +73,7 @@ class BaseConfigTests(unittest.TestCase):
         MXBIModel.model_validate_json(config_path.read_text(encoding="utf-8"))
         panel.close()
 
-    def test_legacy_mxbis_option_is_ignored_and_not_exported(self) -> None:
+    def test_legacy_database_options_are_ignored_and_not_exported(self) -> None:
         database = MXBIDatabase.model_validate(
             {
                 "mxbis": ["mxbi1"],
@@ -84,8 +84,9 @@ class BaseConfigTests(unittest.TestCase):
 
         exported = database.model_dump()
         self.assertNotIn("mxbis", exported)
+        # Animals come from the cogmote configuration now (#173).
+        self.assertNotIn("animals", exported)
         self.assertEqual(exported["experimenter"], ["tester"])
-        self.assertEqual(exported["animals"], {"abcd": "mouse"})
 
 
 if __name__ == "__main__":

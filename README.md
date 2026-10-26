@@ -137,6 +137,11 @@ the JSON Schema of `mxbiflow.models.ExperimentConfig`, which
 cogmote fills in each animal's CogMatrix name and RFID tags and sends the
 configuration to the rig with the device config.
 
+The rig never queries CogMatrix for animals: the wizard offers the animals of
+this configuration, read from cogmoteGO with `get_config()`, with their RFID
+tags (`mxbiflow.infra.cogmote_config.read_experiment_config`). A tag of no
+configured animal is logged and starts no task.
+
 ## Reports
 
 Crash reports (`mxbiflow.infra.send_crash_report`) and daily session reports

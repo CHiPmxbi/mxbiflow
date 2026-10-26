@@ -113,8 +113,13 @@ class Scheduler:
 
         self._scene_manager.switch(fallback)
 
-    def _handle_unknown_animal(self) -> None:
-        self._set_current_animal(self._session.unknown_animal_as)
+    def _handle_unknown_animal(self, tag: str | None) -> None:
+        # Only the configured animals train; another animal at the device starts no task.
+        rfid_logger.warning(
+            "Animal without a configured RFID tag starts no task",
+            extra={"animal_id": tag},
+        )
+        self._clear_current_animal()
 
     def handle_event(self, event: Event) -> None:
         if event.type != EVT_DETECTOR:
@@ -138,7 +143,7 @@ class Scheduler:
 
             case DetectorEvent.UNKNOWN_ANIMAL_ENTERED:
                 self._pending_animal = None
-                self._handle_unknown_animal()
+                self._handle_unknown_animal(msg.animal)
 
             case DetectorEvent.ANIMAL_IDENTIFIED:
                 self._pending_animal = msg.animal

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import NamedTuple
 
 from PySide6.QtCore import QPoint, Qt
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...models.animal import AnimalConfig
+from ...models.experiment import ExperimentAnimal
 from ...models.session import RewardEnum, SessionConfig
 from .animal import AnimalCard
 
@@ -85,7 +87,6 @@ class ExperimentConfigGroup(QGroupBox):
 
 class SceneSelection(NamedTuple):
     default_scene: str
-    unknown_animal_as: str
     fault_fallback: str
 
 
@@ -95,7 +96,6 @@ class ExperimentSceneGroup(QGroupBox):
         parent: QWidget | None = None,
         *,
         stages: list[str],
-        animals: list[str],
     ) -> None:
         super().__init__("Scene", parent)
 
@@ -107,14 +107,6 @@ class ExperimentSceneGroup(QGroupBox):
         self.combo_default_scene.addItems(stages)
         layout.addRow(label_default, self.combo_default_scene)
 
-        label_unknown_animal = QLabel("unknown animal as", self)
-        self.combo_unknown_animal_as = QComboBox(self)
-        self.combo_unknown_animal_as.addItems(animals)
-        layout.addRow(
-            label_unknown_animal,
-            self.combo_unknown_animal_as,
-        )
-
         label_fault = QLabel("fault fallback", self)
         self.combo_fault_fallback = QComboBox(self)
         self.combo_fault_fallback.addItems(stages)
@@ -123,17 +115,12 @@ class ExperimentSceneGroup(QGroupBox):
     def load_config(self, config: SessionConfig) -> None:
         if config.default_scene:
             self.combo_default_scene.setCurrentText(config.default_scene)
-        if config.unknown_animal_as:
-            if self.combo_unknown_animal_as.findText(config.unknown_animal_as) < 0:
-                self.combo_unknown_animal_as.addItem(config.unknown_animal_as)
-            self.combo_unknown_animal_as.setCurrentText(config.unknown_animal_as)
         if config.fault_fallback:
             self.combo_fault_fallback.setCurrentText(config.fault_fallback)
 
     def result(self) -> SceneSelection:
         return SceneSelection(
             default_scene=self.combo_default_scene.currentText(),
-            unknown_animal_as=self.combo_unknown_animal_as.currentText(),
             fault_fallback=self.combo_fault_fallback.currentText(),
         )
 
@@ -143,7 +130,7 @@ class ExperimentAnimalsGroup(QGroupBox):
         self,
         parent: QWidget | None = None,
         *,
-        animals: dict[str, str],
+        animals: Sequence[ExperimentAnimal],
         stage_level_tables: dict[str, dict[str, list[int]]],
     ) -> None:
         super().__init__("Animals", parent)

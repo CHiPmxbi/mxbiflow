@@ -49,7 +49,7 @@ class RecordingConfigStore:
 
 def make_session() -> Session:
     animal_config = AnimalConfig(
-        rfid_id="rfid-1",
+        rfid_tags=("rfid-1",),
         name="animal-1",
         stage="vocalization_discriminate",
         level=2,
@@ -67,7 +67,6 @@ def make_session() -> Session:
     config = SessionConfig(
         experimenter="tester",
         send_email=True,
-        unknown_animal_as=animal_config.name,
         animals=(animal_config,),
     )
     return Session(
@@ -139,29 +138,19 @@ class RuntimeStateStoreTests(unittest.TestCase):
 
 
 class SessionModelTests(unittest.TestCase):
-    def test_session_config_without_animals_allows_empty_unknown_mapping(
-        self,
-    ) -> None:
-        config = SessionConfig()
+    def test_animal_config_migrates_a_single_rfid_id(self) -> None:
+        legacy = AnimalConfig.model_validate({"rfid_id": "rfid-1", "name": "a"})
+        empty = AnimalConfig.model_validate({"rfid_id": "", "name": "a"})
 
-        self.assertEqual(config.unknown_animal_as, "")
+        self.assertEqual(legacy.rfid_tags, ("rfid-1",))
+        self.assertEqual(empty.rfid_tags, ())
 
-    def test_session_config_requires_valid_unknown_animal_mapping(self) -> None:
-        animal = AnimalConfig(name="animal-1")
-
-        with self.assertRaisesRegex(ValidationError, "unknown_animal_as must be set"):
-            SessionConfig(animals=(animal,))
-        with self.assertRaisesRegex(
-            ValidationError,
-            "unknown_animal_as must match a configured animal name",
-        ):
-            SessionConfig(unknown_animal_as="missing", animals=(animal,))
-
-        config = SessionConfig(
-            unknown_animal_as=animal.name,
-            animals=(animal,),
+    def test_session_config_ignores_the_retired_unknown_animal_mapping(self) -> None:
+        config = SessionConfig.model_validate(
+            {"unknown_animal_as": "animal-1", "animals": [{"name": "animal-1"}]}
         )
-        self.assertEqual(config.unknown_animal_as, animal.name)
+
+        self.assertNotIn("unknown_animal_as", config.model_dump())
 
     def test_session_config_with_animals_returns_validated_copy(self) -> None:
         animal = AnimalConfig(name="animal-1")
@@ -171,7 +160,6 @@ class SessionModelTests(unittest.TestCase):
             send_email=True,
             note="note",
             default_scene="default",
-            unknown_animal_as=animal.name,
             fault_fallback="fallback",
             hide_cursor=True,
             fullscreen=True,
@@ -186,28 +174,10 @@ class SessionModelTests(unittest.TestCase):
         self.assertEqual(updated.send_email, config.send_email)
         self.assertEqual(updated.note, config.note)
         self.assertEqual(updated.default_scene, config.default_scene)
-        self.assertEqual(updated.unknown_animal_as, config.unknown_animal_as)
         self.assertEqual(updated.fault_fallback, config.fault_fallback)
         self.assertEqual(updated.hide_cursor, config.hide_cursor)
         self.assertEqual(updated.fullscreen, config.fullscreen)
         self.assertEqual(config.animals, (animal,))
-
-        with self.assertRaisesRegex(
-            ValidationError,
-            "unknown_animal_as must match",
-        ):
-            config.with_animals((AnimalConfig(name="animal-2"),))
-
-    def test_legacy_unknown_animal_field_does_not_configure_mapping(self) -> None:
-        animal = AnimalConfig(name="animal-1")
-
-        with self.assertRaisesRegex(ValidationError, "unknown_animal_as must be set"):
-            SessionConfig.model_validate(
-                {
-                    "unknown_animal_fallback_animal": animal.name,
-                    "animals": [animal],
-                }
-            )
 
     def test_animal_config_stage_order_roundtrip(self) -> None:
         config = AnimalConfig(
@@ -223,7 +193,7 @@ class SessionModelTests(unittest.TestCase):
 
     def test_animal_config_with_progress_returns_validated_copy(self) -> None:
         config = AnimalConfig(
-            rfid_id="rfid-1",
+            rfid_tags=("rfid-1",),
             name="animal-1",
             stage="stage_a",
             level=2,
@@ -234,7 +204,7 @@ class SessionModelTests(unittest.TestCase):
 
         self.assertEqual(updated.stage, "stage_b")
         self.assertEqual(updated.level, 3)
-        self.assertEqual(updated.rfid_id, config.rfid_id)
+        self.assertEqual(updated.rfid_tags, config.rfid_tags)
         self.assertEqual(updated.name, config.name)
         self.assertEqual(updated.stage_order, config.stage_order)
         self.assertEqual(config.stage, "stage_a")
@@ -245,7 +215,7 @@ class SessionModelTests(unittest.TestCase):
 
     def test_bootstrap_reuses_animal_config(self) -> None:
         animal_config = AnimalConfig(
-            rfid_id="rfid-1",
+            rfid_tags=("rfid-1",),
             name="animal-1",
             stage="vocalization_discriminate",
             level=2,
@@ -258,7 +228,6 @@ class SessionModelTests(unittest.TestCase):
         ):
             session = init_session(
                 SessionConfig(
-                    unknown_animal_as=animal_config.name,
                     animals=(animal_config,),
                 ),
                 mxbi_config,
@@ -267,7 +236,7 @@ class SessionModelTests(unittest.TestCase):
 
         self.assertIs(animal.config, session.config.animals[0])
         self.assertIs(session.mxbi_config, mxbi_config)
-        self.assertEqual(animal.rfid_id, "rfid-1")
+        self.assertEqual(animal.rfid_tags, ("rfid-1",))
         self.assertEqual(animal.name, "animal-1")
 
     def test_only_session_exposes_state_mutation_methods(self) -> None:
@@ -307,9 +276,9 @@ class SessionModelTests(unittest.TestCase):
 
         session.set_current_animal("animal-1")
         self.assertIs(session.require_current_animal(), animal)
-        self.assertEqual(animal.rfid_id, animal.config.rfid_id)
+        self.assertEqual(animal.rfid_tags, animal.config.rfid_tags)
         self.assertEqual(animal.name, animal.config.name)
-        self.assertNotIn("rfid_id", Animal.model_fields)
+        self.assertNotIn("rfid_tags", Animal.model_fields)
         self.assertNotIn("name", Animal.model_fields)
 
         with self.assertRaises(ValidationError):
@@ -331,20 +300,20 @@ class SessionModelTests(unittest.TestCase):
         animal = state["animals"]["animal-1"]
         config = snapshot["config"]
         assert isinstance(config, dict)
-        self.assertEqual(config["unknown_animal_as"], "animal-1")
+        self.assertNotIn("unknown_animal_as", config)
         self.assertNotIn("unknown_animal_fallback", config)
         self.assertNotIn("unknown_animal_fallback_animal", config)
         self.assertEqual(
             config["animals"][0],
             {
-                "rfid_id": "rfid-1",
+                "rfid_tags": ["rfid-1"],
                 "name": "animal-1",
                 "stage": "vocalization_discriminate",
                 "level": 2,
                 "stage_order": [],
             },
         )
-        self.assertEqual(animal["rfid_id"], "rfid-1")
+        self.assertEqual(animal["rfid_tags"], ["rfid-1"])
         self.assertEqual(animal["name"], "animal-1")
         self.assertNotIn("config", animal)
         self.assertIn("stages", animal)
@@ -503,7 +472,7 @@ class SessionModelTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             session = make_session()
             second_config = AnimalConfig(
-                rfid_id="rfid-2",
+                rfid_tags=("rfid-2",),
                 name="animal-2",
                 stage="vocalization_discriminate",
             )
@@ -615,7 +584,7 @@ class SessionModelTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             config_path = Path(directory) / "config" / "session.json"
             animal_config = AnimalConfig(
-                rfid_id="rfid-1",
+                rfid_tags=("rfid-1",),
                 name="animal-1",
                 stage="stage_a",
                 level=2,
@@ -623,7 +592,6 @@ class SessionModelTests(unittest.TestCase):
             )
             other_config = AnimalConfig(name="animal-2", stage="other", level=4)
             config = SessionConfig(
-                unknown_animal_as=animal_config.name,
                 animals=(animal_config, other_config),
             )
             config_store = ConfigStore(config_path, SessionConfig)
@@ -645,7 +613,7 @@ class SessionModelTests(unittest.TestCase):
                 persisted = ConfigStore(config_path, SessionConfig).value
                 self.assertEqual(persisted.animals[0].stage, "stage_a")
                 self.assertEqual(persisted.animals[0].level, 3)
-                self.assertEqual(persisted.animals[0].rfid_id, "rfid-1")
+                self.assertEqual(persisted.animals[0].rfid_tags, ("rfid-1",))
                 self.assertEqual(
                     persisted.animals[0].stage_order, ("stage_a", "stage_b")
                 )
@@ -710,7 +678,6 @@ class StageNavigationTests(unittest.TestCase):
         )
         session = Session(
             config=SessionConfig(
-                unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
             mxbi_config=MXBIModel(),

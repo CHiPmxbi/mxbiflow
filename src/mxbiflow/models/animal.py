@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -8,6 +9,7 @@ from pydantic import (
     SerializeAsAny,
     computed_field,
     field_serializer,
+    model_validator,
 )
 
 type ContextMap = dict[str, SerializeAsAny[BaseModel]]
@@ -36,16 +38,28 @@ class ContextState(BaseModel):
 class AnimalConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    rfid_id: str = ""
+    # The animal's current RFID tags from CogMatrix (CHiPmxbi/mxbiflow#173).
+    rfid_tags: tuple[str, ...] = ()
     name: str = "mock"
     stage: str = "idle"
     level: int = Field(default=0, ge=0)
     # Ordered stage names for manual next/prev navigation; empty disables it.
     stage_order: tuple[str, ...] = ()
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_rfid_id(cls, data: Any) -> Any:
+        # Session configs saved before #173 hold a single `rfid_id`.
+        if isinstance(data, dict) and "rfid_id" in data:
+            data = dict(data)
+            rfid_id = data.pop("rfid_id")
+            if rfid_id and "rfid_tags" not in data:
+                data["rfid_tags"] = (rfid_id,)
+        return data
+
     def with_progress(self, *, stage: str, level: int) -> AnimalConfig:
         return AnimalConfig(
-            rfid_id=self.rfid_id,
+            rfid_tags=self.rfid_tags,
             name=self.name,
             stage=stage,
             level=level,
@@ -118,8 +132,8 @@ class Animal(ContextState):
 
     @computed_field
     @property
-    def rfid_id(self) -> str:
-        return self.config.rfid_id
+    def rfid_tags(self) -> tuple[str, ...]:
+        return self.config.rfid_tags
 
     @computed_field
     @property
