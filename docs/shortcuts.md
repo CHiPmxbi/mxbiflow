@@ -16,6 +16,9 @@ All shortcuts are registered centrally in
 | `,` | Previous stage | Moves to the previous stage in the current animal's configured `stage_order` list; no-op when unavailable. |
 | `.` | Next stage | Moves to the next stage in the current animal's configured `stage_order` list; no-op when unavailable. |
 
+The same actions are available remotely through cogmoteGO; see
+[remote-control.md](remote-control.md).
+
 ## Adding a new shortcut
 
 1. Add the binding in `register_default_shortcuts` with
