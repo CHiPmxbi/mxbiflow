@@ -220,8 +220,10 @@ def _asset_name(file: str, run_dir: Path) -> str:
     path = Path(file)
     if path.parent == run_dir:
         return path.name
-    # <data root>/<animal>/<date>/<session>/<stage>/result.jsonl
-    return "/".join(path.parts[-5:])
+    # <data root>/<animal>/<date>/<session>/<stage>/result.jsonl; CogMatrix names are
+    # file names without slashes, and the session already fixes date and session.
+    animal, _date, _session, stage, name = path.parts[-5:]
+    return f"{animal}-{stage}-{name}"
 
 
 def _save(run_dir: Path, run: PendingRun) -> None:
