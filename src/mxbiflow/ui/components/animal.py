@@ -34,6 +34,7 @@ class AnimalCard(CardFrame):
         self._stage_level_tables = stage_level_tables
         self._stage_order: tuple[str, ...] = ()
 
+        self._animal_ids = [animal.id for animal in animals]
         self._animal_tags = [animal.rfid_tags for animal in animals]
         self._animal_names = [animal.name for animal in animals]
 
@@ -91,6 +92,12 @@ class AnimalCard(CardFrame):
     def _sync_animal_id(self) -> None:
         self.line_animal_id.setText(", ".join(self.rfid_tags()))
 
+    def cogmatrix_id(self) -> str:
+        index = self.combo_animal_name.currentIndex()
+        if index < 0 or index >= len(self._animal_ids):
+            return ""
+        return self._animal_ids[index]
+
     def rfid_tags(self) -> tuple[str, ...]:
         index = self.combo_animal_name.currentIndex()
         if index < 0 or index >= len(self._animal_tags):
@@ -115,6 +122,7 @@ class AnimalCard(CardFrame):
     @property
     def result(self) -> AnimalConfig:
         return AnimalConfig(
+            cogmatrix_id=self.cogmatrix_id(),
             rfid_tags=self.rfid_tags(),
             name=self.animal_name(),
             stage=self.combo_stage.currentText(),

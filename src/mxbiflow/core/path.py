@@ -58,3 +58,7 @@ def get_internal_state_path() -> Path:
 
 def get_runtime_state_path() -> Path:
     return get_internal_state_path() / "runtime.json"
+
+
+def get_applied_cogmote_config_path() -> Path:
+    return get_internal_state_path() / "cogmote_experiment.json"

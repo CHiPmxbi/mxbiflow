@@ -38,7 +38,8 @@ class ContextState(BaseModel):
 class AnimalConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    # The animal's current RFID tags from CogMatrix (CHiPmxbi/mxbiflow#173).
+    # The CogMatrix animal ID and current RFID tags from cogmote (#173).
+    cogmatrix_id: str = ""
     rfid_tags: tuple[str, ...] = ()
     name: str = "mock"
     stage: str = "idle"
@@ -59,6 +60,7 @@ class AnimalConfig(BaseModel):
 
     def with_progress(self, *, stage: str, level: int) -> AnimalConfig:
         return AnimalConfig(
+            cogmatrix_id=self.cogmatrix_id,
             rfid_tags=self.rfid_tags,
             name=self.name,
             stage=stage,
