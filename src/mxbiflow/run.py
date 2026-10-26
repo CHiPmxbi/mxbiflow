@@ -10,6 +10,7 @@ from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
 from .infra.notify import notify
 from .infra.post_processing import StagePostProcessor, send_session_report
+from .infra.trial_status import clear_trials
 from .models.session import Session
 from .scene import SceneManager
 from .ui import run_session_post_processing, run_wizard
@@ -54,6 +55,7 @@ def run_experiment(
             return
         game = init_gameloop(scene_manager, max_fps)
         session = get_mxbiflow().session
+        clear_trials()
         recorder.retry_pending()
         recorder.start(session)
         game.play()

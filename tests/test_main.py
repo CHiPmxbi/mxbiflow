@@ -34,6 +34,7 @@ class RunExperimentTests(unittest.TestCase):
                 "send_crash_report": {},
                 "notify": {},
                 "CogMatrixRecorder": {},
+                "clear_trials": {},
             }.items()
         }
         self.mocks = {name: p.start() for name, p in self.patches.items()}
@@ -47,6 +48,7 @@ class RunExperimentTests(unittest.TestCase):
         run.run_experiment(SceneManager(), argv=[])
 
         self.game.play.assert_called_once_with()
+        self.mocks["clear_trials"].assert_called_once_with()
         self.recorder.retry_pending.assert_called_once_with()
         self.recorder.start.assert_called_once_with(self.session)
         self.recorder.finish.assert_called_once_with(self.session)
