@@ -32,7 +32,7 @@ from mxbiflow.driver.rewarder import MockRewarderModel
 
 class DetectorModelTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.adapter = TypeAdapter(DetectorModel)
+        self.adapter = TypeAdapter(DetectorModel)  # pyright: ignore[reportArgumentType]
 
     def test_supported_detector_types_are_valid(self) -> None:
         cases = [
@@ -127,7 +127,7 @@ class DetectorFactoryTests(unittest.TestCase):
 
 class EyetrackerModelTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.adapter = TypeAdapter(EyetrackerModel)
+        self.adapter = TypeAdapter(EyetrackerModel)  # pyright: ignore[reportArgumentType]
 
     def test_supported_eyetracker_types_are_valid(self) -> None:
         cases = [

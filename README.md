@@ -155,6 +155,24 @@ the experiment does not register, is sent as a critical notification and the
 process exits with status 1. Run it as a systemd user service that cogmoteGO
 allows (`services` in its config), so Start and Stop in cogmote control it.
 
+## CogMatrix sessions
+
+Every run is recorded in CogMatrix by the rig itself, with the CogMatrix token
+cogmoteGO serves on loopback (`mxbiflow.infra.cogmatrix_sync`). When the game
+loop starts, mxbiflow creates the session with `create_from_device`, using:
+
+- every animal of the cogmote experiment config as a subject;
+- the protocol picked in cogmote and the experiment repository's git version
+  as its implementation;
+- the operator from the config.
+
+When the game loop quits, mxbiflow ends the session and uploads each animal's
+`result.jsonl` and the session snapshot to the storage repository picked in
+cogmote. Every step is kept under `.mxbiflow/state/cogmatrix/` until CogMatrix
+has it, so a run that started offline or whose uploads failed is completed at
+the next start. Without an experiment config in cogmote the run is not
+recorded.
+
 ## Reports
 
 Crash reports (`mxbiflow.infra.send_crash_report`) and daily session reports
