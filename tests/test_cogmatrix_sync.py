@@ -135,8 +135,8 @@ class CogMatrixRecorderTests(unittest.TestCase):
         )
         self.assertTrue(all(u["session_id"] == UUID(int=7) for u in uploads))
         self.assertTrue(all(u["repository_id"] == UUID(REPOSITORY) for u in uploads))
-        self.assertIn(
-            "animal-1/", next(u["name"] for u in uploads if u["name"] != "session.json")
+        self.assertEqual(
+            {u["name"] for u in uploads}, {"animal-1-s-result.jsonl", "session.json"}
         )
         self.assertEqual(list(self.state.iterdir()), [])
 
