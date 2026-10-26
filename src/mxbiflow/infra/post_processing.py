@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 
 from loguru import logger
+from matplotlib.figure import Figure
 from pydantic import BaseModel
+from pymotego import Block, Client, Heading, Image, KeyValue, Table
 
 from ..models.animal import AnimalSessionState
 from ..models.session import Session
-from .notify import notify
 
 
 class StageSummary(BaseModel):
@@ -42,9 +44,25 @@ class SessionSummary(BaseModel):
 
 @dataclass(frozen=True)
 class PostProcessingResult:
-    """One stage's section of the plain-text session report."""
+    """One stage's section of the daily report.
 
-    text: str
+    ``blocks`` are pymoteGO report blocks (cogmote renders them); ``figures`` are PNG images
+    keyed by the names ``Image`` blocks use. Names only need to be unique within the stage.
+    """
+
+    blocks: Sequence[Block]
+    figures: Mapping[str, bytes] = field(default_factory=dict[str, bytes])
+
+
+def figure_png(figure: Figure, *, dpi: int = 100) -> bytes:
+    """Return ``figure`` as PNG bytes.
+
+    Build figures with ``matplotlib.figure.Figure`` rather than pyplot, so no GUI backend
+    is involved and nothing has to be closed.
+    """
+    buffer = BytesIO()
+    figure.savefig(buffer, format="png", dpi=dpi, bbox_inches="tight")
+    return buffer.getvalue()
 
 
 class StagePostProcessor(ABC):
@@ -134,41 +152,84 @@ def summarize(session: Session) -> SessionSummary:
     )
 
 
-def session_overview(summary: SessionSummary) -> str:
-    lines = [
-        f"Session #{summary.session_id}",
-        f"Start: {_format_timestamp(summary.start_at)}",
-        f"End: {_format_timestamp(summary.end_at)}",
-        f"Duration: {_format_duration(summary.duration_seconds)}",
-        f"Experimenter: {summary.experimenter}",
-        f"Reward type: {summary.reward_type}",
+def session_overview(summary: SessionSummary) -> list[Block]:
+    """The overview section: session metadata, animals and their stages."""
+    details = [
+        ("Start", _format_timestamp(summary.start_at)),
+        ("End", _format_timestamp(summary.end_at)),
+        ("Duration", _format_duration(summary.duration_seconds)),
+        ("Experimenter", summary.experimenter),
+        ("Reward type", summary.reward_type),
     ]
     if summary.note:
-        lines.append(f"Note: {summary.note}")
-
-    lines += ["", f"Animals ({summary.total_animals})"]
-    for animal in summary.animals:
-        lines.append(
-            f"- {animal.name} ({', '.join(animal.rfid_tags) or 'no RFID'}): {animal.total_trials} trials, "
-            f"{animal.animal_sessions} sessions, "
-            f"{_format_duration(animal.total_duration_seconds)}"
+        details.append(("Note", summary.note))
+    blocks: list[Block] = [Heading(f"Session #{summary.session_id}"), KeyValue(details)]
+    if not summary.animals:
+        return blocks
+    blocks.append(
+        Table(
+            ["Animal", "RFID", "Trials", "Sessions", "Duration"],
+            [
+                [
+                    animal.name,
+                    ", ".join(animal.rfid_tags) or "no RFID",
+                    animal.total_trials,
+                    animal.animal_sessions,
+                    _format_duration(animal.total_duration_seconds),
+                ]
+                for animal in summary.animals
+            ],
+            caption=f"Animals ({summary.total_animals})",
         )
-        lines += [
-            f"  {stage.name}: {stage.trials} trials, {_format_level(stage)}"
-            for stage in animal.stages
-        ]
-    return "\n".join(lines)
+    )
+    stage_rows = [
+        [animal.name, stage.name, stage.trials, _format_level(stage)]
+        for animal in summary.animals
+        for stage in animal.stages
+    ]
+    if stage_rows:
+        blocks.append(Table(["Animal", "Stage", "Trials", "Level"], stage_rows))
+    return blocks
+
+
+@dataclass(frozen=True)
+class SessionReport:
+    """The daily report as pymoteGO ``Client.report`` takes it."""
+
+    title: str
+    summary: str
+    blocks: list[Block]
+    images: dict[str, bytes]
+
+
+def _stage_section(index: int, result: PostProcessingResult) -> PostProcessingResult:
+    """Prefix the stage's image names so stages may reuse them."""
+
+    def name(image: str) -> str:
+        return f"s{index}-{image}"[:64]
+
+    blocks = [
+        replace(block, image=name(block.image)) if isinstance(block, Image) else block
+        for block in result.blocks
+    ]
+    return PostProcessingResult(
+        blocks, {name(image): png for image, png in result.figures.items()}
+    )
 
 
 def build_session_report(
     session: Session,
     stage_post_processors: Mapping[str, StagePostProcessor],
-) -> str:
-    """Build the plain-text session report from the summary and stage sections."""
-    sections = [session_overview(summarize(session))]
+) -> SessionReport:
+    """Build the daily report from the summary and the stage sections."""
+    summary = summarize(session)
+    blocks = session_overview(summary)
+    images: dict[str, bytes] = {}
 
     if session.data_root is not None:
-        for stage_name, paths_by_animal in session.stage_data_paths.items():
+        for index, (stage_name, paths_by_animal) in enumerate(
+            session.stage_data_paths.items()
+        ):
             post_processor = stage_post_processors.get(stage_name)
             if post_processor is None:
                 logger.warning("skipping stage without post-processor: {}", stage_name)
@@ -178,25 +239,39 @@ def build_session_report(
                 animal: session.data_root / path
                 for animal, path in paths_by_animal.items()
             }
-            sections.append(post_processor.process(session, stage_paths).text)
+            section = _stage_section(
+                index, post_processor.process(session, stage_paths)
+            )
+            blocks.extend(section.blocks)
+            images.update(section.figures)
 
-    return "\n\n".join(sections)
+    trials = sum(animal.total_trials for animal in summary.animals)
+    return SessionReport(
+        title=f"{session.mxbi_config.mxbi_id} Daily Report",
+        summary=f"Session #{summary.session_id}: {summary.total_animals} animals, "
+        f"{trials} trials, {_format_duration(summary.duration_seconds)}",
+        blocks=blocks,
+        images=images,
+    )
 
 
 def send_session_report(
     session: Session,
     stage_post_processors: Mapping[str, StagePostProcessor],
 ) -> None:
-    """Build the completed session report and notify the device's subscribers."""
+    """Build the completed session report and send it to the device's subscribers."""
     if not session.send_email:
         return
 
     try:
-        notify(
-            f"{session.mxbi_config.mxbi_id} Daily Report",
-            build_session_report(session, stage_post_processors),
+        report = build_session_report(session, stage_post_processors)
+        with Client() as client:
+            receipt = client.report(
+                report.title, report.blocks, report.images, summary=report.summary
+            )
+        logger.info(
+            "session report sent: session_id={} url={}", session.session_id, receipt.url
         )
-        logger.info("session report sent: session_id={}", session.session_id)
     except Exception:
         logger.exception("failed to send session report")
         raise
