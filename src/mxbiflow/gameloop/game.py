@@ -11,6 +11,7 @@ from ..models.session import Session
 from ..scene import SceneManager
 from ..utils.logger import logger
 from .detector_bridge import DetectorBridge
+from .remote_control import RemoteControl
 from .scheduler import Scheduler
 from .shortcuts import ShortcutRegistry, register_default_shortcuts
 
@@ -54,6 +55,13 @@ class Game:
             manual_control=self._scheduler,
         )
 
+        self._remote_control = RemoteControl(
+            scheduler=self._scheduler,
+            rewarder=self._mxbi.rewarder,
+            on_capture=self._capture_screen,
+            on_quit=self._request_quit,
+        )
+
         self._mxbiflow = MXBIFlow(self._session, self._mxbi)
 
         set_mxbiflow(self._mxbiflow)
@@ -86,6 +94,7 @@ class Game:
             dt = self._clock.tick(self._max_fps) / 1000.0
 
             self._detector_binder.emit_pygame_event()
+            self._remote_control.poll()
 
             for event in pygame.event.get():
                 self._handle_event(event)
@@ -141,6 +150,7 @@ class Game:
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
         self._session.end()
+        self._remote_control.close()
         self._mxbiflow.close()
         self._mxbi.quit()
         if pygame.display.get_init():

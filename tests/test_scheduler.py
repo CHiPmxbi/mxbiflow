@@ -9,6 +9,7 @@ from mxbiflow.gameloop.scheduler import Scheduler
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 from mxbiflow.scene import SceneManager
+from mxbiflow.scene.idle.idle import IDLE
 from mxbiflow.scene.scene import Scene
 
 
@@ -48,6 +49,28 @@ class StageA(Scene):
 
 class StageB(StageA):
     pass
+
+
+class HeadlessIdle(IDLE):
+    """IDLE without assets, so scheduler tests need no display or MXBIFlow."""
+
+    def __init__(self) -> None:
+        Scene.__init__(self)
+
+    def start(self) -> None:
+        self._running = True
+
+    def quit(self) -> None:
+        self._running = False
+
+    def handle_event(self, event: Event) -> None:
+        pass
+
+    def update(self, dt_s: float) -> None:
+        pass
+
+    def draw(self, screen: Surface) -> None:
+        pass
 
 
 class StageC(StageA):
@@ -206,6 +229,55 @@ class ManualControlTests(unittest.TestCase):
         scheduler.next_stage()
 
         self.assertEqual(session.require_current_animal().current_stage_name, "stage_a")
+
+    def test_switch_stage_moves_to_any_registered_stage(self) -> None:
+        session, _animal = self._make_session(stage="stage_a")
+        scheduler, scene_manager = self._make_scheduler(session)
+        session.set_current_animal("animal-a")
+
+        scheduler.switch_stage("stage_c")
+
+        self.assertEqual(session.require_current_animal().current_stage_name, "stage_c")
+        scheduler.update()
+        scene_manager.apply_pending()
+        self.assertIsInstance(scene_manager.current, StageC)
+
+    def test_switch_stage_ignores_unregistered_stage(self) -> None:
+        session, _animal = self._make_session(stage="stage_a")
+        scheduler, _scene_manager = self._make_scheduler(session)
+        session.set_current_animal("animal-a")
+
+        scheduler.switch_stage("stage_unregistered")
+
+        self.assertEqual(session.require_current_animal().current_stage_name, "stage_a")
+
+    def test_pause_shows_idle_and_resume_restarts_task(self) -> None:
+        session, _animal = self._make_session(stage="stage_a")
+        scheduler, scene_manager = self._make_scheduler(session)
+        scene_manager.register({IDLE.name(): HeadlessIdle})
+        scheduler = Scheduler(session, scene_manager)
+        session.set_current_animal("animal-a")
+        scheduler.level_up()
+        scheduler.update()
+        scene_manager.apply_pending()
+        self.assertIsInstance(scene_manager.current, StageA)
+
+        scheduler.pause()
+        scheduler.update()
+        scene_manager.apply_pending()
+        self.assertTrue(scheduler.paused)
+        self.assertIsInstance(scene_manager.current, IDLE)
+
+        scheduler.level_up()
+        scheduler.update()
+        scene_manager.apply_pending()
+        self.assertIsInstance(scene_manager.current, IDLE)
+
+        scheduler.resume()
+        scheduler.update()
+        scene_manager.apply_pending()
+        self.assertFalse(scheduler.paused)
+        self.assertIsInstance(scene_manager.current, StageA)
 
 
 class IdentityUpdateTests(unittest.TestCase):
