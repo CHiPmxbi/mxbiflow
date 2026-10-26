@@ -49,7 +49,7 @@ class Game:
         self._shortcuts = ShortcutRegistry()
         register_default_shortcuts(
             self._shortcuts,
-            on_quit=self._request_quit,
+            on_quit=self.request_quit,
             on_capture=self._capture_screen,
             detector_bridge=self._detector_binder,
             manual_control=self._scheduler,
@@ -59,7 +59,7 @@ class Game:
             scheduler=self._scheduler,
             rewarder=self._mxbi.rewarder,
             on_capture=self._capture_screen,
-            on_quit=self._request_quit,
+            on_quit=self.request_quit,
         )
 
         self._mxbiflow = MXBIFlow(self._session, self._mxbi)
@@ -133,7 +133,8 @@ class Game:
     def _handle_keyboard_event(self, event: Event) -> None:
         self._shortcuts.handle_event(event)
 
-    def _request_quit(self) -> None:
+    def request_quit(self) -> None:
+        """End :meth:`play` after the current frame."""
         self._running = False
 
     def _capture_screen(self) -> None:

@@ -586,6 +586,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cogmatrix", extra = ["auth"] },
     { name = "gpiozero" },
+    { name = "httpx" },
     { name = "inflection" },
     { name = "keyring" },
     { name = "matplotlib" },
@@ -626,6 +627,7 @@ dev = [
 requires-dist = [
     { name = "cogmatrix", extras = ["auth"], git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=a6f555a567454688defff10fddb3534463e85358" },
     { name = "gpiozero", specifier = ">=2.0.1.post3" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "inflection", specifier = ">=0.5.1" },
     { name = "keyring", specifier = ">=25.7.0" },
     { name = "loguru", marker = "extra == 'log'", specifier = ">=0.7.3" },

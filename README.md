@@ -153,7 +153,10 @@ animal keeps its local stage and level from earlier runs until an operator
 changes them in cogmote. A configuration that cannot start, for example a stage
 the experiment does not register, is sent as a critical notification and the
 process exits with status 1. Run it as a systemd user service that cogmoteGO
-allows (`services` in its config), so Start and Stop in cogmote control it.
+allows (`services` in its config), so Start and Stop in cogmote control it;
+SIGTERM ends the game loop like the quit command, so a stopped run is still
+ended and uploaded. Each run clears the `trials` broadcast first, so the
+cogmote views do not replay the previous run.
 
 ## CogMatrix sessions
 
@@ -169,9 +172,27 @@ loop starts, mxbiflow creates the session with `create_from_device`, using:
 When the game loop quits, mxbiflow ends the session and uploads each animal's
 `result.jsonl` and the session snapshot to the storage repository picked in
 cogmote. Every step is kept under `.mxbiflow/state/cogmatrix/` until CogMatrix
-has it, so a run that started offline or whose uploads failed is completed at
-the next start. Without an experiment config in cogmote the run is not
-recorded.
+has it, so a run that started offline or whose uploads failed is completed in
+the background of the next run. Without an experiment config in cogmote the run
+is not recorded.
+
+## Camera recording
+
+With **Record the camera** on in the device's cogmote configuration
+(`recording.record_camera`), the rig records its own camera during the game
+loop (`mxbiflow.infra.camera_recording`). MediaMTX serves the Pi camera on path
+`mystream`; mxbiflow switches its recording on and off through MediaMTX's
+loopback API (`PATCH /v3/config/paths/patch/mystream`). MediaMTX writes fMP4
+segments to `~/recordings/mystream/` (CHiPmxbi/setup configures it, with the
+device code and time burned into the image).
+
+At the end of the run mxbiflow writes a WebVTT subtitle file next to each
+segment with one cue per published trial (trial, animal, `stage@level`,
+result), uploads the segments and subtitles to the session after its results
+as `camera-<segment>.mp4` and `.vtt`, and deletes them locally once uploaded.
+A cue's time is the trial time minus the capture of the segment's first frame:
+the segment start in its name minus `recording.capture_latency_ms`, the delay
+from the camera to MediaMTX, measured once by filming a millisecond clock.
 
 ## Reports
 
