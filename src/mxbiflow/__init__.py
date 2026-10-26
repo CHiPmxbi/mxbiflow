@@ -1,3 +1,8 @@
+import os
+
+# Keep stdout clean for command output such as `mxbiflow schema`.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+
 from .bootstrap import init_gameloop
 from .core.context import MXBIFlow, get_mxbiflow
 from .core.path import get_base_path, set_base_path
