@@ -356,6 +356,26 @@ class IdentityUpdateTests(unittest.TestCase):
         self.assertEqual(self.session.require_current_animal().name, "identified")
         self.assertIsInstance(self.manager.current, StageB)
 
+    def test_leave_ends_the_running_trial_while_its_animal_is_set(self) -> None:
+        seen: list[str | None] = []
+        scene = self.manager.current
+        assert scene is not None
+        original_quit = scene.quit
+
+        def quit_and_record() -> None:
+            current = self.session.current_animal
+            seen.append(current.name if current is not None else None)
+            original_quit()
+
+        scene.quit = quit_and_record  # type: ignore[method-assign]
+        self.send(DetectorEvent.ANIMAL_LEFT)
+        self.scheduler.update()
+        self.manager.apply_pending()
+
+        self.assertEqual(seen, ["fallback"])
+        self.assertIsNone(self.session.current_animal)
+        self.assertIsInstance(self.manager.current, StageC)
+
     def test_leave_cancels_pending_identity(self) -> None:
         self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
         self.send(DetectorEvent.ANIMAL_LEFT)

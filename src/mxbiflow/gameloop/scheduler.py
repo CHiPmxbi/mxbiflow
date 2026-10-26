@@ -34,6 +34,12 @@ class Scheduler:
         if self._session.current_animal is None:
             return
 
+        # End a running trial while its animal is still set: the scene saves,
+        # settles and publishes the trial in quit().
+        scene = self._scene_manager.current
+        if scene is not None and not isinstance(scene, IDLE) and scene.running:
+            self._scene_manager.switch(self._scenes[IDLE.name()], defer=False)
+
         self._session.clear_current_animal()
         self._mark_refresh()
 
