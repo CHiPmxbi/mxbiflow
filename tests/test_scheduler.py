@@ -78,7 +78,7 @@ class StageC(StageA):
 
 
 class SchedulerTests(unittest.TestCase):
-    def test_unknown_animal_uses_configured_animal_stage(self) -> None:
+    def test_unknown_animal_starts_no_task(self) -> None:
         animal_config = AnimalConfig(name="fallback", stage="target_stage")
         animal = Animal(
             config=animal_config,
@@ -87,7 +87,6 @@ class SchedulerTests(unittest.TestCase):
         )
         session = Session(
             config=SessionConfig(
-                unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
             mxbi_config=MXBIModel(),
@@ -96,7 +95,9 @@ class SchedulerTests(unittest.TestCase):
         scene_manager = SceneManager()
         scene_manager.register([TargetStage])
         self.assertIs(scene_manager.scenes["target_stage"], TargetStage)
+        scene_manager.register({"idle": HeadlessIdle})
         scheduler = Scheduler(session, scene_manager)
+        session.set_current_animal("fallback")
 
         scheduler.handle_event(
             Event(
@@ -110,8 +111,9 @@ class SchedulerTests(unittest.TestCase):
         scheduler.update()
         scene_manager.apply_pending()
 
-        self.assertIs(session.current_animal, animal)
-        self.assertIsInstance(scene_manager.current, TargetStage)
+        self.assertIsNone(session.current_animal)
+        self.assertIsNotNone(animal.animal_sessions[0].end_at)
+        self.assertIsInstance(scene_manager.current, HeadlessIdle)
 
 
 class ManualControlTests(unittest.TestCase):
@@ -135,7 +137,6 @@ class ManualControlTests(unittest.TestCase):
         )
         session = Session(
             config=SessionConfig(
-                unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
             mxbi_config=MXBIModel(),
@@ -295,7 +296,7 @@ class IdentityUpdateTests(unittest.TestCase):
             for config in configs
         }
         self.session = Session(
-            config=SessionConfig(unknown_animal_as="fallback", animals=configs),
+            config=SessionConfig(animals=configs),
             mxbi_config=MXBIModel(),
             state=SessionState(animals=animals),
         )
@@ -304,7 +305,7 @@ class IdentityUpdateTests(unittest.TestCase):
         self.manager.register({"idle": StageC})
         self.manager.fault_fallback = "stage_c"
         self.scheduler = Scheduler(self.session, self.manager)
-        self.send(DetectorEvent.UNKNOWN_ANIMAL_ENTERED)
+        self.send(DetectorEvent.ANIMAL_ENTERED, "fallback")
         self.scheduler.update()
         self.manager.apply_pending()
 
@@ -372,7 +373,7 @@ class IdentityUpdateTests(unittest.TestCase):
         self.manager.current.quit()
         self.scheduler.update()
         self.manager.apply_pending()
-        self.assertEqual(self.session.require_current_animal().name, "fallback")
+        self.assertIsNone(self.session.current_animal)
 
     def test_fault_cancels_pending_identity(self) -> None:
         self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")

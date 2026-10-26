@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
@@ -9,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...models.animal import AnimalConfig
+from ...models.experiment import ExperimentAnimal
 from .card import CardFrame
 
 # stage_name -> {animal_name -> [level_ids]}
@@ -21,7 +24,7 @@ class AnimalCard(CardFrame):
     def __init__(
         self,
         parent: QWidget | None,
-        animals: dict[str, str],
+        animals: Sequence[ExperimentAnimal],
         stage_level_tables: StageLevelTables,
     ) -> None:
         super().__init__(parent=parent, object_name="card")
@@ -31,9 +34,8 @@ class AnimalCard(CardFrame):
         self._stage_level_tables = stage_level_tables
         self._stage_order: tuple[str, ...] = ()
 
-        items = list(animals.items())
-        self._animal_ids = [animal_id for animal_id, _name in items]
-        self._animal_names = [name for _animal_id, name in items]
+        self._animal_tags = [animal.rfid_tags for animal in animals]
+        self._animal_names = [animal.name for animal in animals]
 
         layout = QFormLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -44,7 +46,7 @@ class AnimalCard(CardFrame):
         self.combo_animal_name.currentIndexChanged.connect(self._on_animal_changed)
         layout.addRow(label_animal_name, self.combo_animal_name)
 
-        lable_animal_id = QLabel("id", self)
+        lable_animal_id = QLabel("rfid", self)
         self.line_animal_id = QLineEdit(self)
         self.line_animal_id.setReadOnly(True)
         self.line_animal_id.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -87,14 +89,13 @@ class AnimalCard(CardFrame):
             self.combo_level.setEnabled(False)
 
     def _sync_animal_id(self) -> None:
-        index = self.combo_animal_name.currentIndex()
-        if index < 0 or index >= len(self._animal_ids):
-            self.line_animal_id.setText("")
-            return
-        self.line_animal_id.setText(self._animal_ids[index])
+        self.line_animal_id.setText(", ".join(self.rfid_tags()))
 
-    def animal_id(self) -> str:
-        return self.line_animal_id.text()
+    def rfid_tags(self) -> tuple[str, ...]:
+        index = self.combo_animal_name.currentIndex()
+        if index < 0 or index >= len(self._animal_tags):
+            return ()
+        return self._animal_tags[index]
 
     def animal_name(self) -> str:
         return self.combo_animal_name.currentText()
@@ -114,7 +115,7 @@ class AnimalCard(CardFrame):
     @property
     def result(self) -> AnimalConfig:
         return AnimalConfig(
-            rfid_id=self.animal_id(),
+            rfid_tags=self.rfid_tags(),
             name=self.animal_name(),
             stage=self.combo_stage.currentText(),
             level=int(self.combo_level.currentText())

@@ -93,13 +93,16 @@ class DetectorBridge:
                 self._detector.animal_present(animal_id)
 
     def manual_emit_by_index(self, index: int) -> None:
-        """Simulate the animal at *index* in the animal map entering."""
+        """Simulate the animal at *index* in the animal map entering, by its first tag."""
         rfid_key = self._rfid_key_at(index)
         if rfid_key is not None:
             self.manual_emit(rfid_key)
 
     def _rfid_key_at(self, index: int) -> str | None:
-        keys = list(self._animals_map.keys())
+        first_tags: dict[str, str] = {}
+        for tag, name in self._animals_map.items():
+            first_tags.setdefault(name, tag)
+        keys = list(first_tags.values())
         if index < len(keys):
             return keys[index]
         return None

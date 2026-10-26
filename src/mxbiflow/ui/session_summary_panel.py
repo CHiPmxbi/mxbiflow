@@ -96,7 +96,7 @@ class SessionSummaryPanel(QDialog):
         layout = QVBoxLayout(group)
         headers = (
             "Name",
-            "RFID ID",
+            "RFID tags",
             "Total Trials",
             "Animal Sessions",
             "Duration",
@@ -104,7 +104,7 @@ class SessionSummaryPanel(QDialog):
         rows = [
             (
                 animal.name,
-                animal.rfid_id or "N/A",
+                ", ".join(animal.rfid_tags) or "N/A",
                 str(animal.total_trials),
                 str(animal.animal_sessions),
                 _format_duration(animal.total_duration_seconds),
