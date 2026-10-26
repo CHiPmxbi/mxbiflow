@@ -1,5 +1,7 @@
 import io
 import json
+import subprocess
+import sys
 import unittest
 from contextlib import redirect_stdout
 
@@ -64,6 +66,16 @@ class ExperimentConfigTests(unittest.TestCase):
         reward = schema["properties"]["parameters"]["properties"]["reward_type"]
         self.assertEqual(reward["enum"], [member.value for member in RewardEnum])
         self.assertEqual(reward["default"], "agum_one_fifth")
+
+    def test_cli_output_is_only_the_schema(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-m", "mxbiflow", "schema"],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+
+        self.assertEqual(json.loads(result.stdout), experiment_config_schema())
 
     def test_cli_prints_the_schema(self) -> None:
         output = io.StringIO()
