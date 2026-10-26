@@ -128,6 +128,15 @@ run on a background thread; when cogmoteGO is unreachable they are logged
 and dropped, and the game loop carries on. The device goes back to `idle`
 when the game loop quits.
 
+## Experiment configuration in cogmote
+
+Operators configure a run in cogmote instead of the wizard: the cage's
+animals with stage and level, and the parameters. The form is generated from
+the JSON Schema of `mxbiflow.models.ExperimentConfig`, which
+`mxbiflow schema` prints; cogmote keeps a copy pinned to an mxbiflow commit.
+cogmote fills in each animal's CogMatrix name and RFID tags and sends the
+configuration to the rig with the device config.
+
 ## Reports
 
 Crash reports (`mxbiflow.infra.send_crash_report`) and daily session reports

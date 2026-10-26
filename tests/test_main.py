@@ -34,7 +34,7 @@ class MainTests(unittest.TestCase):
             patch.object(cli, "init_gameloop", side_effect=init_gameloop),
             patch.object(cli, "get_mxbiflow", side_effect=get_mxbiflow),
         ):
-            cli.main()
+            cli.main([])
 
         send_crash_report.assert_not_called()
         run_session_post_processing.assert_called_once_with(session, {})

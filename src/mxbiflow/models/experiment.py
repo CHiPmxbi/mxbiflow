@@ -1,0 +1,105 @@
+"""Experiment configuration that operators edit in cogmote (cagelab/cogmote#344).
+
+cogmote generates its form from :func:`experiment_config_schema`, looks up the
+chosen animals in CogMatrix, and sends the result to the rig in the device
+configuration, where mxbiflow reads it with ``pymotego.Client().get_config()``.
+Fields marked ``readOnly`` are filled by cogmote, not by the operator.
+"""
+
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from .reward import RewardEnum
+
+_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
+
+
+class ExperimentAnimal(BaseModel):
+    model_config = ConfigDict(frozen=True, title="Animal")
+
+    id: str = Field(min_length=1, title="Animal", description="CogMatrix animal ID")
+    name: str = Field(
+        default="",
+        description="CogMatrix display name; set by cogmote",
+        json_schema_extra={"readOnly": True},
+    )
+    rfid_tags: tuple[str, ...] = Field(
+        default=(),
+        title="RFID tags",
+        description="Current CogMatrix rfid identifiers; set by cogmote",
+        json_schema_extra={"readOnly": True},
+    )
+    stage: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Stage the animal trains in; must be registered by the experiment",
+    )
+    level: int = Field(default=0, ge=0, description="Level within the stage")
+
+
+class ExperimentParameters(BaseModel):
+    model_config = ConfigDict(frozen=True, title="Parameters")
+
+    reward_type: RewardEnum = Field(
+        default=RewardEnum.AGUM_ONE_FIFTH, title="Reward type"
+    )
+    send_email: bool = Field(default=False, description="Send the daily report")
+    note: str = Field(default="", max_length=1000)
+    default_scene: str = Field(
+        default="",
+        max_length=200,
+        description="Scene shown when no animal is present; empty uses idle",
+    )
+    fault_fallback: str = Field(
+        default="",
+        max_length=200,
+        description="Scene shown on a detector fault; empty uses idle",
+    )
+    hide_cursor: bool = True
+    fullscreen: bool = True
+
+
+class ExperimentConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, title="MXBI experiment")
+
+    experiment: str = Field(
+        default="",
+        max_length=200,
+        description="Experiment name for operators; the rig runs its installed experiment",
+    )
+    animals: tuple[ExperimentAnimal, ...] = Field(
+        min_length=1,
+        description="The cage's animals, fixed for the run; animal IDs are unique",
+    )
+    parameters: ExperimentParameters = Field(default_factory=ExperimentParameters)
+
+    @model_validator(mode="after")
+    def _validate_unique_animals(self) -> ExperimentConfig:
+        ids = [animal.id for animal in self.animals]
+        if len(ids) != len(set(ids)):
+            raise ValueError("animal IDs must be unique")
+        return self
+
+
+def experiment_config_schema() -> dict[str, Any]:
+    """Return the JSON Schema (2020-12) of :class:`ExperimentConfig`.
+
+    References are inlined, so form generators need no ``$ref`` resolution.
+    """
+    schema = ExperimentConfig.model_json_schema()
+    defs: dict[str, Any] = schema.pop("$defs", {})
+    return {"$schema": _SCHEMA_DIALECT, **_inline_refs(schema, defs)}
+
+
+def _inline_refs(node: Any, defs: dict[str, Any]) -> Any:
+    if isinstance(node, list):
+        return [_inline_refs(item, defs) for item in node]
+    if not isinstance(node, dict):
+        return node
+    inlined = {key: _inline_refs(value, defs) for key, value in node.items()}
+    ref = inlined.pop("$ref", None)
+    if ref is None:
+        return inlined
+    target = _inline_refs(defs[ref.removeprefix("#/$defs/")], defs)
+    return {**target, **inlined}
