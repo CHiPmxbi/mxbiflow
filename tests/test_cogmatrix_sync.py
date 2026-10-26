@@ -99,7 +99,9 @@ class CogMatrixRecorderTests(unittest.TestCase):
             read_config=lambda: config,
         )
 
-    def run_session(self, recorder: CogMatrixRecorder) -> Session:
+    def run_session(
+        self, recorder: CogMatrixRecorder, recordings: list[Path] | None = None
+    ) -> Session:
         session = make_session()
         session.start(self.root / "data")
         recorder.start(session)
@@ -110,8 +112,15 @@ class CogMatrixRecorderTests(unittest.TestCase):
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text('{"trial": 1}\n', encoding="utf-8")
         session.end()
-        recorder.finish(session)
+        recorder.finish(session, recordings=recordings or [])
         return session
+
+    def recordings(self) -> list[Path]:
+        files = [self.root / "2026-10-27_09-00-00-000000.mp4"]
+        files.append(files[0].with_suffix(".vtt"))
+        for file in files:
+            file.write_bytes(b"x")
+        return files
 
     def names(self) -> list[str]:
         return [name for name, _ in self.fake.calls]
@@ -167,6 +176,42 @@ class CogMatrixRecorderTests(unittest.TestCase):
 
         self.assertEqual(self.names(), ["create", "end", "upload", "upload"])
         self.assertFalse(run_dir.exists())
+
+    def test_recordings_are_uploaded_last_and_deleted(self) -> None:
+        recordings = self.recordings()
+        self.fake.fail = {"upload"}
+        self.run_session(self.recorder(), recordings)
+
+        self.assertTrue(all(file.is_file() for file in recordings))
+
+        self.recorder().retry_pending()
+
+        uploads = [value for name, value in self.fake.calls if name == "upload"]
+        self.assertEqual(
+            [u["name"] for u in uploads[2:]],
+            [
+                "camera-2026-10-27_09-00-00-000000.mp4",
+                "camera-2026-10-27_09-00-00-000000.vtt",
+            ],
+        )
+        self.assertFalse(any(file.exists() for file in recordings))
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_recording_removed_by_retention_is_skipped(self) -> None:
+        recordings = self.recordings()
+        recordings[0].unlink()
+
+        self.run_session(self.recorder(), recordings)
+
+        self.assertEqual(len(self.names()), 5)
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_recordings_of_a_run_not_in_cogmatrix_are_kept(self) -> None:
+        recordings = self.recordings()
+
+        self.run_session(self.recorder({**CONFIG, "experiment": None}), recordings)
+
+        self.assertTrue(all(file.is_file() for file in recordings))
 
     def test_aborted_runs_end_as_aborted(self) -> None:
         recorder = self.recorder()

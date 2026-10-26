@@ -46,6 +46,9 @@ class SessionConfig(BaseModel):
 
     animals: tuple[AnimalConfig, ...] = ()
 
+    record_camera: bool = False
+    capture_latency_ms: int = Field(default=0, ge=0)
+
     def with_animals(self, animals: tuple[AnimalConfig, ...]) -> SessionConfig:
         return SessionConfig(
             experimenter=self.experimenter,
@@ -57,6 +60,8 @@ class SessionConfig(BaseModel):
             hide_cursor=self.hide_cursor,
             fullscreen=self.fullscreen,
             animals=animals,
+            record_camera=self.record_camera,
+            capture_latency_ms=self.capture_latency_ms,
         )
 
 

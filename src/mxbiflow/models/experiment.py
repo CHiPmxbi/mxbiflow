@@ -79,6 +79,23 @@ class ExperimentParameters(BaseModel):
     fullscreen: bool = True
 
 
+class RecordingConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, title="Recording")
+
+    record_camera: bool = Field(
+        default=False,
+        title="Record the camera",
+        description="Record the rig camera during sessions and upload it to CogMatrix",
+    )
+    capture_latency_ms: int = Field(
+        default=0,
+        ge=0,
+        le=1000,
+        title="Capture latency (ms)",
+        description="Camera-to-MediaMTX delay that the trial subtitles correct for",
+    )
+
+
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(frozen=True, title="MXBI experiment")
 
@@ -102,6 +119,7 @@ class ExperimentConfig(BaseModel):
         description="The cage's animals, fixed for the run; animal IDs are unique",
     )
     parameters: ExperimentParameters = Field(default_factory=ExperimentParameters)
+    recording: RecordingConfig = Field(default_factory=RecordingConfig)
 
     @model_validator(mode="after")
     def _validate_unique_animals(self) -> ExperimentConfig:

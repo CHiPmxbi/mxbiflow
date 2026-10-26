@@ -94,6 +94,8 @@ def session_config_from_experiment(
         hide_cursor=parameters.hide_cursor,
         fullscreen=parameters.fullscreen,
         animals=tuple(animal_config(animal) for animal in experiment.animals),
+        record_camera=experiment.recording.record_camera,
+        capture_latency_ms=experiment.recording.capture_latency_ms,
     )
 
 

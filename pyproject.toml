@@ -8,6 +8,7 @@ requires-python = ">=3.14"
 dependencies = [
     "cogmatrix[auth]",
     "gpiozero>=2.0.1.post3",
+    "httpx>=0.28.1",
     "inflection>=0.5.1",
     "keyring>=25.7.0",
     "matplotlib>=3.11.1",

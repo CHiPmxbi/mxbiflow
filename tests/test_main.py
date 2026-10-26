@@ -1,4 +1,6 @@
 import unittest
+from datetime import timedelta
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from mxbiflow import __main__ as cli
@@ -10,6 +12,8 @@ from mxbiflow.scene import SceneManager
 class RunExperimentTests(unittest.TestCase):
     def setUp(self) -> None:
         self.session = Mock()
+        self.session.config.record_camera = False
+        self.session.config.capture_latency_ms = 40
         self.game = Mock()
         context: list[Mock] = []
 
@@ -35,10 +39,14 @@ class RunExperimentTests(unittest.TestCase):
                 "notify": {},
                 "CogMatrixRecorder": {},
                 "clear_trials": {},
+                "CameraRecording": {},
+                "signal": {},
+                "Thread": {},
             }.items()
         }
         self.mocks = {name: p.start() for name, p in self.patches.items()}
         self.recorder = self.mocks["CogMatrixRecorder"].return_value
+        self.camera = self.mocks["CameraRecording"].return_value
 
     def tearDown(self) -> None:
         for p in self.patches.values():
@@ -49,9 +57,12 @@ class RunExperimentTests(unittest.TestCase):
 
         self.game.play.assert_called_once_with()
         self.mocks["clear_trials"].assert_called_once_with()
-        self.recorder.retry_pending.assert_called_once_with()
+        self.mocks["Thread"].assert_called_once_with(
+            target=self.recorder.retry_pending, name="cogmatrix-retry", daemon=True
+        )
         self.recorder.start.assert_called_once_with(self.session)
-        self.recorder.finish.assert_called_once_with(self.session)
+        self.recorder.finish.assert_called_once_with(self.session, recordings=[])
+        self.mocks["CameraRecording"].assert_not_called()
         self.mocks["apply_cogmote_config"].assert_not_called()
         self.mocks["run_session_post_processing"].assert_called_once_with(
             self.session, {}
@@ -105,7 +116,44 @@ class RunExperimentTests(unittest.TestCase):
         error, session = self.mocks["send_crash_report"].call_args.args
         self.assertIsInstance(error, RuntimeError)
         self.assertIs(session, self.session)
-        self.recorder.finish.assert_called_once_with(self.session, aborted=True)
+        self.recorder.finish.assert_called_once_with(
+            self.session, aborted=True, recordings=[]
+        )
+
+    def test_camera_is_recorded_when_configured(self) -> None:
+        self.session.config.record_camera = True
+        self.camera.stop.return_value = [Path("a.mp4"), Path("a.vtt")]
+
+        run.run_experiment(SceneManager(), argv=["--from-cogmote"])
+
+        self.camera.start.assert_called_once_with()
+        trials = self.mocks["get_mxbiflow"]().trials
+        self.camera.stop.assert_called_once_with(
+            trials, capture_latency=timedelta(milliseconds=40)
+        )
+        self.recorder.finish.assert_called_once_with(
+            self.session, recordings=[Path("a.mp4"), Path("a.vtt")]
+        )
+
+    def test_a_crash_still_uploads_the_recording(self) -> None:
+        self.session.config.record_camera = True
+        self.camera.stop.return_value = [Path("a.mp4"), Path("a.vtt")]
+        self.game.play.side_effect = RuntimeError("boom")
+
+        with self.assertRaises(RuntimeError):
+            run.run_experiment(SceneManager(), argv=["--from-cogmote"])
+
+        self.recorder.finish.assert_called_once_with(
+            self.session, aborted=True, recordings=[Path("a.mp4"), Path("a.vtt")]
+        )
+
+    def test_sigterm_ends_the_game_loop(self) -> None:
+        run.run_experiment(SceneManager(), argv=["--from-cogmote"])
+
+        signum, handler = self.mocks["signal"].signal.call_args.args
+        self.assertIs(signum, self.mocks["signal"].SIGTERM)
+        handler(15, None)
+        self.game.request_quit.assert_called_once_with()
 
 
 class CliTests(unittest.TestCase):

@@ -1,10 +1,15 @@
 """Run an experiment: through the wizard, or headless from the cogmote configuration."""
 
 import argparse
+import signal
 from collections.abc import Mapping, Sequence
+from datetime import timedelta
+from pathlib import Path
+from threading import Thread
 
 from .bootstrap import init_gameloop
-from .core.context import get_mxbiflow
+from .core.context import MXBIFlow, get_mxbiflow
+from .infra.camera_recording import CameraRecording
 from .infra.cogmatrix_sync import CogMatrixRecorder
 from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
@@ -35,7 +40,11 @@ def run_experiment(
 
     Each run is recorded in CogMatrix (:class:`CogMatrixRecorder`): the session
     is created once the game loop is set up, ended and given its results when
-    the game loop quits; what fails is completed at a later start.
+    the game loop quits; what fails is completed in the background of a later
+    run. With ``record_camera`` in the session configuration, the rig camera is
+    recorded during the game loop and uploaded with the results
+    (:class:`CameraRecording`). SIGTERM, as from ``systemctl stop``, ends the
+    game loop like the quit command.
     """
     parser = argparse.ArgumentParser(description="Run the experiment.")
     parser.add_argument(
@@ -47,6 +56,7 @@ def run_experiment(
     processors = post_processors or {}
 
     session: Session | None = None
+    camera: CameraRecording | None = None
     recorder = recorder or CogMatrixRecorder()
     try:
         if args.from_cogmote:
@@ -54,12 +64,20 @@ def run_experiment(
         elif not run_wizard(scene_manager):
             return
         game = init_gameloop(scene_manager, max_fps)
-        session = get_mxbiflow().session
+        signal.signal(signal.SIGTERM, lambda *_: game.request_quit())
+        mxbiflow = get_mxbiflow()
+        session = mxbiflow.session
         clear_trials()
-        recorder.retry_pending()
         recorder.start(session)
+        # Earlier runs' uploads, recordings among them, must not delay this one.
+        Thread(
+            target=recorder.retry_pending, name="cogmatrix-retry", daemon=True
+        ).start()
+        if session.config.record_camera:
+            camera = CameraRecording()
+            camera.start()
         game.play()
-        recorder.finish(session)
+        recorder.finish(session, recordings=_stop_camera(camera, mxbiflow))
         if args.from_cogmote:
             send_session_report(session, processors)
         else:
@@ -71,7 +89,7 @@ def run_experiment(
     except Exception as exc:
         send_crash_report(exc, session)
         if session is not None:
-            _finish_aborted(recorder, session)
+            _finish_aborted(recorder, session, camera)
         raise
 
 
@@ -82,10 +100,21 @@ def _report_not_started(reason: str) -> None:
         logger.exception("cannot send the not-started notification")
 
 
-def _finish_aborted(recorder: CogMatrixRecorder, session: Session) -> None:
+def _stop_camera(camera: CameraRecording | None, mxbiflow: MXBIFlow) -> list[Path]:
+    if camera is None:
+        return []
+    latency = timedelta(milliseconds=mxbiflow.session.config.capture_latency_ms)
+    return camera.stop(mxbiflow.trials, capture_latency=latency)
+
+
+def _finish_aborted(
+    recorder: CogMatrixRecorder, session: Session, camera: CameraRecording | None
+) -> None:
     try:
         if session.start_at is not None and session.end_at is None:
             session.end()
-        recorder.finish(session, aborted=True)
+        recorder.finish(
+            session, aborted=True, recordings=_stop_camera(camera, get_mxbiflow())
+        )
     except Exception:  # noqa: BLE001 - the crash report is already out
         logger.exception("cannot record the aborted run in CogMatrix")

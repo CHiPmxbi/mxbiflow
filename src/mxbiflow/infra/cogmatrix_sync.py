@@ -6,11 +6,15 @@ endpoint, the protocol, the storage repository and the operator; all its
 animals are the subjects. Every step is kept in a local record under
 ``.mxbiflow/state/cogmatrix/`` until CogMatrix has it, so a run that started
 offline or whose uploads failed is completed at the next start.
+
+Camera recordings (#195) are uploaded after the results and deleted locally
+once CogMatrix has them; a recording that MediaMTX's retention already removed
+is skipped.
 """
 
 import json
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -52,6 +56,7 @@ class PendingRun(BaseModel):
     status: ExperimentSessionStatus = ExperimentSessionStatus.completed
     ended: bool = False
     files: list[str] = Field(default_factory=list)
+    recordings: list[str] = Field(default_factory=list)
     uploaded: list[str] = Field(default_factory=list)
 
 
@@ -115,10 +120,24 @@ class CogMatrixRecorder:
         self._current = run_dir
         self._sync(run_dir)
 
-    def finish(self, session: Session, *, aborted: bool = False) -> None:
-        """End the run's CogMatrix session and upload its results."""
+    def finish(
+        self,
+        session: Session,
+        *,
+        aborted: bool = False,
+        recordings: Sequence[Path] = (),
+    ) -> None:
+        """End the run's CogMatrix session and upload its results and recordings.
+
+        ``recordings`` are deleted once uploaded.
+        """
         run_dir = self._current
         if run_dir is None:
+            if recordings:
+                logger.warning(
+                    "camera recordings kept, the run is not in CogMatrix: %s",
+                    ", ".join(str(p) for p in recordings),
+                )
             return
         run = _load(run_dir)
         snapshot = run_dir / "session.json"
@@ -140,6 +159,7 @@ class CogMatrixRecorder:
             else ExperimentSessionStatus.completed
         )
         run.files = [str(p) for p in results if p.is_file()] + [str(snapshot)]
+        run.recordings = [str(p) for p in recordings]
         _save(run_dir, run)
         self._sync(run_dir)
         self._current = None
@@ -187,6 +207,22 @@ class CogMatrixRecorder:
                         session_id=UUID(run.session_id),
                         name=_asset_name(file, run_dir),
                     )
+                    run.uploaded.append(file)
+                    _save(run_dir, run)
+                for file in run.recordings:
+                    if file in run.uploaded:
+                        continue
+                    recording = Path(file)
+                    if recording.is_file():
+                        client.data_assets.upload(
+                            recording,
+                            repository_id=_repository_id(run.config),
+                            session_id=UUID(run.session_id),
+                            name=f"camera-{recording.name}",
+                        )
+                        recording.unlink()
+                    else:
+                        logger.warning("camera recording %s is gone", file)
                     run.uploaded.append(file)
                     _save(run_dir, run)
         except Exception as error:  # noqa: BLE001 - kept for the next start

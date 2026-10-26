@@ -1,9 +1,11 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 from mxbiflow.driver import MXBI
 from mxbiflow.driver.eyetracker.eyetracker import EyeSample
 
+from ..infra.camera_recording import TrialMark
 from ..infra.timer import FrameTimer
 from ..infra.trial_status import TrialPublisher
 from ..models.session import Session
@@ -16,6 +18,7 @@ class MXBIFlow:
         self._timer = FrameTimer()
         self._mxbi = mxbi
         self._trial_publisher: TrialPublisher | None = None
+        self._trials: list[TrialMark] = []
 
     @property
     def session(self) -> Session:
@@ -43,6 +46,11 @@ class MXBIFlow:
         return None if eyetracker is None else eyetracker.sample()
 
     @property
+    def trials(self) -> Sequence[TrialMark]:
+        """The session's published trials, for the camera recording's subtitles."""
+        return self._trials
+
+    @property
     def data_dir(self) -> Path:
         return get_data_dir_path()
 
@@ -55,6 +63,17 @@ class MXBIFlow:
         accuracy) and publishes ``record`` to the ``trials`` broadcast. Call it
         once per trial; ``correct=None`` leaves the trial out of accuracy.
         """
+        animal = self._session.require_current_animal()
+        self._trials.append(
+            TrialMark(
+                at=datetime.now(UTC),
+                animal=animal.name,
+                stage=animal.current_stage.stage_name,
+                level=animal.current_stage.level,
+                trial_id=animal.trial_id,
+                correct=correct,
+            )
+        )
         if self._trial_publisher is None:
             self._trial_publisher = TrialPublisher(self._session)
         self._trial_publisher.publish(record, correct=correct)

@@ -22,7 +22,7 @@ from mxbiflow.infra.cogmote_config import (
     session_config_from_experiment,
 )
 from mxbiflow.models.animal import AnimalConfig
-from mxbiflow.models.experiment import ExperimentConfig
+from mxbiflow.models.experiment import ExperimentConfig, RecordingConfig
 from mxbiflow.models.session import SessionConfig
 from mxbiflow.scene import SceneManager
 from mxbiflow.ui.experiment_panel import ExperimentPanel
@@ -103,6 +103,20 @@ class SessionConfigFromExperimentTests(unittest.TestCase):
         )
         self.assertEqual(config.reward_type, "m_juice")
         self.assertFalse(config.fullscreen)
+        self.assertFalse(config.record_camera)
+
+    def test_maps_the_recording_switch(self) -> None:
+        recorded = experiment().model_copy(
+            update={
+                "recording": RecordingConfig(record_camera=True, capture_latency_ms=40)
+            }
+        )
+
+        config = session_config_from_experiment(recorded, stages=self.stages)
+
+        self.assertTrue(config.record_camera)
+        self.assertEqual(config.capture_latency_ms, 40)
+        self.assertTrue(config.with_animals(()).record_camera)
 
     def test_unknown_stages_are_rejected(self) -> None:
         with self.assertRaisesRegex(CogmoteConfigError, "unknown stages typo"):

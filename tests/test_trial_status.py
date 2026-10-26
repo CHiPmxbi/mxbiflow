@@ -2,10 +2,9 @@ import unittest
 from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
-from test_session import make_session
-
 from httpx import Response
 from pymotego.errors import ProblemError
+from test_session import make_session
 
 from mxbiflow.infra.trial_status import BROADCAST_NAME, TrialPublisher, clear_trials
 
