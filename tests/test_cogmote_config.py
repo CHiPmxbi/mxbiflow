@@ -28,10 +28,12 @@ from mxbiflow.scene import SceneManager
 from mxbiflow.ui.experiment_panel import ExperimentPanel
 
 EXPERIMENT = {
+    "protocol": {"id": "p1"},
+    "repository": {"id": "r1"},
     "animals": [
         {"id": "a1", "name": "Mira", "rfid_tags": ["t1", "t2"], "stage": "idle"},
         {"id": "b2", "name": "Kiwi", "rfid_tags": [], "stage": "idle"},
-    ]
+    ],
 }
 
 
@@ -58,12 +60,16 @@ class ReadExperimentConfigTests(unittest.TestCase):
 
     def test_rejects_an_unreadable_experiment(self) -> None:
         with self.assertRaises(ValidationError):
-            read_experiment_config(client({"experiment": {"animals": []}}))
+            read_experiment_config(
+                client({"experiment": {**EXPERIMENT, "animals": []}})
+            )
 
 
 def experiment(stage: str = "detect", level: int = 1) -> ExperimentConfig:
     return ExperimentConfig.model_validate(
         {
+            "protocol": {"id": "p1"},
+            "repository": {"id": "r1"},
             "animals": [
                 {
                     "id": "a1",

@@ -3,7 +3,8 @@
 cogmote generates its form from :func:`experiment_config_schema`, looks up the
 chosen animals in CogMatrix, and sends the result to the rig in the device
 configuration, where mxbiflow reads it with ``pymotego.Client().get_config()``.
-Fields marked ``readOnly`` are filled by cogmote, not by the operator.
+Fields marked ``readOnly`` are filled by cogmote, not by the operator, and
+``x-cogmatrix`` marks CogMatrix IDs that cogmote offers pickers for and checks.
 """
 
 from typing import Any
@@ -15,10 +16,28 @@ from .reward import RewardEnum
 _SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
 
+class CogMatrixRef(BaseModel):
+    """A CogMatrix record the operator picks in cogmote; ``x-cogmatrix`` names its type."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str = Field(min_length=1, description="CogMatrix ID")
+    name: str = Field(
+        default="",
+        description="CogMatrix name; set by cogmote",
+        json_schema_extra={"readOnly": True},
+    )
+
+
 class ExperimentAnimal(BaseModel):
     model_config = ConfigDict(frozen=True, title="Animal")
 
-    id: str = Field(min_length=1, title="Animal", description="CogMatrix animal ID")
+    id: str = Field(
+        min_length=1,
+        title="Animal",
+        description="CogMatrix animal ID",
+        json_schema_extra={"x-cogmatrix": "animal"},
+    )
     name: str = Field(
         default="",
         description="CogMatrix display name; set by cogmote",
@@ -67,6 +86,16 @@ class ExperimentConfig(BaseModel):
         default="",
         max_length=200,
         description="Experiment name for operators; the rig runs its installed experiment",
+    )
+    protocol: CogMatrixRef = Field(
+        title="Protocol",
+        description="CogMatrix protocol of the sessions",
+        json_schema_extra={"x-cogmatrix": "protocol"},
+    )
+    repository: CogMatrixRef = Field(
+        title="Data repository",
+        description="CogMatrix storage repository for the results",
+        json_schema_extra={"x-cogmatrix": "repository"},
     )
     animals: tuple[ExperimentAnimal, ...] = Field(
         min_length=1,
