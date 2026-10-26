@@ -1,10 +1,13 @@
 import unittest
 from datetime import UTC, datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from test_session import make_session
 
-from mxbiflow.infra.trial_status import BROADCAST_NAME, TrialPublisher
+from httpx import Response
+from pymotego.errors import ProblemError
+
+from mxbiflow.infra.trial_status import BROADCAST_NAME, TrialPublisher, clear_trials
 
 
 def make_publisher() -> tuple[TrialPublisher, Mock, Mock]:
@@ -100,3 +103,30 @@ class TrialPublisherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def problem(status: int) -> ProblemError:
+    return ProblemError(
+        Response(status), type="about:blank", title="error", detail=None
+    )
+
+
+class ClearTrialsTests(unittest.TestCase):
+    def test_deletes_the_trials_broadcast(self) -> None:
+        broadcast = Mock()
+
+        clear_trials(broadcast)
+
+        broadcast.delete.assert_called_once_with(BROADCAST_NAME)
+
+    def test_missing_broadcast_or_cogmotego_is_ignored(self) -> None:
+        for error in (problem(404), problem(500), ConnectionError("refused")):
+            with self.subTest(error=error):
+                clear_trials(Mock(delete=Mock(side_effect=error)))
+
+    def test_closes_the_broadcast_it_creates(self) -> None:
+        with patch("mxbiflow.infra.trial_status.Broadcast") as broadcast:
+            clear_trials()
+
+        broadcast.return_value.delete.assert_called_once_with(BROADCAST_NAME)
+        broadcast.return_value.close.assert_called_once_with()

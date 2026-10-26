@@ -13,6 +13,7 @@ from threading import Thread
 
 from pydantic import JsonValue
 from pymotego import Broadcast, Client, StatusPatch
+from pymotego.errors import ProblemError
 
 from ..models.session import Session
 from ..utils.logger import logger
@@ -34,6 +35,27 @@ class _Tally:
     @property
     def accuracy(self) -> float | None:
         return self.correct / self.judged if self.judged else None
+
+
+def clear_trials(broadcast: Broadcast | None = None) -> None:
+    """Drop the previous run's trials from the broadcast (#196).
+
+    cogmoteGO keeps a broadcast's newest events until it is deleted, so a new
+    run would replay the last run's trials; whoever publishes a broadcast
+    clears it. A missing broadcast or an absent cogmoteGO is not an error.
+    """
+    owned = broadcast is None
+    broadcast = broadcast if broadcast is not None else Broadcast()
+    try:
+        broadcast.delete(BROADCAST_NAME)
+    except ProblemError as error:
+        if error.status != 404:
+            logger.warning("cannot clear the trials broadcast: %s", error)
+    except Exception as error:  # noqa: BLE001 - cogmoteGO may be absent
+        logger.warning("cannot clear the trials broadcast: %s", error)
+    finally:
+        if owned:
+            broadcast.close()
 
 
 class TrialPublisher:
