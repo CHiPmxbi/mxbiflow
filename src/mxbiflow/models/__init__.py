@@ -6,8 +6,10 @@ from .experiment import (
     ExperimentParameters,
     experiment_config_schema,
 )
+from .trial import COLUMN
 
 __all__ = [
+    "COLUMN",
     "Animal",
     "AnimalBaseInfo",
     "CogMatrixRef",

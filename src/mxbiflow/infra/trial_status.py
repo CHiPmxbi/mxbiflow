@@ -10,16 +10,20 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from queue import SimpleQueue
 from threading import Thread
+from typing import Any
 
-from pydantic import JsonValue
+from pydantic import BaseModel
 from pymotego import Broadcast, Client, StatusPatch
 from pymotego.errors import ProblemError
 
 from ..models.session import Session
+from ..models.trial import TrialEvent, schema_hint, split_record
 from ..utils.logger import logger
 
 #: Broadcast that receives one event per finished trial.
 BROADCAST_NAME = "trials"
+#: Companion broadcast whose latest event is the schema hint for cogmote's table.
+HINT_BROADCAST_NAME = f"{BROADCAST_NAME}.schema"
 
 _CLOSE_TIMEOUT_S = 5.0
 
@@ -38,7 +42,7 @@ class _Tally:
 
 
 def clear_trials(broadcast: Broadcast | None = None) -> None:
-    """Drop the previous run's trials from the broadcast (#196).
+    """Drop the previous run's trials and hint from the broadcasts (#196).
 
     cogmoteGO keeps a broadcast's newest events until it is deleted, so a new
     run would replay the last run's trials; whoever publishes a broadcast
@@ -47,12 +51,14 @@ def clear_trials(broadcast: Broadcast | None = None) -> None:
     owned = broadcast is None
     broadcast = broadcast if broadcast is not None else Broadcast()
     try:
-        broadcast.delete(BROADCAST_NAME)
-    except ProblemError as error:
-        if error.status != 404:
-            logger.warning("cannot clear the trials broadcast: %s", error)
-    except Exception as error:  # noqa: BLE001 - cogmoteGO may be absent
-        logger.warning("cannot clear the trials broadcast: %s", error)
+        for name in (BROADCAST_NAME, HINT_BROADCAST_NAME):
+            try:
+                broadcast.delete(name)
+            except ProblemError as error:
+                if error.status != 404:
+                    logger.warning("cannot clear the %s broadcast: %s", name, error)
+            except Exception as error:  # noqa: BLE001 - cogmoteGO may be absent
+                logger.warning("cannot clear the %s broadcast: %s", name, error)
     finally:
         if owned:
             broadcast.close()
@@ -72,16 +78,20 @@ class TrialPublisher:
         self._client = client if client is not None else Client()
         self._broadcast = broadcast if broadcast is not None else Broadcast()
         self._tallies: dict[str, _Tally] = {}
+        self._hint: dict[str, Any] | None = None
         self._jobs: SimpleQueue[_Job | None] = SimpleQueue()
         self._failing = False
         self._thread = Thread(target=self._run, name="trial-publisher", daemon=True)
         self._thread.start()
 
-    def publish(self, record: Mapping[str, object], *, correct: bool | None) -> None:
+    def publish(
+        self, record: BaseModel | Mapping[str, object], *, correct: bool | None
+    ) -> None:
         """Queue the status patch and broadcast for the current animal's trial.
 
         ``correct`` is ``None`` for trials that do not count toward accuracy,
-        such as aborted ones.
+        such as aborted ones. A record model also gives the table its schema
+        hint, published again whenever the record model changes.
         """
         animal = self._session.require_current_animal()
         stage = animal.current_stage
@@ -102,16 +112,23 @@ class TrialPublisher:
                 "accuracy": tally.accuracy,
             },
         }
-        event: JsonValue = {
-            "session_id": self._session.session_id,
-            "animal": animal.name,
-            "stage": stage.stage_name,
-            "level": stage.level,
-            "trial_id": animal.trial_id,
-            "correct": correct,
-            "record": json.loads(json.dumps(record, default=str)),
-        }
+        if isinstance(record, BaseModel):
+            record_type: type[BaseModel] | None = type(record)
+            base_info, data = split_record(record)
+        else:
+            record_type, base_info = None, None
+            data = json.loads(json.dumps(record, default=str))
+        event = TrialEvent(
+            **(base_info or animal.base_info).model_dump(),
+            stage=stage.stage_name,
+            correct=correct,
+            session_id=self._session.session_id,
+            record=data,
+        ).model_dump(mode="json")
         self._jobs.put(lambda: self._client.patch_status(**status))
+        if (hint := schema_hint(record_type)) != self._hint:
+            self._hint = hint
+            self._jobs.put(lambda: self._broadcast.publish(HINT_BROADCAST_NAME, hint))
         self._jobs.put(lambda: self._broadcast.publish(BROADCAST_NAME, event))
 
     def close(self) -> None:
