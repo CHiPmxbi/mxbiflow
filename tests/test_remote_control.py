@@ -83,7 +83,7 @@ class RemoteControlTests(unittest.TestCase):
             scheduler=self.scheduler,
             rewarder=self.rewarder,
             on_capture=lambda: self.events.append("screenshot"),
-            on_quit=lambda send_report: self.events.append(f"quit:{send_report}"),
+            on_quit=lambda: self.events.append("quit"),
             connect=self._connect,  # type: ignore[arg-type]
             **kwargs,  # type: ignore[arg-type]
         )
@@ -99,7 +99,7 @@ class RemoteControlTests(unittest.TestCase):
             {"command": "resume"},
             {"command": "reward", "duration_ms": 300},
             {"command": "screenshot"},
-            {"command": "quit", "send_report": False},
+            {"command": "quit"},
         ]
         remote = self._remote()
 
@@ -118,14 +118,7 @@ class RemoteControlTests(unittest.TestCase):
             ],
         )
         self.assertEqual(self.rewarder.rewards, [300])
-        self.assertEqual(self.events, ["screenshot", "quit:False"])
-
-    def test_quit_without_a_report_choice(self) -> None:
-        self.proxy.commands.append({"command": "quit"})
-
-        self._remote().poll()
-
-        self.assertEqual(self.events, ["quit:None"])
+        self.assertEqual(self.events, ["screenshot", "quit"])
 
     def test_invalid_commands_are_ignored(self) -> None:
         remote = self._remote()
@@ -175,7 +168,7 @@ class RemoteControlTests(unittest.TestCase):
             scheduler=self.scheduler,
             rewarder=self.rewarder,
             on_capture=lambda: None,
-            on_quit=lambda _send_report: None,
+            on_quit=lambda: None,
             connect=refuse,  # type: ignore[arg-type]
             retry_interval_s=0.0,
         )
@@ -187,7 +180,7 @@ class RemoteControlTests(unittest.TestCase):
             scheduler=self.scheduler,
             rewarder=self.rewarder,
             on_capture=lambda: None,
-            on_quit=lambda _send_report: None,
+            on_quit=lambda: None,
             connect=refuse,  # type: ignore[arg-type]
             retry_interval_s=60.0,
         )

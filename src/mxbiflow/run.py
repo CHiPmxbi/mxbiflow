@@ -61,8 +61,7 @@ def run_experiment(
     After the game loop, the run summary and the steps after it (CogMatrix,
     the report) are reported to cogmote and shown on the rig screen without a
     confirm step (:mod:`mxbiflow.infra.run_end`). The report is sent when the
-    quit command asked for it, else when the session config's ``send_email``
-    does.
+    session config's ``send_email`` asks for it, however the run ended.
     """
     parser = argparse.ArgumentParser(description="Run the experiment.")
     parser.add_argument(
@@ -98,10 +97,7 @@ def run_experiment(
         game.play()
         recordings = _stop_camera(camera, mxbiflow)
         camera = None
-        send_report = (
-            game.send_report if game.send_report is not None else session.send_email
-        )
-        _finish(mxbiflow, recorder, recordings, send_report, processors)
+        _finish(mxbiflow, recorder, recordings, session.send_email, processors)
     except CogmoteConfigError as error:
         logger.error("run not started: %s", error)
         _report_not_started(str(error))
