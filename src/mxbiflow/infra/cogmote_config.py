@@ -56,7 +56,9 @@ def session_config_from_experiment(
     unknown = sorted(
         {animal.stage for animal in experiment.animals}.union(
             s for s in (parameters.default_scene, parameters.fault_fallback) if s
-        ).difference(stages)
+        )
+        .union(experiment.stages)
+        .difference(stages)
     )
     if unknown:
         raise CogmoteConfigError(
@@ -96,6 +98,7 @@ def session_config_from_experiment(
         animals=tuple(animal_config(animal) for animal in experiment.animals),
         record_camera=experiment.recording.record_camera,
         capture_latency_ms=experiment.recording.capture_latency_ms,
+        stage_configs=experiment.stages,
     )
 
 

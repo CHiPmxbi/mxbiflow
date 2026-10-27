@@ -130,6 +130,24 @@ class SessionConfigFromExperimentTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(CogmoteConfigError, "nope"):
             session_config_from_experiment(bad_scene, stages=self.stages)
+        bad_config = experiment().model_copy(update={"stages": {"gone": {}}})
+        with self.assertRaisesRegex(CogmoteConfigError, "gone"):
+            session_config_from_experiment(bad_config, stages=self.stages)
+
+    def test_maps_the_stage_configurations(self) -> None:
+        document = {"default": {"levels": {}}, "Mira": {"reward_ms": 5}}
+        configured = experiment().model_copy(update={"stages": {"detect": document}})
+
+        config = session_config_from_experiment(configured, stages=self.stages)
+
+        self.assertEqual(config.stage_configs, {"detect": document})
+        self.assertEqual(config.with_animals(()).stage_configs, {"detect": document})
+        self.assertEqual(
+            session_config_from_experiment(
+                experiment(), stages=self.stages
+            ).stage_configs,
+            {},
+        )
 
     def test_local_progress_survives_until_the_operator_changes_it(self) -> None:
         progressed = SessionConfig(

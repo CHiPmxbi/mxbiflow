@@ -1,6 +1,7 @@
 """Run an experiment: through the wizard, or headless from the cogmote configuration."""
 
 import argparse
+import json
 import signal
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
@@ -9,10 +10,12 @@ from threading import Thread
 
 from .bootstrap import init_gameloop
 from .core.context import MXBIFlow, get_mxbiflow
+from .core.path import get_base_path
 from .infra.camera_recording import CameraRecording
 from .infra.cogmatrix_sync import CogMatrixRecorder
 from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
+from .infra.manifest import describe
 from .infra.notify import notify
 from .infra.post_processing import StagePostProcessor, deliver_session_report
 from .infra.run_end import (
@@ -62,6 +65,9 @@ def run_experiment(
     the report) are reported to cogmote and shown on the rig screen without a
     confirm step (:mod:`mxbiflow.infra.run_end`). The report is sent when the
     session config's ``send_email`` asks for it, however the run ended.
+
+    ``--describe`` prints the experiment manifest (:mod:`mxbiflow.infra.manifest`)
+    and returns without a window, hardware or run.
     """
     parser = argparse.ArgumentParser(description="Run the experiment.")
     parser.add_argument(
@@ -69,7 +75,15 @@ def run_experiment(
         action="store_true",
         help="start from the cogmote configuration without the wizard",
     )
+    parser.add_argument(
+        "--describe",
+        action="store_true",
+        help="print the experiment manifest as JSON and exit, without a run",
+    )
     args = parser.parse_args(argv)
+    if args.describe:
+        print(json.dumps(describe(scene_manager, get_base_path()), indent=2))
+        return
     processors = post_processors or {}
 
     session: Session | None = None

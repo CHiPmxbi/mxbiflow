@@ -3,8 +3,10 @@
 cogmote generates its form from :func:`experiment_config_schema`, looks up the
 chosen animals in CogMatrix, and sends the result to the rig in the device
 configuration, where mxbiflow reads it with ``pymotego.Client().get_config()``.
-Fields marked ``readOnly`` are filled by cogmote, not by the operator, and
-``x-cogmatrix`` marks CogMatrix IDs that cogmote offers pickers for and checks.
+Fields marked ``readOnly`` are filled by cogmote, not by the operator,
+``x-cogmatrix`` marks CogMatrix IDs that cogmote offers pickers for and checks,
+and ``x-mxbi-stages`` marks the stage configurations that cogmote's stage editor
+writes (:mod:`mxbiflow.models.stage_config`).
 """
 
 from typing import Any
@@ -120,6 +122,15 @@ class ExperimentConfig(BaseModel):
     )
     parameters: ExperimentParameters = Field(default_factory=ExperimentParameters)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
+    stages: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        title="Stage configurations",
+        description=(
+            "Stage name to its config.json document: the default and per-animal "
+            "overrides by animal name; a stage without one uses its template"
+        ),
+        json_schema_extra={"x-mxbi-stages": True},
+    )
 
     @model_validator(mode="after")
     def _validate_unique_animals(self) -> ExperimentConfig:
@@ -130,11 +141,16 @@ class ExperimentConfig(BaseModel):
 
 
 def experiment_config_schema() -> dict[str, Any]:
-    """Return the JSON Schema (2020-12) of :class:`ExperimentConfig`.
+    """Return the JSON Schema (2020-12) of :class:`ExperimentConfig`."""
+    return inlined_json_schema(ExperimentConfig)
+
+
+def inlined_json_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """Return the JSON Schema (2020-12) of ``model``.
 
     References are inlined, so form generators need no ``$ref`` resolution.
     """
-    schema = ExperimentConfig.model_json_schema()
+    schema = model.model_json_schema()
     defs: dict[str, Any] = schema.pop("$defs", {})
     return {"$schema": _SCHEMA_DIALECT, **_inline_refs(schema, defs)}
 
