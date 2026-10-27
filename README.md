@@ -53,8 +53,8 @@ scene_manager.register([IDLE, Detect, Discriminate])
 run_experiment(scene_manager, post_processors=STAGE_POST_PROCESSORS, max_fps=120)
 ```
 
-`run_experiment` runs the wizard, plays the session, sends the daily report
-and reports crashes. With `--from-cogmote` on the command line
+`run_experiment` runs the wizard, plays the session, finishes the run (see
+[Run end](#run-end)) and reports crashes. With `--from-cogmote` on the command line
 (`uv run main.py --from-cogmote`, or `mxbiflow run --from-cogmote`) it starts
 from the cogmote configuration instead, without any dialog. The building
 blocks (`run_wizard`, `init_gameloop`, `run_session_post_processing`) stay
@@ -193,6 +193,25 @@ as `camera-<segment>.mp4` and `.vtt`, and deletes them locally once uploaded.
 A cue's time is the trial time minus the capture of the segment's first frame:
 the segment start in its name minus `recording.capture_latency_ms`, the delay
 from the camera to MediaMTX, measured once by filming a millisecond clock.
+
+## Run end
+
+When the game loop quits, `run_experiment` finishes the run without a confirm
+step (cagelab/cogmote#424):
+
+- the run summary (per animal: trials, accuracy, duration, stage levels) goes to
+  cogmoteGO's `run-summary` broadcast;
+- the steps after the run (end the CogMatrix session, upload the results,
+  upload the camera recording, send the report) go to the device status as
+  `steps`, with `state: finishing`, then `failed` when a step failed, else
+  `idle`. Failed CogMatrix steps are retried at the next start; a failed
+  report is not;
+- the rig screen shows both until the steps are done, then 15 seconds longer.
+
+The report is sent when the `quit` command asked for it (`send_report`, from
+cogmote's stop dialog), else when the session config's `send_email` does. The
+next run clears the steps and the summary. A crash marks the status `failed`
+with a failed `run` step.
 
 ## Reports
 

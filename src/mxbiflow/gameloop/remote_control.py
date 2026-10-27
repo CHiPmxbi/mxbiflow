@@ -50,8 +50,13 @@ class _SimpleCommand(BaseModel):
         "pause",
         "resume",
         "screenshot",
-        "quit",
     ]
+
+
+class _Quit(BaseModel):
+    command: Literal["quit"]
+    send_report: bool | None = None
+    """Send the report after the run; ``None`` leaves it to the session config."""
 
 
 class _SwitchStage(BaseModel):
@@ -65,7 +70,7 @@ class _Reward(BaseModel):
 
 
 type Command = Annotated[
-    _SimpleCommand | _SwitchStage | _Reward, Field(discriminator="command")
+    _SimpleCommand | _SwitchStage | _Reward | _Quit, Field(discriminator="command")
 ]
 
 # pydantic resolves `type` aliases; its stubs do not accept them yet.
@@ -90,7 +95,7 @@ class RemoteControl:
         scheduler: RemoteScheduler,
         rewarder: Rewarder,
         on_capture: Callable[[], None],
-        on_quit: Callable[[], None],
+        on_quit: Callable[[bool | None], None],
         connect: Callable[[], CommandProxy] = lambda: CommandProxy(PROXY_NAME),
         retry_interval_s: float = 5.0,
     ) -> None:
@@ -148,8 +153,8 @@ class RemoteControl:
                 self._scheduler.resume()
             case _SimpleCommand(command="screenshot"):
                 self._on_capture()
-            case _SimpleCommand(command="quit"):
-                self._on_quit()
+            case _Quit(send_report=send_report):
+                self._on_quit(send_report)
 
     def _ensure_proxy(self) -> CommandProxy | None:
         if self._proxy is not None:

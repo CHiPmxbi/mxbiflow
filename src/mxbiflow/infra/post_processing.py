@@ -259,10 +259,16 @@ def send_session_report(
     session: Session,
     stage_post_processors: Mapping[str, StagePostProcessor],
 ) -> None:
-    """Build the completed session report and send it to the device's subscribers."""
-    if not session.send_email:
-        return
+    """Send the completed session report when the session config asks for it."""
+    if session.send_email:
+        deliver_session_report(session, stage_post_processors)
 
+
+def deliver_session_report(
+    session: Session,
+    stage_post_processors: Mapping[str, StagePostProcessor],
+) -> str:
+    """Build the session report, send it to the device's subscribers and return its URL."""
     try:
         report = build_session_report(session, stage_post_processors)
         with Client() as client:
@@ -272,6 +278,7 @@ def send_session_report(
         logger.info(
             "session report sent: session_id={} url={}", session.session_id, receipt.url
         )
+        return receipt.url
     except Exception:
         logger.exception("failed to send session report")
         raise

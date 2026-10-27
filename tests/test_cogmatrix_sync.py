@@ -4,15 +4,22 @@ import unittest
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
+import httpx
 from cogmatrix import CodeVersion, ExperimentSessionStatus
 from pydantic import JsonValue
 from test_session import make_session
 
 from mxbiflow.core.path import set_base_path
 from mxbiflow.infra.cogmatrix_sync import CogMatrixRecorder, PendingRun
+from mxbiflow.infra.run_end import (
+    END_SESSION,
+    UPLOAD_RECORDING,
+    UPLOAD_RESULTS,
+    RunEnd,
+)
 from mxbiflow.models.session import Session
 
 PROTOCOL = "44444444-4444-4444-8444-444444444444"
@@ -44,7 +51,8 @@ class FakeCogMatrix:
         self.sessions = self
         self.data_assets = self
 
-    def __call__(self, endpoint: str) -> Self:
+    def __call__(self, endpoint: str, storage: Any = None) -> Self:
+        self.storage = storage
         self.endpoints.append(endpoint)
         return self
 
@@ -76,6 +84,12 @@ class FakeCogMatrix:
 
     def upload(self, path: str, **kwargs: Any) -> None:
         self._record("upload", {"path": path, **kwargs})
+        # Sends the file in one storage PUT, as small CogMatrix uploads do.
+        request = httpx.Request(
+            "PUT", "https://s3.example/x", content=Path(path).read_bytes()
+        )
+        for hook in self.storage.event_hooks["response"]:
+            hook(httpx.Response(200, request=request))
 
 
 class CogMatrixRecorderTests(unittest.TestCase):
@@ -100,7 +114,10 @@ class CogMatrixRecorderTests(unittest.TestCase):
         )
 
     def run_session(
-        self, recorder: CogMatrixRecorder, recordings: list[Path] | None = None
+        self,
+        recorder: CogMatrixRecorder,
+        recordings: list[Path] | None = None,
+        steps: RunEnd | None = None,
     ) -> Session:
         session = make_session()
         session.start(self.root / "data")
@@ -112,7 +129,7 @@ class CogMatrixRecorderTests(unittest.TestCase):
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text('{"trial": 1}\n', encoding="utf-8")
         session.end()
-        recorder.finish(session, recordings=recordings or [])
+        recorder.finish(session, recordings=recordings or [], steps=steps)
         return session
 
     def recordings(self) -> list[Path]:
@@ -223,6 +240,67 @@ class CogMatrixRecorderTests(unittest.TestCase):
 
         end = self.fake.calls[1][1]
         self.assertEqual(end.status, ExperimentSessionStatus.aborted)
+
+    def steps(self, client: Mock) -> RunEnd:
+        return RunEnd([END_SESSION, UPLOAD_RESULTS, UPLOAD_RECORDING], client=client)
+
+    def test_finish_reports_each_step(self) -> None:
+        client = Mock()
+        steps = self.steps(client)
+        recordings = self.recordings()
+        recordings[0].write_bytes(b"x" * 1000)
+
+        self.run_session(self.recorder(), recordings, steps)
+
+        end, results, recording = steps.steps
+        self.assertEqual(end.state, "done")
+        self.assertEqual(
+            end.url, f"https://matrix.example/sessions?session={UUID(int=7)}"
+        )
+        self.assertEqual((results.state, results.done, results.total), ("done", 2, 2))
+        self.assertEqual(
+            (recording.state, recording.done, recording.total, recording.unit),
+            ("done", 1001, 1001, "bytes"),
+        )
+        sent = [call.kwargs for call in client.patch_status.call_args_list]
+        self.assertEqual(sent[0]["state"], "finishing")
+        self.assertEqual(sent[-1]["steps"][-1].state, "done")
+
+    def test_a_failed_upload_fails_the_steps_left_for_the_next_start(self) -> None:
+        steps = self.steps(Mock())
+        self.fake.fail = {"upload"}
+
+        self.run_session(self.recorder(), self.recordings(), steps)
+
+        end, results, recording = steps.steps
+        self.assertEqual(end.state, "done")
+        self.assertEqual(
+            (results.state, results.reason, results.retry),
+            ("failed", "upload failed", True),
+        )
+        self.assertEqual(recording.state, "failed")
+
+    def test_a_run_that_never_ended_is_ended_as_aborted_at_the_next_start(self) -> None:
+        session = make_session()
+        session.start(self.root / "data")
+        self.recorder().start(session)
+        session.set_current_animal("animal-1")
+        path = session.register_stage_data_path(animal="animal-1", stage="s")
+        assert session.data_root is not None
+        result = session.data_root / path / "result.jsonl"
+        result.parent.mkdir(parents=True, exist_ok=True)
+        result.write_text('{"trial": 1}\n', encoding="utf-8")
+        # The process dies here; the next start completes the run.
+
+        self.recorder().retry_pending()
+
+        self.assertEqual(self.names(), ["create", "end", "upload"])
+        end = self.fake.calls[1][1]
+        self.assertEqual(end.status, ExperimentSessionStatus.aborted)
+        assert session.start_at is not None
+        self.assertGreaterEqual(end.ended_at, session.start_at.replace(microsecond=0))
+        self.assertEqual(self.fake.calls[2][1]["name"], "animal-1-s-result.jsonl")
+        self.assertEqual(list(self.state.iterdir()), [])
 
     def test_without_an_experiment_config_nothing_is_recorded(self) -> None:
         config = {**CONFIG, "experiment": None}
