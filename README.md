@@ -156,7 +156,10 @@ when the game loop quits.
 Operators configure a run in cogmote instead of the wizard: the cage's
 animals with stage and level, and the parameters. The form is generated from
 the JSON Schema of `mxbiflow.models.ExperimentConfig`, which
-`mxbiflow schema` prints; cogmote keeps a copy pinned to an mxbiflow commit.
+`mxbiflow schema` prints and the experiment manifest carries as `config_schema`;
+cogmote keeps a copy pinned to an mxbiflow commit for devices that report no
+manifest yet. Fields marked `x-mxbi-stage` name a registered stage and get a
+stage picker, and each object lists its property order in `x-mxbi-order`.
 cogmote fills in each animal's CogMatrix name and RFID tags and sends the
 configuration to the rig with the device config.
 

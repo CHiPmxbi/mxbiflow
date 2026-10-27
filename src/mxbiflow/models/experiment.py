@@ -5,8 +5,11 @@ chosen animals in CogMatrix, and sends the result to the rig in the device
 configuration, where mxbiflow reads it with ``pymotego.Client().get_config()``.
 Fields marked ``readOnly`` are filled by cogmote, not by the operator,
 ``x-cogmatrix`` marks CogMatrix IDs that cogmote offers pickers for and checks,
-and ``x-mxbi-stages`` marks the stage configurations that cogmote's stage editor
-writes (:mod:`mxbiflow.models.stage_config`).
+``x-mxbi-stages`` marks the stage configurations that cogmote's stage editor
+writes (:mod:`mxbiflow.models.stage_config`), and ``x-mxbi-stage`` marks fields
+that name one of the experiment's registered stages.
+Every object lists its properties in declaration order in ``x-mxbi-order``, since
+stores such as PostgreSQL ``jsonb`` do not keep key order.
 """
 
 from typing import Any
@@ -16,6 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .reward import RewardEnum
 
 _SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
+STAGE_MARKER = "x-mxbi-stage"
+ORDER_MARKER = "x-mxbi-order"
 
 
 class CogMatrixRef(BaseModel):
@@ -55,6 +60,7 @@ class ExperimentAnimal(BaseModel):
         min_length=1,
         max_length=200,
         description="Stage the animal trains in; must be registered by the experiment",
+        json_schema_extra={STAGE_MARKER: True},
     )
     level: int = Field(default=0, ge=0, description="Level within the stage")
 
@@ -65,20 +71,26 @@ class ExperimentParameters(BaseModel):
     reward_type: RewardEnum = Field(
         default=RewardEnum.AGUM_ONE_FIFTH, title="Reward type"
     )
-    send_email: bool = Field(default=False, description="Send the daily report")
-    note: str = Field(default="", max_length=1000)
     default_scene: str = Field(
         default="",
         max_length=200,
+        title="Default scene",
         description="Scene shown when no animal is present; empty uses idle",
+        json_schema_extra={STAGE_MARKER: True},
     )
     fault_fallback: str = Field(
         default="",
         max_length=200,
+        title="Fault fallback",
         description="Scene shown on a detector fault; empty uses idle",
+        json_schema_extra={STAGE_MARKER: True},
     )
-    hide_cursor: bool = True
     fullscreen: bool = True
+    hide_cursor: bool = Field(default=True, title="Hide cursor")
+    send_email: bool = Field(
+        default=False, title="Send email", description="Send the daily report"
+    )
+    note: str = Field(default="", max_length=1000)
 
 
 class RecordingConfig(BaseModel):
@@ -148,7 +160,8 @@ def experiment_config_schema() -> dict[str, Any]:
 def inlined_json_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Return the JSON Schema (2020-12) of ``model``.
 
-    References are inlined, so form generators need no ``$ref`` resolution.
+    References are inlined, so form generators need no ``$ref`` resolution, and
+    every object carries its property order in ``x-mxbi-order``.
     """
     schema = model.model_json_schema()
     defs: dict[str, Any] = schema.pop("$defs", {})
@@ -161,6 +174,9 @@ def _inline_refs(node: Any, defs: dict[str, Any]) -> Any:
     if not isinstance(node, dict):
         return node
     inlined = {key: _inline_refs(value, defs) for key, value in node.items()}
+    properties = inlined.get("properties")
+    if isinstance(properties, dict) and inlined.get("type") == "object":
+        inlined[ORDER_MARKER] = list(properties)
     discriminator = inlined.get("discriminator")
     if isinstance(discriminator, dict) and "mapping" in discriminator:
         # The mapping points into the removed $defs; the oneOf options remain.
