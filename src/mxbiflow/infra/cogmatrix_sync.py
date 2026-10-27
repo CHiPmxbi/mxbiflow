@@ -10,6 +10,13 @@ offline or whose uploads failed is completed at the next start.
 Camera recordings (#195) are uploaded after the results and deleted locally
 once CogMatrix has them; a recording that MediaMTX's retention already removed
 is skipped.
+
+A run that never ended, because the rig lost power or the process died (#193),
+is ended as ``aborted`` at the next start, at its last result write, with the
+results it has.
+
+:meth:`CogMatrixRecorder.finish` reports its progress as run end steps
+(:class:`~mxbiflow.infra.run_end.RunEnd`), recordings in bytes.
 """
 
 import json
@@ -18,8 +25,10 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 from uuid import UUID
 
+import httpx
 from cogmatrix import (
     CodeVersion,
     CogMatrixClient,
@@ -28,18 +37,34 @@ from cogmatrix import (
 )
 from cogmatrix.auth import CogmoteTokenAuth
 from cogmatrix.git import code_version
+from cogmatrix.transfer import STORAGE_TIMEOUT
 from pydantic import BaseModel, Field, JsonValue
 from pymotego import Client
 
 from ..core.path import get_base_path, get_internal_state_path
 from ..models.session import Session
 from ..utils.logger import logger
+from .run_end import (
+    COGMATRIX_STEPS,
+    END_SESSION,
+    UPLOAD_RECORDING,
+    UPLOAD_RESULTS,
+    RunEnd,
+)
 
-type ClientFactory = Callable[[str], CogMatrixClient]
+type ClientFactory = Callable[[str, httpx.Client], CogMatrixClient]
+"""Builds a client for the endpoint that sends file bytes with the given storage client."""
 
 
-def cogmote_client(endpoint: str) -> CogMatrixClient:
-    return CogMatrixClient(endpoint, auth=CogmoteTokenAuth(endpoint))
+def cogmote_client(endpoint: str, storage: httpx.Client) -> CogMatrixClient:
+    return CogMatrixClient(
+        endpoint, auth=CogmoteTokenAuth(endpoint), storage_client=storage
+    )
+
+
+def session_url(endpoint: str, session_id: str) -> str:
+    """The session in the CogMatrix web app, served next to its GraphQL endpoint."""
+    return urljoin(endpoint, f"/sessions?session={session_id}")
 
 
 class PendingRun(BaseModel):
@@ -51,6 +76,8 @@ class PendingRun(BaseModel):
     started_at: datetime
     title: str
     notes: str | None = None
+    data_root: str | None = None
+    data_path: str | None = None
     session_id: str | None = None
     ended_at: datetime | None = None
     status: ExperimentSessionStatus = ExperimentSessionStatus.completed
@@ -79,12 +106,21 @@ class CogMatrixRecorder:
         self._read_config = read_config
         self._current: Path | None = None
 
+    @property
+    def recording(self) -> bool:
+        """The current run is in CogMatrix, so :meth:`finish` has steps to report."""
+        return self._current is not None
+
     def retry_pending(self) -> None:
-        """Complete the runs that earlier starts left unfinished."""
+        """Complete the runs that earlier starts left unfinished.
+
+        Runs that never ended are ended as aborted first (#193).
+        """
         if not self._state_dir.is_dir():
             return
         for run_dir in sorted(self._state_dir.iterdir()):
             if run_dir.is_dir() and run_dir != self._current:
+                _end_abandoned(run_dir)
                 self._sync(run_dir)
 
     def start(self, session: Session) -> None:
@@ -114,6 +150,8 @@ class CogMatrixRecorder:
             started_at=_milliseconds(session.start_at),
             title=f"{session.mxbi_config.mxbi_id} session {session.session_id}",
             notes=session.note or None,
+            data_root=str(session.data_root) if session.data_root else None,
+            data_path=str(session.data_path) if session.data_path else None,
         )
         run_dir = self._state_dir / str(session.data_path).replace("/", "-")
         _save(run_dir, run)
@@ -126,10 +164,11 @@ class CogMatrixRecorder:
         *,
         aborted: bool = False,
         recordings: Sequence[Path] = (),
+        steps: RunEnd | None = None,
     ) -> None:
         """End the run's CogMatrix session and upload its results and recordings.
 
-        ``recordings`` are deleted once uploaded.
+        ``recordings`` are deleted once uploaded. ``steps`` receives the progress.
         """
         run_dir = self._current
         if run_dir is None:
@@ -161,18 +200,35 @@ class CogMatrixRecorder:
         run.files = [str(p) for p in results if p.is_file()] + [str(snapshot)]
         run.recordings = [str(p) for p in recordings]
         _save(run_dir, run)
-        self._sync(run_dir)
+        self._sync(run_dir, steps)
         self._current = None
 
-    def _sync(self, run_dir: Path) -> bool:
+    def _sync(self, run_dir: Path, steps: RunEnd | None = None) -> bool:
         """Push what CogMatrix lacks; True when the run is complete and forgotten."""
         try:
             run = _load(run_dir)
         except (OSError, ValueError) as error:
             logger.warning("unreadable CogMatrix record %s: %s", run_dir, error)
             return False
+        sent: int | None = None  # recording bytes, counted once the recordings start
+
+        def count_sent(response: httpx.Response) -> None:
+            nonlocal sent
+            if sent is None or response.request.method != "PUT":
+                return
+            if response.is_success and steps is not None:
+                sent += int(response.request.headers.get("Content-Length", 0))
+                steps.progress(UPLOAD_RECORDING, sent)
+
         try:
-            with self._client_factory(run.endpoint) as client:
+            with (
+                httpx.Client(
+                    timeout=STORAGE_TIMEOUT, event_hooks={"response": [count_sent]}
+                ) as storage,
+                self._client_factory(run.endpoint, storage) as client,
+            ):
+                if steps is not None:
+                    steps.start(END_SESSION)
                 if run.session_id is None:
                     created = client.sessions.create_from_device(
                         run.config,
@@ -198,6 +254,12 @@ class CogMatrixRecorder:
                     )
                     run.ended = True
                     _save(run_dir, run)
+                if steps is not None:
+                    steps.done(
+                        END_SESSION, url=session_url(run.endpoint, run.session_id)
+                    )
+                    done = sum(file in run.uploaded for file in run.files)
+                    steps.start(UPLOAD_RESULTS, done=done, total=len(run.files))
                 for file in run.files:
                     if file in run.uploaded:
                         continue
@@ -209,6 +271,16 @@ class CogMatrixRecorder:
                     )
                     run.uploaded.append(file)
                     _save(run_dir, run)
+                    if steps is not None:
+                        steps.progress(
+                            UPLOAD_RESULTS, len(set(run.uploaded) & set(run.files))
+                        )
+                if steps is not None:
+                    steps.done(UPLOAD_RESULTS)
+                    left = [Path(f) for f in run.recordings if f not in run.uploaded]
+                    total = sum(f.stat().st_size for f in left if f.is_file())
+                    steps.start(UPLOAD_RECORDING, done=0, total=total, unit=True)
+                    sent = 0
                 for file in run.recordings:
                     if file in run.uploaded:
                         continue
@@ -225,12 +297,41 @@ class CogMatrixRecorder:
                         logger.warning("camera recording %s is gone", file)
                     run.uploaded.append(file)
                     _save(run_dir, run)
+                if steps is not None:
+                    steps.done(UPLOAD_RECORDING)
         except Exception as error:  # noqa: BLE001 - kept for the next start
             logger.warning("CogMatrix sync of %s deferred: %s", run_dir.name, error)
+            if steps is not None:
+                steps.fail(COGMATRIX_STEPS, _reason(error), retry=True)
             return False
         shutil.rmtree(run_dir)
         logger.info("CogMatrix session %s complete", run.session_id)
         return True
+
+
+def _end_abandoned(run_dir: Path) -> None:
+    """End a run that no process ended as aborted, with the results it wrote."""
+    try:
+        run = _load(run_dir)
+    except OSError, ValueError:
+        return
+    if run.ended_at is not None:
+        return
+    results: list[Path] = []
+    if run.data_root is not None and run.data_path is not None:
+        # <data root>/<animal>/<data path>/<stage>/result.jsonl
+        results = sorted(Path(run.data_root).glob(f"*/{run.data_path}/*/result.jsonl"))
+    last = max((p.stat().st_mtime for p in results), default=None)
+    ended = datetime.fromtimestamp(last, UTC) if last else run.started_at
+    run.ended_at = _milliseconds(max(ended, run.started_at))
+    run.status = ExperimentSessionStatus.aborted
+    run.files = [str(p) for p in results]
+    _save(run_dir, run)
+    logger.info("run %s never ended; ending it as aborted", run_dir.name)
+
+
+def _reason(error: Exception) -> str:
+    return str(error) or type(error).__name__
 
 
 def _milliseconds(moment: datetime) -> datetime:

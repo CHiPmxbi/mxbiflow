@@ -14,7 +14,7 @@ class RunExperimentTests(unittest.TestCase):
         self.session = Mock()
         self.session.config.record_camera = False
         self.session.config.capture_latency_ms = 40
-        self.game = Mock()
+        self.game = Mock(send_report=None)
         context: list[Mock] = []
 
         def init_gameloop(_scene_manager: object, _max_fps: int) -> Mock:
@@ -33,8 +33,12 @@ class RunExperimentTests(unittest.TestCase):
                 "get_mxbiflow": {"side_effect": get_mxbiflow},
                 "run_wizard": {"return_value": True},
                 "apply_cogmote_config": {},
-                "run_session_post_processing": {},
-                "send_session_report": {},
+                "deliver_session_report": {"return_value": "https://mote/r/1"},
+                "begin_run": {},
+                "publish_summary": {},
+                "run_summary": {},
+                "RunEnd": {},
+                "show_run_end": {"side_effect": lambda _s, _t, work, **_kw: work()},
                 "send_crash_report": {},
                 "notify": {},
                 "CogMatrixRecorder": {},
@@ -47,6 +51,7 @@ class RunExperimentTests(unittest.TestCase):
         self.mocks = {name: p.start() for name, p in self.patches.items()}
         self.recorder = self.mocks["CogMatrixRecorder"].return_value
         self.camera = self.mocks["CameraRecording"].return_value
+        self.steps = self.mocks["RunEnd"].return_value
 
     def tearDown(self) -> None:
         for p in self.patches.values():
@@ -61,13 +66,14 @@ class RunExperimentTests(unittest.TestCase):
             target=self.recorder.retry_pending, name="cogmatrix-retry", daemon=True
         )
         self.recorder.start.assert_called_once_with(self.session)
-        self.recorder.finish.assert_called_once_with(self.session, recordings=[])
+        self.mocks["begin_run"].assert_called_once_with(self.session)
+        self.recorder.finish.assert_called_once_with(
+            self.session, recordings=[], steps=self.steps
+        )
         self.mocks["CameraRecording"].assert_not_called()
         self.mocks["apply_cogmote_config"].assert_not_called()
-        self.mocks["run_session_post_processing"].assert_called_once_with(
-            self.session, {}
-        )
         self.mocks["send_crash_report"].assert_not_called()
+        self.steps.close.assert_called_once_with()
 
     def test_rejected_wizard_starts_nothing(self) -> None:
         self.mocks["run_wizard"].return_value = False
@@ -87,10 +93,33 @@ class RunExperimentTests(unittest.TestCase):
         stages = self.mocks["apply_cogmote_config"].call_args.args[0]
         self.assertEqual(set(stages), {"idle"})
         self.game.play.assert_called_once_with()
-        self.mocks["send_session_report"].assert_called_once_with(
+        self.mocks["publish_summary"].assert_called_once_with(
+            self.mocks["run_summary"].return_value
+        )
+        # The session config's send_email decides without a choice from the stop request.
+        self.mocks["deliver_session_report"].assert_called_once_with(
             self.session, processors
         )
-        self.mocks["run_session_post_processing"].assert_not_called()
+        self.steps.done.assert_any_call("send_report", url="https://mote/r/1")
+
+    def test_the_stop_request_decides_the_report(self) -> None:
+        self.session.send_email = True
+        self.game.send_report = False
+
+        run.run_experiment(SceneManager(), argv=["--from-cogmote"])
+
+        self.mocks["deliver_session_report"].assert_not_called()
+        names = self.mocks["RunEnd"].call_args.args[0]
+        self.assertEqual(names, ["end_session", "upload_results"])
+
+    def test_a_failed_report_is_a_failed_step(self) -> None:
+        self.session.send_email = True
+        self.mocks["deliver_session_report"].side_effect = ConnectionError("offline")
+
+        run.run_experiment(SceneManager(), argv=["--from-cogmote"])
+
+        self.steps.fail.assert_called_once_with(["send_report"], "offline", retry=False)
+        self.steps.close.assert_called_once_with()
 
     def test_unusable_config_is_notified_and_exits_1(self) -> None:
         self.mocks["apply_cogmote_config"].side_effect = CogmoteConfigError(
@@ -117,7 +146,10 @@ class RunExperimentTests(unittest.TestCase):
         self.assertIsInstance(error, RuntimeError)
         self.assertIs(session, self.session)
         self.recorder.finish.assert_called_once_with(
-            self.session, aborted=True, recordings=[]
+            self.session, aborted=True, recordings=[], steps=self.steps
+        )
+        self.steps.fail.assert_called_once_with(
+            ["run"], "the run crashed; see the crash report", retry=False
         )
 
     def test_camera_is_recorded_when_configured(self) -> None:
@@ -132,8 +164,9 @@ class RunExperimentTests(unittest.TestCase):
             trials, capture_latency=timedelta(milliseconds=40)
         )
         self.recorder.finish.assert_called_once_with(
-            self.session, recordings=[Path("a.mp4"), Path("a.vtt")]
+            self.session, recordings=[Path("a.mp4"), Path("a.vtt")], steps=self.steps
         )
+        self.assertIn("upload_recording", self.mocks["RunEnd"].call_args.args[0])
 
     def test_a_crash_still_uploads_the_recording(self) -> None:
         self.session.config.record_camera = True
@@ -144,7 +177,10 @@ class RunExperimentTests(unittest.TestCase):
             run.run_experiment(SceneManager(), argv=["--from-cogmote"])
 
         self.recorder.finish.assert_called_once_with(
-            self.session, aborted=True, recordings=[Path("a.mp4"), Path("a.vtt")]
+            self.session,
+            aborted=True,
+            recordings=[Path("a.mp4"), Path("a.vtt")],
+            steps=self.steps,
         )
 
     def test_sigterm_ends_the_game_loop(self) -> None:

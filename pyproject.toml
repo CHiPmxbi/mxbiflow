@@ -47,7 +47,7 @@ reportPrivateUsage = "error"
 # (PJendritza/mx_eye#29). There is no compatibility layer, so the driver and
 # the tracker have to be updated together.
 py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "44b684b56a413ba776aa8bea511c3864f7e36e0c" }
-pymotego = { git = "https://github.com/cagelab/pymoteGO.git", rev = "73945699d0fbe0efff593ba6c0889960ef50f5cb" }
+pymotego = { git = "https://github.com/cagelab/pymoteGO.git", rev = "43915d0b5384ac082180e494dc4257c46deccfaf" }
 cogmatrix = { git = "https://github.com/cagelab/cogmatrix-python.git", subdirectory = "packages/sdk", rev = "a6f555a567454688defff10fddb3534463e85358" }
 
 

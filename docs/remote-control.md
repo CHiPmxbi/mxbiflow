@@ -22,7 +22,7 @@ connection every 5 seconds.
 | `{"command": "pause"}` | Show IDLE and start no task; a running trial is aborted. |
 | `{"command": "resume"}` | Resume scheduling; the present animal's task starts. |
 | `{"command": "screenshot"}` | Save a screenshot to the session screenshot directory. |
-| `{"command": "quit"}` | End the run, as `Esc` does. |
+| `{"command": "quit", "send_report": true}` | End the run, as `Esc` does. `send_report` (optional) overrides the session config's `send_email` for the report after the run; cogmote's stop dialog sends it. |
 
 Level and stage commands act on the animal currently at the device and are
 no-ops when none is present.

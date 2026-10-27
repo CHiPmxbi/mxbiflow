@@ -81,6 +81,7 @@ class Game:
         self._clock = pygame.time.Clock()
         self._max_fps = max_fps
         self._running = True
+        self._send_report: bool | None = None
 
         self._mxbi.begin()
         self._scene_manager.init()
@@ -133,9 +134,19 @@ class Game:
     def _handle_keyboard_event(self, event: Event) -> None:
         self._shortcuts.handle_event(event)
 
-    def request_quit(self) -> None:
-        """End :meth:`play` after the current frame."""
+    def request_quit(self, send_report: bool | None = None) -> None:
+        """End :meth:`play` after the current frame.
+
+        ``send_report`` is the stop request's choice; ``None`` keeps an earlier one.
+        """
+        if send_report is not None:
+            self._send_report = send_report
         self._running = False
+
+    @property
+    def send_report(self) -> bool | None:
+        """Whether the stop request asked for the report; ``None`` when it did not say."""
+        return self._send_report
 
     def _capture_screen(self) -> None:
         screenshot_dir = self._session.absolute_screenshot_data_path

@@ -14,11 +14,23 @@ from .infra.cogmatrix_sync import CogMatrixRecorder
 from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
 from .infra.notify import notify
-from .infra.post_processing import StagePostProcessor, send_session_report
+from .infra.post_processing import StagePostProcessor, deliver_session_report
+from .infra.run_end import (
+    COGMATRIX_STEPS,
+    END_SESSION,
+    SEND_REPORT,
+    UPLOAD_RECORDING,
+    UPLOAD_RESULTS,
+    RunEnd,
+    begin_run,
+    publish_summary,
+    run_summary,
+)
 from .infra.trial_status import clear_trials
 from .models.session import Session
 from .scene import SceneManager
-from .ui import run_session_post_processing, run_wizard
+from .ui import run_wizard
+from .ui.run_end_screen import show_run_end
 from .utils.logger import logger
 
 
@@ -45,6 +57,12 @@ def run_experiment(
     recorded during the game loop and uploaded with the results
     (:class:`CameraRecording`). SIGTERM, as from ``systemctl stop``, ends the
     game loop like the quit command.
+
+    After the game loop, the run summary and the steps after it (CogMatrix,
+    the report) are reported to cogmote and shown on the rig screen without a
+    confirm step (:mod:`mxbiflow.infra.run_end`). The report is sent when the
+    quit command asked for it, else when the session config's ``send_email``
+    does.
     """
     parser = argparse.ArgumentParser(description="Run the experiment.")
     parser.add_argument(
@@ -68,6 +86,7 @@ def run_experiment(
         mxbiflow = get_mxbiflow()
         session = mxbiflow.session
         clear_trials()
+        begin_run(session)
         recorder.start(session)
         # Earlier runs' uploads, recordings among them, must not delay this one.
         Thread(
@@ -77,11 +96,12 @@ def run_experiment(
             camera = CameraRecording()
             camera.start()
         game.play()
-        recorder.finish(session, recordings=_stop_camera(camera, mxbiflow))
-        if args.from_cogmote:
-            send_session_report(session, processors)
-        else:
-            run_session_post_processing(session, processors)
+        recordings = _stop_camera(camera, mxbiflow)
+        camera = None
+        send_report = (
+            game.send_report if game.send_report is not None else session.send_email
+        )
+        _finish(mxbiflow, recorder, recordings, send_report, processors)
     except CogmoteConfigError as error:
         logger.error("run not started: %s", error)
         _report_not_started(str(error))
@@ -91,6 +111,51 @@ def run_experiment(
         if session is not None:
             _finish_aborted(recorder, session, camera)
         raise
+
+
+def _finish(
+    mxbiflow: MXBIFlow,
+    recorder: CogMatrixRecorder,
+    recordings: list[Path],
+    send_report: bool,
+    processors: Mapping[str, StagePostProcessor],
+) -> None:
+    session = mxbiflow.session
+    summary = run_summary(session, mxbiflow.trials)
+    publish_summary(summary)
+    names: list[str] = []
+    if recorder.recording:
+        names += [END_SESSION, UPLOAD_RESULTS] + (
+            [UPLOAD_RECORDING] if recordings else []
+        )
+    if send_report:
+        names.append(SEND_REPORT)
+    steps = RunEnd(names)
+
+    def work() -> None:
+        try:
+            recorder.finish(session, recordings=recordings, steps=steps)
+        except Exception as error:  # noqa: BLE001 - the report still goes out
+            logger.exception("cannot record the run in CogMatrix")
+            steps.fail(COGMATRIX_STEPS, str(error), retry=False)
+        if send_report:
+            steps.start(SEND_REPORT)
+            try:
+                steps.done(SEND_REPORT, url=deliver_session_report(session, processors))
+            except Exception as error:  # noqa: BLE001 - logged by the report
+                steps.fail(
+                    [SEND_REPORT], str(error) or type(error).__name__, retry=False
+                )
+
+    screen = mxbiflow.mxbi.screen_size
+    show_run_end(
+        summary,
+        steps,
+        work,
+        size=(screen.width, screen.height),
+        fullscreen=session.fullscreen,
+    )
+    steps.close()
 
 
 def _report_not_started(reason: str) -> None:
@@ -110,11 +175,18 @@ def _stop_camera(camera: CameraRecording | None, mxbiflow: MXBIFlow) -> list[Pat
 def _finish_aborted(
     recorder: CogMatrixRecorder, session: Session, camera: CameraRecording | None
 ) -> None:
+    steps = RunEnd(["run", *COGMATRIX_STEPS] if recorder.recording else ["run"])
+    steps.fail(["run"], "the run crashed; see the crash report", retry=False)
     try:
         if session.start_at is not None and session.end_at is None:
             session.end()
         recorder.finish(
-            session, aborted=True, recordings=_stop_camera(camera, get_mxbiflow())
+            session,
+            aborted=True,
+            recordings=_stop_camera(camera, get_mxbiflow()),
+            steps=steps,
         )
     except Exception:  # noqa: BLE001 - the crash report is already out
         logger.exception("cannot record the aborted run in CogMatrix")
+    finally:
+        steps.close()
