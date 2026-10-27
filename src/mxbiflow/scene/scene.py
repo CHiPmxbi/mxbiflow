@@ -4,10 +4,9 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from inflection import underscore
+from pydantic import BaseModel
 from pygame.event import Event
 from pygame.surface import Surface
-
-from ..models.stage_config import StageConfig
 
 
 class Scene(ABC):
@@ -16,7 +15,7 @@ class Scene(ABC):
     title: ClassVar[str] = ""
     description: ClassVar[str] = ""
     # The stage configuration model and its config.json, the default template.
-    config_model: ClassVar[type[StageConfig[Any]] | None] = None
+    config_model: ClassVar[type[BaseModel] | None] = None
     config_template: ClassVar[Path | None] = None
 
     @classmethod
@@ -25,7 +24,7 @@ class Scene(ABC):
 
         It is the one cogmote sent for this stage with the run's configuration,
         else the stage's ``config.json`` template. Pass it to
-        :meth:`StageConfig.for_animal`.
+        :func:`~mxbiflow.models.stage_config.for_animal`.
         """
         from ..core.context import get_mxbiflow
 

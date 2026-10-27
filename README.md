@@ -188,7 +188,8 @@ class TouchscreenTraining(Scene):
 `levels: dict[LevelID, LevelT]`, marked `x-mxbi-levels` in the schema.
 `config.json` maps `"default"` to the stage configuration and animal names to
 overrides, only the fields that differ, merged over the default before
-validation: `TouchConfig.for_animal(TouchscreenTraining.config_document(), name)`.
+validation: `for_animal(TouchConfig, TouchscreenTraining.config_document(), name)`.
+A stage without levels may use any pydantic model as `config_model`.
 `config_document()` returns the document cogmote sent for the stage with the
 run's configuration (`stages` in the experiment configuration), else the
 template.

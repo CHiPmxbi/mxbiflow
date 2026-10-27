@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from mxbiflow import run
 from mxbiflow.core.path import set_base_path
 from mxbiflow.models.experiment import inlined_json_schema
-from mxbiflow.models.stage_config import StageConfig, merge_overrides
+from mxbiflow.models.stage_config import StageConfig, for_animal, merge_overrides
 from mxbiflow.scene import Scene, SceneManager
 
 TEMPLATE: dict[str, Any] = {
@@ -57,20 +57,20 @@ class Plain(Touch):
 
 class StageConfigTests(unittest.TestCase):
     def test_overrides_merge_over_the_default(self) -> None:
-        config = TouchConfig.for_animal(TEMPLATE, "Apollo")
+        config = for_animal(TouchConfig, TEMPLATE, "Apollo")
         self.assertEqual(config.reward_ms, 100)
         self.assertEqual(config.levels[1].target_size, 0.4)
         self.assertEqual(config.levels[2].target_size, 0.35)
         self.assertEqual(
-            TouchConfig.for_animal(TEMPLATE, "Bob").levels[2].target_size, 0.3
+            for_animal(TouchConfig, TEMPLATE, "Bob").levels[2].target_size, 0.3
         )
 
     def test_merged_overrides_are_validated(self) -> None:
         document = {**TEMPLATE, "Bob": {"levels": {"1": {"target_size": 2}}}}
         with self.assertRaises(ValidationError):
-            TouchConfig.for_animal(document, "Bob")
+            for_animal(TouchConfig, document, "Bob")
         with self.assertRaisesRegex(ValueError, "default"):
-            TouchConfig.for_animal({"Bob": {}}, "Bob")
+            for_animal(TouchConfig, {"Bob": {}}, "Bob")
 
     def test_merge_keeps_the_default_untouched(self) -> None:
         default = {"a": {"b": 1, "c": 2}}

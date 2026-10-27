@@ -9,7 +9,7 @@ where ``x-mxbi-levels`` marks the level table, and fields carry ``title``,
 """
 
 from collections.abc import Mapping
-from typing import Annotated, Any, Self
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, WithJsonSchema
 
@@ -23,7 +23,10 @@ LEVELS_MARKER = "x-mxbi-levels"
 
 
 class StageConfig[LevelT: BaseModel](BaseModel):
-    """Base of a stage's configuration: subclasses add the fixed fields."""
+    """Base of a staged configuration: subclasses add the fixed fields.
+
+    A stage without levels may use any pydantic model as its configuration.
+    """
 
     levels: dict[LevelID, LevelT] = Field(
         title="Levels",
@@ -31,13 +34,15 @@ class StageConfig[LevelT: BaseModel](BaseModel):
         json_schema_extra={LEVELS_MARKER: True},
     )
 
-    @classmethod
-    def for_animal(cls, document: Mapping[str, Any], animal: str) -> Self:
-        """Validate the default of ``document`` with ``animal``'s overrides merged over it."""
-        if DEFAULT_KEY not in document:
-            raise ValueError(f"the stage configuration has no {DEFAULT_KEY!r} entry")
-        override = document.get(animal) or {}
-        return cls.model_validate(merge_overrides(document[DEFAULT_KEY], override))
+
+def for_animal[T: BaseModel](
+    model: type[T], document: Mapping[str, Any], animal: str
+) -> T:
+    """Validate the default of ``document`` with ``animal``'s overrides merged over it."""
+    if DEFAULT_KEY not in document:
+        raise ValueError(f"the stage configuration has no {DEFAULT_KEY!r} entry")
+    override = document.get(animal) or {}
+    return model.model_validate(merge_overrides(document[DEFAULT_KEY], override))
 
 
 def merge_overrides(
