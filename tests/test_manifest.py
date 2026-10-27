@@ -138,6 +138,17 @@ class DescribeTests(unittest.TestCase):
         self.assertEqual(plain["title"], "Plain")
         self.assertEqual(plain["levels"], [{"id": 1}, {"id": 2}, {"id": 3}])
         self.assertIsNone(plain["schema"])
+        hardware = manifest["hardware_schema"]
+        self.assertEqual(
+            set(hardware["properties"]),
+            {"screen_size", "rewarders", "detectors", "eyetrackers"},
+        )
+        self.assertNotIn("$defs", hardware)
+        self.assertNotIn("$ref", json.dumps(hardware))
+        self.assertEqual(
+            hardware["properties"]["detectors"]["items"]["discriminator"],
+            {"propertyName": "type"},
+        )
 
 
 if __name__ == "__main__":

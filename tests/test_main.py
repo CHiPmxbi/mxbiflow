@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 from mxbiflow import __main__ as cli
 from mxbiflow import run
 from mxbiflow.infra.cogmote_config import CogmoteConfigError
+from mxbiflow.infra.hardware_config import HardwareConfigError
 from mxbiflow.scene import SceneManager
 
 
@@ -33,6 +34,7 @@ class RunExperimentTests(unittest.TestCase):
                 "get_mxbiflow": {"side_effect": get_mxbiflow},
                 "run_wizard": {"return_value": True},
                 "apply_cogmote_config": {},
+                "sync_hardware_config": {},
                 "deliver_session_report": {"return_value": "https://mote/r/1"},
                 "begin_run": {},
                 "publish_summary": {},
@@ -132,6 +134,22 @@ class RunExperimentTests(unittest.TestCase):
             "mxbiflow run not started", "unknown stages detect", severity="critical"
         )
         self.mocks["init_gameloop"].assert_not_called()
+        self.mocks["send_crash_report"].assert_not_called()
+
+    def test_missing_hardware_config_is_notified_and_exits_1(self) -> None:
+        self.mocks["init_gameloop"].side_effect = HardwareConfigError(
+            "no hardware configuration"
+        )
+
+        with self.assertRaises(SystemExit):
+            run.run_experiment(SceneManager(), argv=["--from-cogmote"])
+
+        self.mocks["sync_hardware_config"].assert_called_once_with()
+        self.mocks["notify"].assert_called_once_with(
+            "mxbiflow run not started",
+            "no hardware configuration",
+            severity="critical",
+        )
         self.mocks["send_crash_report"].assert_not_called()
 
     def test_crash_is_reported_with_the_session(self) -> None:

@@ -2,7 +2,8 @@
 
 It describes what cogmote needs of an installed experiment: its stages in
 registration order with titles, levels, configuration schema and ``config.json``
-template, and the schema of the cogmote experiment configuration. It is
+template, the schema of the cogmote experiment configuration and of the rig
+hardware configuration (#210). It is
 written at install time, so describing touches no window, hardware or run.
 """
 
@@ -12,6 +13,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+from ..driver import MXBIModel
 from ..models.experiment import experiment_config_schema, inlined_json_schema
 from ..models.stage_config import DEFAULT_KEY
 from ..scene import Scene, SceneManager
@@ -29,6 +31,7 @@ def describe(scene_manager: SceneManager, base_path: Path) -> dict[str, Any]:
         "version": project["project"]["version"],
         "mxbiflow_version": version("mxbiflow"),
         "config_schema": experiment_config_schema(),
+        "hardware_schema": inlined_json_schema(MXBIModel),
         "stages": [
             describe_stage(scene)
             for scene in scene_manager.scenes.values()

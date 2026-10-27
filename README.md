@@ -176,14 +176,28 @@ SIGTERM ends the game loop like the quit command, so a stopped run is still
 ended and uploaded. Each run clears the `trials` broadcast first, so the
 cogmote views do not replay the previous run.
 
+## Hardware configuration
+
+The rig hardware (screen size, rewarders, detectors, eye trackers; the
+`MXBIModel` in `mxbiflow.driver`) belongs to the device, not to an experiment.
+cogmote keeps named hardware presets per device and sends the current one
+under `hardware` in the device config. At each start, wizard or headless,
+mxbiflow copies it to `~/.config/mxbi/mxbi.json`, which every experiment on the
+rig reads and the wizard's MXBI panel edits
+(`mxbiflow.infra.hardware_config`). When cogmote has no preset or cogmoteGO is
+unreachable, that file is used as it is; an experiment's old
+`config/mxbi.json` is moved there once if the device has none. Without any
+hardware configuration the run does not start. The device name in cogmote
+names the rig in report and CogMatrix session titles.
+
 ## Experiment manifest and stage configurations
 
 `--describe` (`uv run main.py --describe`) prints the experiment's manifest as
 JSON and exits without a window, hardware or run. The rig's setup writes it
 next to the installed experiment, and cogmote reads it for stage and level
 choices, titles and the stage editor. It holds `manifest_version`, the name and
-version from `pyproject.toml`, the experiment configuration schema, and the
-stages in registration order with their title, description, levels, stage
+version from `pyproject.toml`, the experiment configuration schema, the
+hardware configuration schema (`hardware_schema`), and the stages in registration order with their title, description, levels, stage
 configuration schema and `config.json` template.
 
 A stage describes itself with class attributes:
@@ -307,7 +321,7 @@ from mxbiflow.driver.eyetracker import Eyetracker, MxEyeEyetracker
 ```
 
 An `eyetracker` is configured through the optional `eyetrackers` list of
-`config/mxbi.json` (for example `{"type": "mx_eye", "id": 0, "enabled": true}`)
+the hardware configuration (for example `{"type": "mx_eye", "id": 0, "enabled": true}`)
 and read at runtime through `get_mxbiflow().mxbi.eyetracker`, which is `None`
 when no eyetracker is configured. The `mx_eye` backend streams through
 py-mx-eye; until that tracker reports a screen-space mapping, its samples carry

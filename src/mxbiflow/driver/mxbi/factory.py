@@ -30,11 +30,14 @@ from .mxbi import MXBI
 
 
 class MXBIModel(BaseModel):
-    mxbi_id: str = Field(default="debug")
-    screen_size: tuple[int, int] = Field(default=(1024, 600))
-    rewarders: list[RewarderModel] = Field(default_factory=list)
-    detectors: list[DetectorModel] = Field(default_factory=list)
-    eyetrackers: list[EyetrackerModel] = Field(default_factory=list)
+    """The rig hardware; the device name in cogmote identifies the rig."""
+
+    screen_size: tuple[int, int] = Field(default=(1024, 600), title="Screen size")
+    rewarders: list[RewarderModel] = Field(default_factory=list, title="Rewarders")
+    detectors: list[DetectorModel] = Field(default_factory=list, title="Detectors")
+    eyetrackers: list[EyetrackerModel] = Field(
+        default_factory=list, title="Eye trackers"
+    )
 
 
 def build_mxbi(config: MXBIModel, logger=None) -> MXBI:

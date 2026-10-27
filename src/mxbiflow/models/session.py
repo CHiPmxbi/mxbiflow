@@ -170,6 +170,8 @@ class Session(BaseModel):
     config: SessionConfig
     mxbi_config: MXBIModel = Field(exclude=True)
     state: SessionState
+    device_name: str = Field(default="mxbi", exclude=True)
+    """The device name in cogmote, the rig's name in reports."""
 
     _session_store: RuntimeStateStore | None = PrivateAttr(default=None)
     _config_store: SessionConfigStore | None = PrivateAttr(default=None)

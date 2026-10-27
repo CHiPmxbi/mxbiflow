@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import socket
-
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -24,10 +22,6 @@ class BaseConfig(QGroupBox):
         self._layout = QFormLayout()
         self.setLayout(self._layout)
 
-        self._label_mxbi = QLabel("mxbi id:")
-        self._value_mxbi = QLabel(self.mxbi_id)
-        self._layout.addRow(self._label_mxbi, self._value_mxbi)
-
         self._label_screen = QLabel("screen:")
         self._combo_screen = QComboBox()
 
@@ -42,10 +36,6 @@ class BaseConfig(QGroupBox):
         self._spin_auto_accept.setRange(0, 3600)
         self._spin_auto_accept.setSpecialValueText("Disabled")
         self._layout.addRow(self._label_auto_accept, self._spin_auto_accept)
-
-    @property
-    def mxbi_id(self) -> str:
-        return socket.gethostname()
 
     @property
     def screen_size(self) -> tuple[int, int]:
@@ -65,5 +55,4 @@ class BaseConfig(QGroupBox):
         self._spin_auto_accept.setValue(timeout_seconds)
 
     def apply_to_model(self, model: MXBIModel) -> None:
-        model.mxbi_id = self.mxbi_id
         model.screen_size = self._combo_screen.currentData()

@@ -85,11 +85,11 @@ def build_crash_report(
 ) -> CrashReport:
     """Build a plain-text crash report for ``exc``. Never raises.
 
-    ``session`` provides the mxbi identifier and animal context; the tail
+    ``session`` provides the device name and animal context; the tail
     of ``log_file`` fills the space left under the notification size limit.
     """
     now = datetime.now(UTC)
-    mxbi_id = session.mxbi_config.mxbi_id
+    mxbi_id = session.device_name
     traceback_text = "".join(
         traceback.format_exception(type(exc), exc, exc.__traceback__)
     )
