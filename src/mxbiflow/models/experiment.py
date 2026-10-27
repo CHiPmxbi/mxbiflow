@@ -161,6 +161,12 @@ def _inline_refs(node: Any, defs: dict[str, Any]) -> Any:
     if not isinstance(node, dict):
         return node
     inlined = {key: _inline_refs(value, defs) for key, value in node.items()}
+    discriminator = inlined.get("discriminator")
+    if isinstance(discriminator, dict) and "mapping" in discriminator:
+        # The mapping points into the removed $defs; the oneOf options remain.
+        inlined["discriminator"] = {
+            k: v for k, v in discriminator.items() if k != "mapping"
+        }
     ref = inlined.pop("$ref", None)
     if ref is None:
         return inlined

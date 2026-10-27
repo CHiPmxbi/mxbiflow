@@ -1,14 +1,15 @@
+import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication
 
 from mxbiflow.core.path import get_mxbi_config_path, set_base_path
 from mxbiflow.driver import MXBIModel
@@ -39,28 +40,22 @@ class BaseConfigTests(unittest.TestCase):
         self._home_patch.stop()
         self._temporary_directory.cleanup()
 
-    @patch("mxbiflow.ui.components.baseconfig.socket.gethostname")
-    def test_hostname_is_read_only_and_saved_as_mxbi_id(
-        self, gethostname: Mock
-    ) -> None:
-        gethostname.return_value = "mxbi-host"
+    def test_panel_edits_the_device_global_config(self) -> None:
         config_path = get_mxbi_config_path()
+        self.assertEqual(
+            config_path,
+            Path(self._temporary_directory.name) / ".config" / "mxbi" / "mxbi.json",
+        )
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(
-            MXBIModel(
-                mxbi_id="outdated",
-            ).model_dump_json(indent=4),
-            encoding="utf-8",
+            '{"mxbi_id": "outdated", "screen_size": [1024, 600]}', encoding="utf-8"
         )
 
         panel = MXBIPanel()
-        labels = [label.text() for label in panel.findChildren(QLabel)]
-        self.assertIn("mxbi-host", labels)
-
         QTest.mouseClick(panel.save_button, Qt.MouseButton.LeftButton)
 
-        saved = MXBIModel.model_validate_json(config_path.read_text(encoding="utf-8"))
-        self.assertEqual(saved.mxbi_id, "mxbi-host")
+        saved = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertNotIn("mxbi_id", saved)
         panel.close()
 
     def test_missing_mxbi_config_creates_default(self) -> None:

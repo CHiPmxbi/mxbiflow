@@ -15,6 +15,7 @@ from .infra.camera_recording import CameraRecording
 from .infra.cogmatrix_sync import CogMatrixRecorder
 from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
+from .infra.hardware_config import sync_hardware_config
 from .infra.manifest import describe
 from .infra.notify import notify
 from .infra.post_processing import StagePostProcessor, deliver_session_report
@@ -66,6 +67,10 @@ def run_experiment(
     confirm step (:mod:`mxbiflow.infra.run_end`). The report is sent when the
     session config's ``send_email`` asks for it, however the run ended.
 
+    The hardware configuration is cogmote's current preset, else the
+    device-global copy of the last one (:mod:`mxbiflow.infra.hardware_config`);
+    without either the run does not start.
+
     ``--describe`` prints the experiment manifest (:mod:`mxbiflow.infra.manifest`)
     and returns without a window, hardware or run.
     """
@@ -92,7 +97,8 @@ def run_experiment(
     try:
         if args.from_cogmote:
             apply_cogmote_config(scene_manager.scenes.keys())
-        elif not run_wizard(scene_manager):
+        sync_hardware_config()
+        if not args.from_cogmote and not run_wizard(scene_manager):
             return
         game = init_gameloop(scene_manager, max_fps)
         signal.signal(signal.SIGTERM, lambda *_: game.request_quit())

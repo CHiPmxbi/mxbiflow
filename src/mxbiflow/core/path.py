@@ -25,6 +25,12 @@ def get_config_dir_path() -> Path:
 
 
 def get_mxbi_config_path() -> Path:
+    """The rig hardware configuration, shared by every experiment on the device."""
+    return Path.home() / ".config" / "mxbi" / MXBI_CONFIG_FILENAME
+
+
+def get_legacy_mxbi_config_path() -> Path:
+    """Where each experiment kept its own hardware configuration before."""
     return get_config_dir_path() / MXBI_CONFIG_FILENAME
 
 

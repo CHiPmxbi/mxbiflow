@@ -148,7 +148,7 @@ class CogMatrixRecorder:
             config=config,
             code=code,
             started_at=_milliseconds(session.start_at),
-            title=f"{session.mxbi_config.mxbi_id} session {session.session_id}",
+            title=f"{session.device_name} session {session.session_id}",
             notes=session.note or None,
             data_root=str(session.data_root) if session.data_root else None,
             data_path=str(session.data_path) if session.data_path else None,

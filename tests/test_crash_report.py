@@ -14,10 +14,9 @@ from mxbiflow.models.session import Session, SessionConfig, SessionState
 def _make_session() -> Session:
     return Session(
         config=SessionConfig(),
-        mxbi_config=MXBIModel(
-            mxbi_id="mxbi5",
-        ),
+        mxbi_config=MXBIModel(),
         state=SessionState(),
+        device_name="mxbi5",
     )
 
 

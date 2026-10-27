@@ -247,7 +247,7 @@ def build_session_report(
 
     trials = sum(animal.total_trials for animal in summary.animals)
     return SessionReport(
-        title=f"{session.mxbi_config.mxbi_id} Daily Report",
+        title=f"{session.device_name} Daily Report",
         summary=f"Session #{summary.session_id}: {summary.total_animals} animals, "
         f"{trials} trials, {_format_duration(summary.duration_seconds)}",
         blocks=blocks,

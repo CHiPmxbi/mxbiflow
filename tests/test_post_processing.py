@@ -132,7 +132,7 @@ class SessionReportTests(unittest.TestCase):
         summarize_.return_value = _summary([])
         overview.return_value = [Heading("Session #3")]
         session = MagicMock()
-        session.mxbi_config.mxbi_id = "mxbi-1"
+        session.device_name = "mxbi-1"
         session.data_root = Path("data")
         session.stage_data_paths = {
             "stage": {"m1": Path("m1/stage")},

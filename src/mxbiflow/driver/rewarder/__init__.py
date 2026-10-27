@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .mock_rewarder import MockRewarder
 from .rewarder import Rewarder, RewarderEnum
@@ -13,6 +13,8 @@ rewarders: dict[str, type[Rewarder]] = {
 
 
 class MockRewarderModel(BaseModel):
+    model_config = ConfigDict(title="Mock rewarder")
+
     type: Literal[RewarderEnum.MOCK] = RewarderEnum.MOCK
     id: int = Field(default=0, ge=0)
 
@@ -24,6 +26,8 @@ class MockRewarderModel(BaseModel):
 
 
 class GPIORewarderModel(BaseModel):
+    model_config = ConfigDict(title="GPIO pump")
+
     type: Literal[RewarderEnum.RPI_GPIO] = RewarderEnum.RPI_GPIO
     id: int = Field(default=0, ge=0)
 

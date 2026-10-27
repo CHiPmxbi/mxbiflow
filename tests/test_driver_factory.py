@@ -214,7 +214,7 @@ class MXBIModelEyetrackerTests(unittest.TestCase):
 
     def test_legacy_config_without_eyetrackers_is_accepted(self) -> None:
         model = MXBIModel.model_validate_json(
-            '{"mxbi_id": "rig", "rewarders": [], "detectors": []}'
+            '{"mxbi_id": "legacy", "rewarders": [], "detectors": []}'
         )
 
         self.assertEqual(model.eyetrackers, [])
