@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .beambreak_continuous_detector import BeambreakContinuousDetector
 from .detector import Detector, DetectorEnum
@@ -10,6 +10,8 @@ from .rfid_continuous_detector import RFIDContinuousDetector
 
 
 class MockDetectorModel(BaseModel):
+    model_config = ConfigDict(title="Mock detector")
+
     type: Literal[DetectorEnum.MOCK] = DetectorEnum.MOCK
     id: int = Field(default=0, ge=0)
 
@@ -21,6 +23,8 @@ class MockDetectorModel(BaseModel):
 
 
 class RFIDContinuousDetectorModel(BaseModel):
+    model_config = ConfigDict(title="RFID reader")
+
     type: Literal[DetectorEnum.RFID_CONTINUOUS] = DetectorEnum.RFID_CONTINUOUS
     id: int = Field(default=0, ge=0)
 
@@ -38,6 +42,8 @@ class RFIDContinuousDetectorModel(BaseModel):
 
 
 class BeamBreakContinuousDetectorModel(BaseModel):
+    model_config = ConfigDict(title="Beam break")
+
     type: Literal[DetectorEnum.BEAMBREAK_CONTINUOUS] = DetectorEnum.BEAMBREAK_CONTINUOUS
     id: int = Field(default=0, ge=0)
 
@@ -53,6 +59,8 @@ class BeamBreakContinuousDetectorModel(BaseModel):
 
 
 class FusionContinuousDetectorModel(BaseModel):
+    model_config = ConfigDict(title="RFID + beam break")
+
     type: Literal[DetectorEnum.FUSION_CONTINUOUS] = DetectorEnum.FUSION_CONTINUOUS
     id: int = Field(default=0, ge=0)
 
