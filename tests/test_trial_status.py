@@ -3,10 +3,52 @@ from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 from httpx import Response
+from pydantic import BaseModel, Field
 from pymotego.errors import ProblemError
 from test_session import make_session
 
-from mxbiflow.infra.trial_status import BROADCAST_NAME, TrialPublisher, clear_trials
+from mxbiflow.infra.trial_status import (
+    BROADCAST_NAME,
+    HINT_BROADCAST_NAME,
+    TrialPublisher,
+    clear_trials,
+)
+from mxbiflow.models import COLUMN, AnimalBaseInfo
+
+
+class Stimulus(BaseModel):
+    frequency_hz: int = Field(title="Frequency", json_schema_extra={"unit": "Hz"})
+
+
+class Result(BaseModel):
+    animal: AnimalBaseInfo
+    stimulus: Stimulus
+    response_latency_ms: float | None = Field(
+        None, title="Reaction time", json_schema_extra={"unit": "ms", **COLUMN}
+    )
+
+
+def make_result(level: int = 2) -> Result:
+    return Result(
+        animal=AnimalBaseInfo(
+            animal="animal-1",
+            trial_id=7,
+            level=level,
+            level_trial_id=3,
+            animal_session_id=1,
+            animal_session_trial_id=4,
+        ),
+        stimulus=Stimulus(frequency_hz=440),
+        response_latency_ms=512.5,
+    )
+
+
+def published(broadcast: Mock, name: str) -> list[object]:
+    return [
+        call.args[1]
+        for call in broadcast.publish.call_args_list
+        if call.args[0] == name
+    ]
 
 
 def make_publisher() -> tuple[TrialPublisher, Mock, Mock]:
@@ -56,8 +98,8 @@ class TrialPublisherTests(unittest.TestCase):
             },
         )
 
-        name, event = broadcast.publish.call_args_list[0].args
-        self.assertEqual(name, BROADCAST_NAME)
+        event = published(broadcast, BROADCAST_NAME)[0]
+        assert isinstance(event, dict)
         self.assertEqual(event["animal"], "animal-1")
         self.assertEqual(event["stage"], "vocalization_discriminate")
         self.assertEqual(event["level"], 2)
@@ -85,16 +127,66 @@ class TrialPublisherTests(unittest.TestCase):
         _, event = broadcast.publish.call_args.args
         self.assertEqual(event["record"], {"at": str(at)})
 
+    def test_record_model_context_is_not_repeated(self) -> None:
+        publisher, _, broadcast = make_publisher()
+
+        # Settlement leveled the animal up before the trial was published.
+        publisher.publish(make_result(level=1), correct=True)
+        publisher.close()
+
+        event = published(broadcast, BROADCAST_NAME)[0]
+        self.assertEqual(
+            event,
+            {
+                "trial_id": 7,
+                "animal": "animal-1",
+                "stage": "vocalization_discriminate",
+                "level": 1,
+                "correct": True,
+                "level_trial_id": 3,
+                "animal_session_id": 1,
+                "animal_session_trial_id": 4,
+                "session_id": 0,
+                "record": {
+                    "stimulus": {"frequency_hz": 440},
+                    "response_latency_ms": 512.5,
+                },
+            },
+        )
+
+    def test_publishes_the_hint_when_the_record_model_changes(self) -> None:
+        publisher, _, broadcast = make_publisher()
+
+        publisher.publish(make_result(), correct=True)
+        publisher.publish(make_result(), correct=False)
+        publisher.publish({"result": "legacy"}, correct=None)
+        publisher.close()
+
+        names = [call.args[0] for call in broadcast.publish.call_args_list]
+        self.assertEqual(
+            names,
+            [
+                HINT_BROADCAST_NAME,
+                BROADCAST_NAME,
+                BROADCAST_NAME,
+                HINT_BROADCAST_NAME,
+                BROADCAST_NAME,
+            ],
+        )
+        hint = published(broadcast, HINT_BROADCAST_NAME)[0]
+        assert isinstance(hint, dict)
+        self.assertIn("record.response_latency_ms", hint["columns"])
+
     def test_failures_do_not_stop_publishing(self) -> None:
         publisher, client, broadcast = make_publisher()
-        broadcast.publish.side_effect = [ConnectionError("down"), Mock()]
+        broadcast.publish.side_effect = [Mock(), ConnectionError("down"), Mock()]
 
         with self.assertLogs("mxbiflow", level="INFO") as logs:
             publisher.publish({}, correct=True)
             publisher.publish({}, correct=True)
             publisher.close()
 
-        self.assertEqual(broadcast.publish.call_count, 2)
+        self.assertEqual(len(published(broadcast, BROADCAST_NAME)), 2)
         self.assertEqual(client.patch_status.call_count, 3)
         self.assertIn("failed to publish trial status", logs.output[0])
         self.assertIn("recovered", logs.output[1])
@@ -116,7 +208,10 @@ class ClearTrialsTests(unittest.TestCase):
 
         clear_trials(broadcast)
 
-        broadcast.delete.assert_called_once_with(BROADCAST_NAME)
+        self.assertEqual(
+            [call.args for call in broadcast.delete.call_args_list],
+            [(BROADCAST_NAME,), (HINT_BROADCAST_NAME,)],
+        )
 
     def test_missing_broadcast_or_cogmotego_is_ignored(self) -> None:
         for error in (problem(404), problem(500), ConnectionError("refused")):
@@ -127,5 +222,5 @@ class ClearTrialsTests(unittest.TestCase):
         with patch("mxbiflow.infra.trial_status.Broadcast") as broadcast:
             clear_trials()
 
-        broadcast.return_value.delete.assert_called_once_with(BROADCAST_NAME)
+        self.assertEqual(broadcast.return_value.delete.call_count, 2)
         broadcast.return_value.close.assert_called_once_with()

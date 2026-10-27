@@ -122,12 +122,30 @@ records with your own standard-library handlers instead.
 After each trial, a scene reports the result once:
 
 ```python
-get_mxbiflow().publish_trial(result.model_dump(), correct=is_correct)
+get_mxbiflow().publish_trial(result, correct=is_correct)
 ```
 
 mxbiflow patches the device status in cogmoteGO (animal, `stage@level`,
 trial count and accuracy for this session) so the cogmote device page shows
-the run live, and publishes the record to the `trials` broadcast. Pass
+the run live, and publishes the record to the `trials` broadcast. An event
+holds the trial's context at the top level (`trial_id`, `animal`, `stage`,
+`level`, `correct`, the rest of `AnimalBaseInfo` and `session_id`) and the
+record under `record`, without the record's `AnimalBaseInfo` field, which is
+the top level's source. From the record model mxbiflow also derives the hint
+for cogmote's live data table and publishes it to `trials.schema`
+(`mxbiflow.models.trial`): field `title`, and `unit`, `decimals` and
+`COLUMN` (a default column) in `json_schema_extra`:
+
+```python
+from mxbiflow.models import COLUMN
+
+response_latency_ms: float | None = Field(
+    None, title="Reaction time", json_schema_extra={"unit": "ms", "decimals": 0, **COLUMN}
+)
+```
+
+A plain mapping is still accepted and published as is, without a record
+hint. Pass
 `correct=None` for trials that should not count toward accuracy. Requests
 run on a background thread; when cogmoteGO is unreachable they are logged
 and dropped, and the game loop carries on. The device goes back to `idle`

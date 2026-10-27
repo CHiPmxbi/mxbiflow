@@ -2,6 +2,8 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from mxbiflow.driver import MXBI
 from mxbiflow.driver.eyetracker.eyetracker import EyeSample
 
@@ -55,13 +57,16 @@ class MXBIFlow:
         return get_data_dir_path()
 
     def publish_trial(
-        self, record: Mapping[str, object], *, correct: bool | None
+        self, record: BaseModel | Mapping[str, object], *, correct: bool | None
     ) -> None:
         """Report a finished trial of the current animal to cogmoteGO.
 
         Patches the device status (animal, ``stage@level``, trial count and
         accuracy) and publishes ``record`` to the ``trials`` broadcast. Call it
         once per trial; ``correct=None`` leaves the trial out of accuracy.
+        Pass the record model, not its dump: its ``AnimalBaseInfo`` becomes the
+        event's context and its fields the table's schema hint
+        (:mod:`mxbiflow.models.trial`).
         """
         animal = self._session.require_current_animal()
         self._trials.append(
