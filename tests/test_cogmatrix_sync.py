@@ -302,6 +302,21 @@ class CogMatrixRecorderTests(unittest.TestCase):
         self.assertEqual(self.fake.calls[2][1]["name"], "animal-1-s-result.jsonl")
         self.assertEqual(list(self.state.iterdir()), [])
 
+    def test_a_run_that_died_before_any_result_ends_after_its_start(self) -> None:
+        session = make_session()
+        session.start(self.root / "data")
+        self.recorder().start(session)
+        # The process dies before any trial; the next start ends it as aborted.
+
+        self.recorder().retry_pending()
+
+        self.assertEqual(self.names(), ["create", "end"])
+        end = self.fake.calls[1][1]
+        self.assertEqual(end.status, ExperimentSessionStatus.aborted)
+        create = self.fake.calls[0][1]
+        self.assertGreater(end.ended_at, create["started_at"])
+        self.assertEqual(list(self.state.iterdir()), [])
+
     def test_without_an_experiment_config_nothing_is_recorded(self) -> None:
         config = {**CONFIG, "experiment": None}
         self.run_session(self.recorder(config))

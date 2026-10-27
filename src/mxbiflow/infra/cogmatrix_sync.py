@@ -22,7 +22,7 @@ results it has.
 import json
 import shutil
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -249,7 +249,11 @@ class CogMatrixRecorder:
                         EndExperimentSessionInput(
                             id=UUID(run.session_id),
                             status=run.status,
-                            ended_at=run.ended_at,
+                            # CogMatrix needs the end strictly after the start; a run
+                            # that died before writing anything ends at its start.
+                            ended_at=max(
+                                run.ended_at, run.started_at + timedelta(milliseconds=1)
+                            ),
                         )
                     )
                     run.ended = True
