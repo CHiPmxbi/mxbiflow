@@ -208,9 +208,9 @@ step (cagelab/cogmote#424):
   report is not;
 - the rig screen shows both until the steps are done, then 15 seconds longer.
 
-The report is sent when the `quit` command asked for it (`send_report`, from
-cogmote's stop dialog), else when the session config's `send_email` does. The
-next run clears the steps and the summary. A crash marks the status `failed`
+The report is sent when the session config's `send_email` asks for it,
+however the run ended (cogmote's Stop, `q` on the rig, or SIGTERM). The next
+run clears the steps and the summary. A crash marks the status `failed`
 with a failed `run` step.
 
 ## Reports

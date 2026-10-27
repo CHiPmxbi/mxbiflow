@@ -14,7 +14,7 @@ class RunExperimentTests(unittest.TestCase):
         self.session = Mock()
         self.session.config.record_camera = False
         self.session.config.capture_latency_ms = 40
-        self.game = Mock(send_report=None)
+        self.game = Mock()
         context: list[Mock] = []
 
         def init_gameloop(_scene_manager: object, _max_fps: int) -> Mock:
@@ -96,15 +96,13 @@ class RunExperimentTests(unittest.TestCase):
         self.mocks["publish_summary"].assert_called_once_with(
             self.mocks["run_summary"].return_value
         )
-        # The session config's send_email decides without a choice from the stop request.
         self.mocks["deliver_session_report"].assert_called_once_with(
             self.session, processors
         )
         self.steps.done.assert_any_call("send_report", url="https://mote/r/1")
 
-    def test_the_stop_request_decides_the_report(self) -> None:
-        self.session.send_email = True
-        self.game.send_report = False
+    def test_without_send_email_no_report_is_sent(self) -> None:
+        self.session.send_email = False
 
         run.run_experiment(SceneManager(), argv=["--from-cogmote"])
 
