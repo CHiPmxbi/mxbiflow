@@ -82,6 +82,21 @@ class ExperimentConfigTests(unittest.TestCase):
         )
         self.assertEqual(animal["properties"]["id"]["x-cogmatrix"], "animal")
 
+    def test_schema_marks_stage_fields_and_order(self) -> None:
+        schema = experiment_config_schema()
+
+        animal = schema["properties"]["animals"]["items"]
+        parameters = schema["properties"]["parameters"]
+        self.assertTrue(animal["properties"]["stage"]["x-mxbi-stage"])
+        self.assertTrue(parameters["properties"]["default_scene"]["x-mxbi-stage"])
+        self.assertTrue(parameters["properties"]["fault_fallback"]["x-mxbi-stage"])
+        self.assertEqual(schema["x-mxbi-order"], list(schema["properties"]))
+        self.assertEqual(animal["x-mxbi-order"], list(animal["properties"]))
+        self.assertEqual(
+            parameters["x-mxbi-order"][:3],
+            ["reward_type", "default_scene", "fault_fallback"],
+        )
+
     def test_cli_output_is_only_the_schema(self) -> None:
         result = subprocess.run(
             [sys.executable, "-m", "mxbiflow", "schema"],
