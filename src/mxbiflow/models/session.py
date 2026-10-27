@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import (
     BaseModel,
@@ -49,6 +49,10 @@ class SessionConfig(BaseModel):
     record_camera: bool = False
     capture_latency_ms: int = Field(default=0, ge=0)
 
+    # Stage configuration documents from cogmote by stage name; a stage
+    # without one uses its config.json template.
+    stage_configs: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
     def with_animals(self, animals: tuple[AnimalConfig, ...]) -> SessionConfig:
         return SessionConfig(
             experimenter=self.experimenter,
@@ -62,6 +66,7 @@ class SessionConfig(BaseModel):
             animals=animals,
             record_camera=self.record_camera,
             capture_latency_ms=self.capture_latency_ms,
+            stage_configs=self.stage_configs,
         )
 
 

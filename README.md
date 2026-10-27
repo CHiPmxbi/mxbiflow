@@ -158,6 +158,42 @@ SIGTERM ends the game loop like the quit command, so a stopped run is still
 ended and uploaded. Each run clears the `trials` broadcast first, so the
 cogmote views do not replay the previous run.
 
+## Experiment manifest and stage configurations
+
+`--describe` (`uv run main.py --describe`) prints the experiment's manifest as
+JSON and exits without a window, hardware or run. The rig's setup writes it
+next to the installed experiment, and cogmote reads it for stage and level
+choices, titles and the stage editor. It holds `manifest_version`, the name and
+version from `pyproject.toml`, the experiment configuration schema, and the
+stages in registration order with their title, description, levels, stage
+configuration schema and `config.json` template.
+
+A stage describes itself with class attributes:
+
+```python
+class TouchConfig(StageConfig[TouchLevel]):
+    reward_duration_ms: int = Field(
+        gt=0, title="Reward duration", json_schema_extra={"unit": "ms"}
+    )
+
+
+class TouchscreenTraining(Scene):
+    title = "Touchscreen training"
+    description = "Touch a single target at the centre."
+    config_model = TouchConfig
+    config_template = Path(__file__).parent / "config.json"
+```
+
+`StageConfig[LevelT]` gives each stage its fixed fields plus
+`levels: dict[LevelID, LevelT]`, marked `x-mxbi-levels` in the schema.
+`config.json` maps `"default"` to the stage configuration and animal names to
+overrides, only the fields that differ, merged over the default before
+validation: `for_animal(TouchConfig, TouchscreenTraining.config_document(), name)`.
+A stage without levels may use any pydantic model as `config_model`.
+`config_document()` returns the document cogmote sent for the stage with the
+run's configuration (`stages` in the experiment configuration), else the
+template.
+
 ## CogMatrix sessions
 
 Every run is recorded in CogMatrix by the rig itself, with the CogMatrix token
