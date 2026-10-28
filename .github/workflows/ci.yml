@@ -31,7 +31,7 @@ jobs:
           git config --global
           url."https://x-access-token:${CAGELAB_READ_TOKEN}@github.com/cagelab/".insteadOf
           "https://github.com/cagelab/"
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uv sync --locked
       - run: uv run pyright
       # pyglet reads the screen sizes from an X display.
