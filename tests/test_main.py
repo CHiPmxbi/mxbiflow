@@ -36,6 +36,8 @@ class RunExperimentTests(unittest.TestCase):
                 "apply_cogmote_config": {},
                 "sync_hardware_config": {},
                 "deliver_session_report": {"return_value": "https://mote/r/1"},
+                "build_session_report": {},
+                "experiment_name": {"return_value": "task"},
                 "begin_run": {},
                 "publish_summary": {},
                 "run_summary": {},
@@ -98,8 +100,11 @@ class RunExperimentTests(unittest.TestCase):
         self.mocks["publish_summary"].assert_called_once_with(
             self.mocks["run_summary"].return_value
         )
+        self.mocks["build_session_report"].assert_called_once_with(
+            self.session, processors, run.get_mxbiflow().trials, "task"
+        )
         self.mocks["deliver_session_report"].assert_called_once_with(
-            self.session, processors
+            self.mocks["build_session_report"].return_value
         )
         self.steps.done.assert_any_call("send_report", url="https://mote/r/1")
 

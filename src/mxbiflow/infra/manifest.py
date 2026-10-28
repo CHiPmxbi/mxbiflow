@@ -24,11 +24,11 @@ MANIFEST_VERSION = 1
 
 def describe(scene_manager: SceneManager, base_path: Path) -> dict[str, Any]:
     """Return the manifest of the experiment at ``base_path`` with its registered stages."""
-    project = tomllib.loads((base_path / "pyproject.toml").read_text(encoding="utf-8"))
+    project = _project(base_path)
     return {
         "manifest_version": MANIFEST_VERSION,
-        "name": project["project"]["name"],
-        "version": project["project"]["version"],
+        "name": project["name"],
+        "version": project["version"],
         "mxbiflow_version": version("mxbiflow"),
         "config_schema": experiment_config_schema(),
         "hardware_schema": inlined_json_schema(MXBIModel),
@@ -38,6 +38,16 @@ def describe(scene_manager: SceneManager, base_path: Path) -> dict[str, Any]:
             if scene is not IDLE
         ],
     }
+
+
+def experiment_name(base_path: Path) -> str:
+    """The experiment's package name, as the manifest names it."""
+    return str(_project(base_path)["name"])
+
+
+def _project(base_path: Path) -> dict[str, Any]:
+    text = (base_path / "pyproject.toml").read_text(encoding="utf-8")
+    return tomllib.loads(text)["project"]
 
 
 def describe_stage(scene: type[Scene]) -> dict[str, Any]:

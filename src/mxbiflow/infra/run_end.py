@@ -21,7 +21,7 @@ from pymotego.errors import ProblemError
 from ..models.session import Session
 from ..utils.logger import logger
 from .camera_recording import TrialMark
-from .post_processing import StageSummary, summarize
+from .post_processing import StageSummary, accuracy, summarize
 
 #: Broadcast that receives one summary per run.
 SUMMARY_BROADCAST = "run-summary"
@@ -63,13 +63,6 @@ class RunSummary(BaseModel):
 
 def run_summary(session: Session, trials: Sequence[TrialMark]) -> RunSummary:
     summary = summarize(session)
-
-    def accuracy(animal: str) -> float | None:
-        judged = [
-            t.correct for t in trials if t.animal == animal and t.correct is not None
-        ]
-        return sum(judged) / len(judged) if judged else None
-
     return RunSummary(
         session_id=summary.session_id,
         started_at=summary.start_at,
@@ -79,7 +72,7 @@ def run_summary(session: Session, trials: Sequence[TrialMark]) -> RunSummary:
             AnimalRun(
                 name=animal.name,
                 trials=animal.total_trials,
-                accuracy=accuracy(animal.name),
+                accuracy=accuracy(trials, animal.name),
                 duration_seconds=animal.total_duration_seconds,
                 stages=animal.stages,
             )

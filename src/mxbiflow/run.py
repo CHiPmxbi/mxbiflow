@@ -16,9 +16,13 @@ from .infra.cogmatrix_sync import CogMatrixRecorder
 from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
 from .infra.hardware_config import sync_hardware_config
-from .infra.manifest import describe
+from .infra.manifest import describe, experiment_name
 from .infra.notify import notify
-from .infra.post_processing import StagePostProcessor, deliver_session_report
+from .infra.post_processing import (
+    StagePostProcessor,
+    build_session_report,
+    deliver_session_report,
+)
 from .infra.run_end import (
     COGMATRIX_STEPS,
     END_SESSION,
@@ -157,8 +161,15 @@ def _finish(
         if send_report:
             steps.start(SEND_REPORT)
             try:
-                steps.done(SEND_REPORT, url=deliver_session_report(session, processors))
+                report = build_session_report(
+                    session,
+                    processors,
+                    mxbiflow.trials,
+                    experiment_name(get_base_path()),
+                )
+                steps.done(SEND_REPORT, url=deliver_session_report(report))
             except Exception as error:  # noqa: BLE001 - logged by the report
+                logger.exception("cannot send the session report")
                 steps.fail(
                     [SEND_REPORT], str(error) or type(error).__name__, retry=False
                 )
