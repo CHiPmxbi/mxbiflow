@@ -48,7 +48,7 @@ reportPrivateUsage = "error"
 # the tracker have to be updated together.
 py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "44b684b56a413ba776aa8bea511c3864f7e36e0c" }
 pymotego = { git = "https://github.com/cagelab/pymoteGO.git", rev = "2460e4509440a78fab011acb613c80b1b4d01329" }
-cogmatrix = { git = "https://github.com/cagelab/cogmatrix-python.git", subdirectory = "packages/sdk", rev = "a6f555a567454688defff10fddb3534463e85358" }
+cogmatrix = { git = "https://github.com/cagelab/cogmatrix-python.git", subdirectory = "packages/sdk", rev = "2c3c156e5545684e31b2349ea02dcaecd5b56860" }
 
 
 [project.scripts]

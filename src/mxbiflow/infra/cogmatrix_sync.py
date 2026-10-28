@@ -7,9 +7,13 @@ animals are the subjects. Every step is kept in a local record under
 ``.mxbiflow/state/cogmatrix/`` until CogMatrix has it, so a run that started
 offline or whose uploads failed is completed at the next start.
 
-Camera recordings (#195) are uploaded after the results and deleted locally
-once CogMatrix has them; a recording that MediaMTX's retention already removed
-is skipped.
+The node registers as an uploader of the session when it creates it and
+uploads with ``sessions.upload_data`` (#216): the results with the list kept
+open, then the camera recordings (#195), closing it. CogMatrix skips what it
+already has, so a retry uploads only the rest, and marks the session's data
+complete once every file arrived. Recordings are deleted locally once
+CogMatrix has them; a recording that MediaMTX's retention already removed is
+skipped.
 
 A run that never ended, because the rig lost power or the process died (#193),
 is ended as ``aborted`` at the next start, at its last result write, with the
@@ -82,9 +86,10 @@ class PendingRun(BaseModel):
     ended_at: datetime | None = None
     status: ExperimentSessionStatus = ExperimentSessionStatus.completed
     ended: bool = False
+    registered: bool = False
+    """The node is an uploader of the session, so CogMatrix waits for its files."""
     files: list[str] = Field(default_factory=list)
     recordings: list[str] = Field(default_factory=list)
-    uploaded: list[str] = Field(default_factory=list)
 
 
 def get_cogmatrix_state_path() -> Path:
@@ -242,12 +247,17 @@ class CogMatrixRecorder:
                     run.session_id = str(created.id)
                     _save(run_dir, run)
                     logger.info("CogMatrix session %s created", run.session_id)
+                session_id = UUID(run.session_id)
+                if not run.registered:
+                    client.sessions.upload_data(session_id, [], complete=False)
+                    run.registered = True
+                    _save(run_dir, run)
                 if run.ended_at is None:
                     return False
                 if not run.ended:
                     client.sessions.end(
                         EndExperimentSessionInput(
-                            id=UUID(run.session_id),
+                            id=session_id,
                             status=run.status,
                             # CogMatrix needs the end strictly after the start; a run
                             # that died before writing anything ends at its start.
@@ -262,45 +272,31 @@ class CogMatrixRecorder:
                     steps.done(
                         END_SESSION, url=session_url(run.endpoint, run.session_id)
                     )
-                    done = sum(file in run.uploaded for file in run.files)
-                    steps.start(UPLOAD_RESULTS, done=done, total=len(run.files))
-                for file in run.files:
-                    if file in run.uploaded:
-                        continue
-                    client.data_assets.upload(
-                        file,
-                        repository_id=_repository_id(run.config),
-                        session_id=UUID(run.session_id),
-                        name=_asset_name(file, run_dir),
-                    )
-                    run.uploaded.append(file)
-                    _save(run_dir, run)
-                    if steps is not None:
-                        steps.progress(
-                            UPLOAD_RESULTS, len(set(run.uploaded) & set(run.files))
-                        )
+                    steps.start(UPLOAD_RESULTS, done=0, total=len(run.files))
+                repository_id = _repository_id(run.config)
+                client.sessions.upload_data(
+                    session_id,
+                    {_asset_name(file, run_dir): Path(file) for file in run.files},
+                    repository_id=repository_id,
+                    complete=False,
+                )
+                recordings = [Path(f) for f in run.recordings]
+                for gone in [f for f in recordings if not f.is_file()]:
+                    logger.warning("camera recording %s is gone", gone)
+                recordings = [f for f in recordings if f.is_file()]
                 if steps is not None:
+                    steps.progress(UPLOAD_RESULTS, len(run.files))
                     steps.done(UPLOAD_RESULTS)
-                    left = [Path(f) for f in run.recordings if f not in run.uploaded]
-                    total = sum(f.stat().st_size for f in left if f.is_file())
+                    total = sum(f.stat().st_size for f in recordings)
                     steps.start(UPLOAD_RECORDING, done=0, total=total, unit=True)
                     sent = 0
-                for file in run.recordings:
-                    if file in run.uploaded:
-                        continue
-                    recording = Path(file)
-                    if recording.is_file():
-                        client.data_assets.upload(
-                            recording,
-                            repository_id=_repository_id(run.config),
-                            session_id=UUID(run.session_id),
-                            name=f"camera-{recording.name}",
-                        )
-                        recording.unlink()
-                    else:
-                        logger.warning("camera recording %s is gone", file)
-                    run.uploaded.append(file)
-                    _save(run_dir, run)
+                client.sessions.upload_data(
+                    session_id,
+                    {f"camera-{f.name}": f for f in recordings},
+                    repository_id=repository_id,
+                )
+                for recording in recordings:
+                    recording.unlink()
                 if steps is not None:
                     steps.done(UPLOAD_RECORDING)
         except Exception as error:  # noqa: BLE001 - kept for the next start

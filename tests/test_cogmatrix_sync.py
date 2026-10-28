@@ -2,13 +2,18 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
 from typing import Any, Self
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
 import httpx
-from cogmatrix import CodeVersion, ExperimentSessionStatus
+from cogmatrix import (
+    CodeVersion,
+    ExperimentSessionStatus,
+    SessionDataMismatch,
+    SessionFileOutcome,
+)
 from pydantic import JsonValue
 from test_session import make_session
 
@@ -41,7 +46,12 @@ CODE = CodeVersion(
 
 
 class FakeCogMatrix:
-    """Records calls; `fail` names the calls that raise once, `offline` fails all."""
+    """Records calls; `fail` names the calls that raise once, `offline` fails all.
+
+    ``upload_data`` keeps what the session has, so a repeated call uploads only
+    the rest; ``uploads`` lists every file it sent. ``mismatch`` names assets
+    CogMatrix holds with other content.
+    """
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
@@ -49,7 +59,9 @@ class FakeCogMatrix:
         self.offline = False
         self.endpoints: list[str] = []
         self.sessions = self
-        self.data_assets = self
+        self.arrived: set[str] = set()
+        self.mismatch: set[str] = set()
+        self.uploads: list[dict[str, Any]] = []
 
     def __call__(self, endpoint: str, storage: Any = None) -> Self:
         self.storage = storage
@@ -82,14 +94,44 @@ class FakeCogMatrix:
     def end(self, input: Any) -> None:
         self._record("end", input)
 
-    def upload(self, path: str, **kwargs: Any) -> None:
-        self._record("upload", {"path": path, **kwargs})
-        # Sends the file in one storage PUT, as small CogMatrix uploads do.
-        request = httpx.Request(
-            "PUT", "https://s3.example/x", content=Path(path).read_bytes()
+    def upload_data(
+        self,
+        session_id: UUID,
+        files: Any,
+        *,
+        repository_id: UUID | None = None,
+        complete: bool = True,
+    ) -> None:
+        named: dict[str, Path] = dict(files)
+        self._record(
+            "upload_data",
+            {
+                "session_id": session_id,
+                "names": list(named),
+                "repository_id": repository_id,
+                "complete": complete,
+            },
         )
-        for hook in self.storage.event_hooks["response"]:
-            hook(httpx.Response(200, request=request))
+        for name, path in named.items():
+            if name in self.arrived or name in self.mismatch:
+                continue
+            if "upload" in self.fail:
+                self.fail.discard("upload")
+                raise ConnectionError("upload failed")
+            # Sends the file in one storage PUT, as small CogMatrix uploads do.
+            request = httpx.Request(
+                "PUT", "https://s3.example/x", content=path.read_bytes()
+            )
+            for hook in self.storage.event_hooks["response"]:
+                hook(httpx.Response(200, request=request))
+            self.arrived.add(name)
+            self.uploads.append({"name": name, "path": path})
+        if self.mismatch & set(named):
+            files = [
+                SimpleNamespace(name=n, outcome=SessionFileOutcome.MISMATCH)
+                for n in sorted(self.mismatch & set(named))
+            ]
+            raise SessionDataMismatch(SimpleNamespace(files=files))  # type: ignore[arg-type]
 
 
 class CogMatrixRecorderTests(unittest.TestCase):
@@ -142,29 +184,57 @@ class CogMatrixRecorderTests(unittest.TestCase):
     def names(self) -> list[str]:
         return [name for name, _ in self.fake.calls]
 
+    def data_calls(self) -> list[dict[str, Any]]:
+        return [value for name, value in self.fake.calls if name == "upload_data"]
+
     def test_records_a_run_and_forgets_it(self) -> None:
         self.run_session(self.recorder())
 
-        self.assertEqual(self.names(), ["create", "end", "upload", "upload"])
+        self.assertEqual(
+            self.names(), ["create", "upload_data", "end", "upload_data", "upload_data"]
+        )
         create = self.fake.calls[0][1]
         self.assertEqual(create["protocol_id"], UUID(PROTOCOL))
         self.assertEqual(create["config"], CONFIG)
         self.assertEqual(create["code"], CODE)
         self.assertEqual(self.fake.endpoints[0], "https://matrix.example/api/graphql")
-        end = self.fake.calls[1][1]
+        end = self.fake.calls[2][1]
         self.assertEqual(
             (end.id, end.status), (UUID(int=7), ExperimentSessionStatus.completed)
         )
-        uploads = [value for name, value in self.fake.calls if name == "upload"]
+        register, results, recordings = self.data_calls()
         self.assertEqual(
-            {Path(u["path"]).name for u in uploads}, {"result.jsonl", "session.json"}
+            register,
+            {
+                "session_id": UUID(int=7),
+                "names": [],
+                "repository_id": None,
+                "complete": False,
+            },
         )
-        self.assertTrue(all(u["session_id"] == UUID(int=7) for u in uploads))
-        self.assertTrue(all(u["repository_id"] == UUID(REPOSITORY) for u in uploads))
         self.assertEqual(
-            {u["name"] for u in uploads}, {"animal-1-s-result.jsonl", "session.json"}
+            results,
+            {
+                "session_id": UUID(int=7),
+                "names": ["animal-1-s-result.jsonl", "session.json"],
+                "repository_id": UUID(REPOSITORY),
+                "complete": False,
+            },
+        )
+        self.assertEqual((recordings["names"], recordings["complete"]), ([], True))
+        self.assertEqual(
+            [Path(u["path"]).name for u in self.fake.uploads],
+            ["result.jsonl", "session.json"],
         )
         self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_registers_as_uploader_when_the_run_starts(self) -> None:
+        session = make_session()
+        session.start(self.root / "data")
+        self.recorder().start(session)
+
+        self.assertEqual(self.names(), ["create", "upload_data"])
+        self.assertEqual(self.data_calls()[0]["complete"], False)
 
     def test_an_offline_run_is_completed_at_the_next_start(self) -> None:
         self.fake.offline = True
@@ -179,20 +249,49 @@ class CogMatrixRecorderTests(unittest.TestCase):
         self.fake.offline = False
         self.recorder().retry_pending()
 
-        self.assertEqual(self.names(), ["create", "end", "upload", "upload"])
+        self.assertEqual(
+            self.names(), ["create", "upload_data", "end", "upload_data", "upload_data"]
+        )
+        self.assertEqual(len(self.fake.uploads), 2)
         self.assertEqual(list(self.state.iterdir()), [])
 
     def test_failed_uploads_are_retried_without_repeating_done_steps(self) -> None:
         self.fake.fail = {"upload"}
         self.run_session(self.recorder())
 
-        self.assertEqual(self.names(), ["create", "end"])
+        self.assertEqual(self.names(), ["create", "upload_data", "end", "upload_data"])
+        self.assertEqual(self.fake.uploads, [])
         [run_dir] = list(self.state.iterdir())
 
         self.recorder().retry_pending()
 
-        self.assertEqual(self.names(), ["create", "end", "upload", "upload"])
+        self.assertEqual(
+            self.names()[4:], ["upload_data", "upload_data"], "end is not repeated"
+        )
+        self.assertEqual(
+            [u["name"] for u in self.fake.uploads],
+            ["animal-1-s-result.jsonl", "session.json"],
+        )
         self.assertFalse(run_dir.exists())
+
+    def test_a_mismatch_keeps_the_run_and_its_recordings(self) -> None:
+        steps = self.steps(Mock())
+        recordings = self.recordings()
+        self.fake.mismatch = {"session.json"}
+
+        self.run_session(self.recorder(), recordings, steps)
+
+        [run_dir] = list(self.state.iterdir())
+        self.assertTrue(all(file.is_file() for file in recordings))
+        _, results, _ = steps.steps
+        self.assertEqual((results.state, results.retry), ("failed", True))
+        self.assertIn("session.json", results.reason or "")
+
+        self.fake.mismatch = set()  # someone invalidated the wrong asset
+        self.recorder().retry_pending()
+
+        self.assertFalse(run_dir.exists())
+        self.assertFalse(any(file.exists() for file in recordings))
 
     def test_recordings_are_uploaded_last_and_deleted(self) -> None:
         recordings = self.recordings()
@@ -203,9 +302,8 @@ class CogMatrixRecorderTests(unittest.TestCase):
 
         self.recorder().retry_pending()
 
-        uploads = [value for name, value in self.fake.calls if name == "upload"]
         self.assertEqual(
-            [u["name"] for u in uploads[2:]],
+            [u["name"] for u in self.fake.uploads[2:]],
             [
                 "camera-2026-10-27_09-00-00-000000.mp4",
                 "camera-2026-10-27_09-00-00-000000.vtt",
@@ -220,7 +318,7 @@ class CogMatrixRecorderTests(unittest.TestCase):
 
         self.run_session(self.recorder(), recordings)
 
-        self.assertEqual(len(self.names()), 5)
+        self.assertEqual(len(self.fake.uploads), 3)
         self.assertEqual(list(self.state.iterdir()), [])
 
     def test_recordings_of_a_run_not_in_cogmatrix_are_kept(self) -> None:
@@ -238,7 +336,7 @@ class CogMatrixRecorderTests(unittest.TestCase):
         session.end()
         recorder.finish(session, aborted=True)
 
-        end = self.fake.calls[1][1]
+        end = self.fake.calls[2][1]
         self.assertEqual(end.status, ExperimentSessionStatus.aborted)
 
     def steps(self, client: Mock) -> RunEnd:
@@ -294,12 +392,14 @@ class CogMatrixRecorderTests(unittest.TestCase):
 
         self.recorder().retry_pending()
 
-        self.assertEqual(self.names(), ["create", "end", "upload"])
-        end = self.fake.calls[1][1]
+        self.assertEqual(
+            self.names(), ["create", "upload_data", "end", "upload_data", "upload_data"]
+        )
+        end = self.fake.calls[2][1]
         self.assertEqual(end.status, ExperimentSessionStatus.aborted)
         assert session.start_at is not None
         self.assertGreaterEqual(end.ended_at, session.start_at.replace(microsecond=0))
-        self.assertEqual(self.fake.calls[2][1]["name"], "animal-1-s-result.jsonl")
+        self.assertEqual(self.data_calls()[1]["names"], ["animal-1-s-result.jsonl"])
         self.assertEqual(list(self.state.iterdir()), [])
 
     def test_a_run_that_died_before_any_result_ends_after_its_start(self) -> None:
@@ -310,8 +410,11 @@ class CogMatrixRecorderTests(unittest.TestCase):
 
         self.recorder().retry_pending()
 
-        self.assertEqual(self.names(), ["create", "end"])
-        end = self.fake.calls[1][1]
+        self.assertEqual(
+            self.names(), ["create", "upload_data", "end", "upload_data", "upload_data"]
+        )
+        self.assertEqual(self.data_calls()[-1]["complete"], True)
+        end = self.fake.calls[2][1]
         self.assertEqual(end.status, ExperimentSessionStatus.aborted)
         create = self.fake.calls[0][1]
         self.assertGreater(end.ended_at, create["started_at"])
