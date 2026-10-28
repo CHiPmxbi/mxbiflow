@@ -55,20 +55,11 @@ class PostProcessingResult:
     figures: Mapping[str, bytes] = field(default_factory=dict[str, bytes])
 
 
-#: Width in inches of a report figure: the email shows images 560 px wide.
-FIGURE_WIDTH_IN = 5.6
+def figure_png(figure: Figure, *, dpi: int = 100) -> bytes:
+    """Return ``figure`` as PNG bytes.
 
-
-def report_figure(height_in: float = 3.5) -> Figure:
-    """A blank figure that reads well at the email's 560 px image width."""
-    return Figure(figsize=(FIGURE_WIDTH_IN, height_in), layout="constrained")
-
-
-def figure_png(figure: Figure, *, dpi: int = 200) -> bytes:
-    """Return ``figure`` as PNG bytes, at twice the 560 px width for sharp screens.
-
-    Build figures with :func:`report_figure` (a ``matplotlib.figure.Figure`` rather than
-    pyplot, so no GUI backend is involved and nothing has to be closed).
+    Build figures with ``matplotlib.figure.Figure`` rather than pyplot, so no GUI backend
+    is involved and nothing has to be closed.
     """
     buffer = BytesIO()
     figure.savefig(buffer, format="png", dpi=dpi, bbox_inches="tight")
@@ -76,21 +67,6 @@ def figure_png(figure: Figure, *, dpi: int = 200) -> bytes:
 
 
 class StagePostProcessor(ABC):
-    """Builds one stage's section of the daily report.
-
-    mxbiflow writes the fixed part (title, session stats, animals, session details);
-    a stage's section follows this convention so every report reads the same:
-
-    - a ``Heading`` with the stage name;
-    - one line of key numbers (trials, accuracy, median reaction time, ...) as a
-      ``Stats`` block of at most six items, or a ``KeyValue`` block;
-    - one or more figures, each an ``Image`` block with a caption; draw them on
-      :func:`report_figure` and encode them with :func:`figure_png`.
-
-    Tables of per-animal details may follow. Round numbers yourself: blocks show values
-    as given.
-    """
-
     @abstractmethod
     def process(
         self,

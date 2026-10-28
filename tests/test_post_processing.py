@@ -17,7 +17,6 @@ from mxbiflow.infra.post_processing import (
     accuracy,
     build_session_report,
     figure_png,
-    report_figure,
     send_session_report,
     session_overview,
     summarize,
@@ -274,12 +273,6 @@ class SessionReportTests(unittest.TestCase):
         figure = Figure(figsize=(2, 1))
         figure.add_subplot().plot([0, 1], [1, 0])
         self.assertTrue(figure_png(figure).startswith(b"\x89PNG\r\n\x1a\n"))
-
-    def test_report_figure_is_twice_the_email_width(self) -> None:
-        figure = report_figure()
-        figure.add_subplot().plot([0, 1], [1, 0])
-        width = int.from_bytes(figure_png(figure)[16:20])
-        self.assertAlmostEqual(width, 1120, delta=40)
 
 
 if __name__ == "__main__":
