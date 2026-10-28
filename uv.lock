@@ -103,7 +103,7 @@ wheels = [
 [[package]]
 name = "cogmatrix"
 version = "0.1.0"
-source = { git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=a6f555a567454688defff10fddb3534463e85358#a6f555a567454688defff10fddb3534463e85358" }
+source = { git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=2c3c156e5545684e31b2349ea02dcaecd5b56860#2c3c156e5545684e31b2349ea02dcaecd5b56860" }
 dependencies = [
     { name = "graphql-core" },
     { name = "httpx" },
@@ -625,7 +625,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cogmatrix", extras = ["auth"], git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=a6f555a567454688defff10fddb3534463e85358" },
+    { name = "cogmatrix", extras = ["auth"], git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=2c3c156e5545684e31b2349ea02dcaecd5b56860" },
     { name = "gpiozero", specifier = ">=2.0.1.post3" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "inflection", specifier = ">=0.5.1" },
