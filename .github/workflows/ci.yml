@@ -24,12 +24,20 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libportaudio2 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
             xvfb
+      # Private git dependencies, read with a one-hour token of the cogsoma-ci GitHub App.
+      - id: cagelab-token
+        uses: actions/create-github-app-token@v3.3.0
+        with:
+          client-id: ${{ vars.CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          owner: cagelab
+          repositories: cogmatrix-python,pymoteGO
       - name: Grant read access to private git dependencies
         env:
-          CAGELAB_READ_TOKEN: ${{ secrets.CAGELAB_READ_TOKEN }}
+          CAGELAB_TOKEN: ${{ steps.cagelab-token.outputs.token }}
         run: >-
           git config --global
-          url."https://x-access-token:${CAGELAB_READ_TOKEN}@github.com/cagelab/".insteadOf
+          url."https://x-access-token:${CAGELAB_TOKEN}@github.com/cagelab/".insteadOf
           "https://github.com/cagelab/"
       - uses: astral-sh/setup-uv@v10.2.0
       - run: uv sync --locked
