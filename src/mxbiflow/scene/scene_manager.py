@@ -1,5 +1,6 @@
 from pygame import Event, Surface
 
+from ..commands import CommandRegistry
 from .idle.idle import IDLE
 from .scene import Scene
 
@@ -14,6 +15,8 @@ class SceneManager:
         self._pending: Scene | None = None
         self._default_scene: type[Scene] = IDLE
         self._fault_fallback: type[Scene] = IDLE
+        #: The experiment's own remote commands, registered next to its stages.
+        self.commands = CommandRegistry()
 
         self.register([IDLE])
 

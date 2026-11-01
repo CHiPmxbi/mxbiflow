@@ -1,19 +1,22 @@
 """Remote control of the game loop through cogmoteGO's command proxy.
 
-cogmote and agents send commands to ``POST /proxies/mxbiflow/requests`` on
-cogmoteGO; the game loop polls them once per frame and runs the same actions
-as the keyboard shortcuts. See ``docs/remote-control.md``.
+The game loop registers the proxy ``mxbiflow`` with the commands of a
+:class:`~mxbiflow.commands.CommandRegistry`: the built-in ones below, which
+run the same actions as the keyboard shortcuts, and the experiment's own.
+It polls them once per frame and replies with each command's result. See
+``docs/remote-control.md``.
 """
 
 import time
-from collections.abc import Callable
-from typing import Annotated, Literal, Protocol
+from collections.abc import Callable, Sequence
+from typing import Literal, Protocol
 
-from pydantic import BaseModel, Field, JsonValue, TypeAdapter, ValidationError
-from pymotego import CommandProxy, HandshakeError
+from pydantic import BaseModel, Field, create_model
+from pymotego import CommandDescription, CommandProxy, HandshakeError
 
 from mxbiflow.driver.rewarder.rewarder import Rewarder
 
+from ..commands import CommandRegistry, NoParams, RemoteCommand, Reply
 from ..utils.logger import logger
 
 #: Proxy name the game loop registers with cogmoteGO.
@@ -41,40 +44,80 @@ class RemoteScheduler(Protocol):
     def resume(self) -> None: ...
 
 
-class _SimpleCommand(BaseModel):
-    command: Literal[
-        "level_up",
-        "level_down",
-        "next_stage",
-        "prev_stage",
-        "pause",
-        "resume",
-        "screenshot",
-        "quit",
+class RewardParams(BaseModel):
+    duration_ms: int = Field(gt=0, le=10_000, title="Duration (ms)")
+
+
+def builtin_commands(
+    *,
+    scheduler: RemoteScheduler,
+    rewarder: Rewarder,
+    on_capture: Callable[[], None],
+    on_quit: Callable[[], None],
+    stages: Sequence[str],
+) -> list[RemoteCommand]:
+    """mxbiflow's own commands; ``switch_stage`` offers the registered ``stages``."""
+
+    def simple(
+        name: str, title: str, action: Callable[[], None], **kwargs: bool | str
+    ) -> RemoteCommand:
+        return RemoteCommand(
+            name=name,
+            title=title,
+            handler=lambda _params: action(),
+            params=NoParams,
+            **kwargs,  # pyright: ignore[reportArgumentType]
+        )
+
+    def reward(params: RewardParams) -> Reply:
+        rewarder.give_reward(params.duration_ms)
+        return Reply(message=f"gave a {params.duration_ms} ms reward")
+
+    commands = [
+        simple("level_up", "Level up", scheduler.level_up),
+        simple("level_down", "Level down", scheduler.level_down),
+        simple("next_stage", "Next stage", scheduler.next_stage),
+        simple("prev_stage", "Previous stage", scheduler.prev_stage),
     ]
-
-
-class _SwitchStage(BaseModel):
-    command: Literal["switch_stage"]
-    stage: str = Field(min_length=1)
-
-
-class _Reward(BaseModel):
-    command: Literal["reward"]
-    duration_ms: int = Field(gt=0, le=10_000)
-
-
-type Command = Annotated[
-    _SimpleCommand | _SwitchStage | _Reward, Field(discriminator="command")
-]
-
-# pydantic resolves `type` aliases; its stubs do not accept them yet.
-_command_adapter: TypeAdapter[Command] = TypeAdapter(Command)  # pyright: ignore[reportArgumentType]
-
-
-def parse_command(body: JsonValue) -> Command:
-    """Validate a command body; raises ``ValidationError`` when it is invalid."""
-    return _command_adapter.validate_python(body)
+    if stages:
+        switch_params = create_model(
+            "SwitchStageParams",
+            stage=(Literal[tuple(stages)], Field(title="Stage")),  # pyright: ignore[reportInvalidTypeForm, reportArgumentType]
+        )
+        commands.append(
+            RemoteCommand(
+                name="switch_stage",
+                title="Switch stage",
+                description="Move the current animal to a registered stage.",
+                handler=lambda params: scheduler.switch_stage(params.stage),  # pyright: ignore[reportAttributeAccessIssue]
+                params=switch_params,
+            )
+        )
+    commands += [
+        RemoteCommand(
+            name="reward",
+            title="Give reward",
+            description="Manual reward on rewarder 0.",
+            handler=reward,
+            params=RewardParams,
+        ),
+        simple(
+            "pause",
+            "Pause",
+            scheduler.pause,
+            description="Show IDLE and start no task; a running trial is aborted.",
+        ),
+        simple("resume", "Resume", scheduler.resume),
+        simple("screenshot", "Screenshot", on_capture),
+        simple(
+            "quit",
+            "Quit",
+            on_quit,
+            description="End the run, as Esc does.",
+            confirm=True,
+        ),
+    ]
+    return commands
 
 
 class RemoteControl:
@@ -86,18 +129,14 @@ class RemoteControl:
 
     def __init__(
         self,
+        commands: CommandRegistry,
         *,
-        scheduler: RemoteScheduler,
-        rewarder: Rewarder,
-        on_capture: Callable[[], None],
-        on_quit: Callable[[], None],
-        connect: Callable[[], CommandProxy] = lambda: CommandProxy(PROXY_NAME),
+        connect: Callable[[Sequence[CommandDescription]], CommandProxy] = (
+            lambda descriptions: CommandProxy(PROXY_NAME, descriptions)
+        ),
         retry_interval_s: float = 5.0,
     ) -> None:
-        self._scheduler = scheduler
-        self._rewarder = rewarder
-        self._on_capture = on_capture
-        self._on_quit = on_quit
+        self._commands = commands
         self._connect = connect
         self._retry_interval_s = retry_interval_s
         self._proxy: CommandProxy | None = None
@@ -109,47 +148,11 @@ class RemoteControl:
         if proxy is None:
             return
         for _ in range(_MAX_COMMANDS_PER_POLL):
-            body = proxy.get_command()
-            if body is None:
+            command = proxy.get_command()
+            if command is None:
                 return
-            self.dispatch(body)
-
-    def dispatch(self, body: JsonValue) -> None:
-        """Run one command body; invalid or failing commands are logged."""
-        try:
-            command = parse_command(body)
-        except ValidationError as error:
-            logger.warning("remote command rejected: %s (%s)", body, error)
-            return
-
-        logger.info("remote command: %s", body)
-        try:
-            self._run(command)
-        except Exception:  # noqa: BLE001 - a remote command never ends the run
-            logger.exception("remote command failed: %s", body)
-
-    def _run(self, command: Command) -> None:
-        match command:
-            case _SwitchStage(stage=stage):
-                self._scheduler.switch_stage(stage)
-            case _Reward(duration_ms=duration_ms):
-                self._rewarder.give_reward(duration_ms)
-            case _SimpleCommand(command="level_up"):
-                self._scheduler.level_up()
-            case _SimpleCommand(command="level_down"):
-                self._scheduler.level_down()
-            case _SimpleCommand(command="next_stage"):
-                self._scheduler.next_stage()
-            case _SimpleCommand(command="prev_stage"):
-                self._scheduler.prev_stage()
-            case _SimpleCommand(command="pause"):
-                self._scheduler.pause()
-            case _SimpleCommand(command="resume"):
-                self._scheduler.resume()
-            case _SimpleCommand(command="screenshot"):
-                self._on_capture()
-            case _SimpleCommand(command="quit"):
-                self._on_quit()
+            reply = self._commands.dispatch(command.command, command.params)
+            proxy.reply(command, reply.ok, reply.message, reply.data)
 
     def _ensure_proxy(self) -> CommandProxy | None:
         if self._proxy is not None:
@@ -163,7 +166,7 @@ class RemoteControl:
         first_attempt = self._last_attempt is None
         self._last_attempt = now
         try:
-            self._proxy = self._connect()
+            self._proxy = self._connect(self._commands.describe())
         except (OSError, HandshakeError) as error:
             if first_attempt:
                 logger.warning("command proxy unavailable, retrying: %s", error)

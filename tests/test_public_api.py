@@ -4,6 +4,7 @@ import unittest
 
 import mxbiflow
 from mxbiflow.bootstrap import init_gameloop
+from mxbiflow.commands import CommandRegistry, NoParams, RemoteCommand, Reply
 from mxbiflow.core.context import MXBIFlow, get_mxbiflow
 from mxbiflow.core.path import get_base_path, set_base_path
 from mxbiflow.scene import Scene, SceneManager
@@ -12,7 +13,11 @@ from mxbiflow.scene import Scene, SceneManager
 class PublicApiTests(unittest.TestCase):
     def test_top_level_exports_are_explicit(self) -> None:
         expected_exports = {
+            "CommandRegistry",
             "MXBIFlow",
+            "NoParams",
+            "RemoteCommand",
+            "Reply",
             "Scene",
             "SceneManager",
             "get_base_path",
@@ -23,6 +28,10 @@ class PublicApiTests(unittest.TestCase):
 
         self.assertEqual(set(mxbiflow.__all__), expected_exports)
         self.assertIs(mxbiflow.MXBIFlow, MXBIFlow)
+        self.assertIs(mxbiflow.CommandRegistry, CommandRegistry)
+        self.assertIs(mxbiflow.NoParams, NoParams)
+        self.assertIs(mxbiflow.RemoteCommand, RemoteCommand)
+        self.assertIs(mxbiflow.Reply, Reply)
         self.assertIs(mxbiflow.Scene, Scene)
         self.assertIs(mxbiflow.SceneManager, SceneManager)
         self.assertIs(mxbiflow.get_base_path, get_base_path)
