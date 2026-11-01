@@ -5,13 +5,15 @@ from pygame import Event
 
 from mxbiflow.driver import MXBI
 
+from ..commands import CommandRegistry
 from ..core.context import MXBIFlow, set_mxbiflow
 from ..core.path import get_data_dir_path
 from ..models.session import Session
 from ..scene import SceneManager
+from ..scene.idle.idle import IDLE
 from ..utils.logger import logger
 from .detector_bridge import DetectorBridge
-from .remote_control import RemoteControl
+from .remote_control import RemoteControl, builtin_commands
 from .scheduler import Scheduler
 from .shortcuts import ShortcutRegistry, register_default_shortcuts
 
@@ -55,11 +57,15 @@ class Game:
             manual_control=self._scheduler,
         )
 
-        self._remote_control = RemoteControl(
+        builtins = builtin_commands(
             scheduler=self._scheduler,
             rewarder=self._mxbi.rewarder,
             on_capture=self._capture_screen,
             on_quit=self.request_quit,
+            stages=[name for name in scene_manager.scenes if name != IDLE.name()],
+        )
+        self._remote_control = RemoteControl(
+            CommandRegistry([*builtins, *scene_manager.commands.commands])
         )
 
         self._mxbiflow = MXBIFlow(self._session, self._mxbi)

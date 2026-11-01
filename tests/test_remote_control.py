@@ -1,8 +1,12 @@
 import unittest
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 
-from pydantic import JsonValue
+from pydantic import BaseModel, Field, JsonValue
+from pymotego import Command, CommandDescription
 
-from mxbiflow.gameloop.remote_control import RemoteControl
+from mxbiflow.commands import CommandRegistry, Reply
+from mxbiflow.gameloop.remote_control import RemoteControl, builtin_commands
 
 
 class FakeScheduler:
@@ -55,15 +59,106 @@ class FakeRewarder:
 
 
 class FakeProxy:
-    def __init__(self, commands: list[JsonValue]) -> None:
-        self.commands = commands
+    def __init__(self) -> None:
+        self.commands: list[Command] = []
+        self.replies: list[tuple[str, bool, str | None, JsonValue]] = []
+        self.descriptions: Sequence[CommandDescription] = ()
         self.closed = False
 
-    def get_command(self, timeout: float = 0) -> JsonValue | None:
+    def push(self, command: str, **params: JsonValue) -> None:
+        self.commands.append(
+            Command(
+                id=str(len(self.commands)),
+                command=command,
+                params=params,
+                expires_at=datetime.now(UTC) + timedelta(seconds=5),
+            )
+        )
+
+    def get_command(self, timeout: float = 0) -> Command | None:
         return self.commands.pop(0) if self.commands else None
+
+    def reply(
+        self,
+        command: Command,
+        ok: bool,
+        message: str | None = None,
+        data: JsonValue = None,
+    ) -> None:
+        self.replies.append((command.command, ok, message, data))
 
     def close(self) -> None:
         self.closed = True
+
+
+class Hint(BaseModel):
+    side: str = Field(pattern="^(left|right)$")
+
+
+class RegistryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.registry = CommandRegistry()
+        self.hints: list[str] = []
+
+        @self.registry.command(
+            "show_hint", title="Show hint", params=Hint, confirm=True
+        )
+        def show_hint(params: Hint) -> Reply:
+            self.hints.append(params.side)
+            return Reply(message=f"hint on the {params.side}", data={"n": 1})
+
+        @self.registry.command("noop", title="No-op")
+        def noop(_params: object) -> None:
+            pass
+
+    def test_describes_commands(self) -> None:
+        descriptions = [
+            d.model_dump(mode="json", exclude_none=True)
+            for d in self.registry.describe()
+        ]
+        self.assertEqual(
+            descriptions,
+            [
+                {
+                    "name": "show_hint",
+                    "title": "Show hint",
+                    "params": Hint.model_json_schema(),
+                    "confirm": True,
+                },
+                {"name": "noop", "title": "No-op", "confirm": False},
+            ],
+        )
+
+    def test_dispatches_validated_params(self) -> None:
+        reply = self.registry.dispatch("show_hint", {"side": "left"})
+        self.assertEqual(reply, Reply(message="hint on the left", data={"n": 1}))
+        self.assertEqual(self.hints, ["left"])
+        self.assertEqual(self.registry.dispatch("noop", {}), Reply())
+
+    def test_rejects_invalid_commands(self) -> None:
+        for command, params in [
+            ("explode", {}),
+            ("show_hint", {}),
+            ("show_hint", {"side": "up"}),
+            ("noop", {"x": 1}),
+        ]:
+            reply = self.registry.dispatch(command, params)
+            self.assertFalse(reply.ok, (command, params))
+            self.assertTrue(reply.message)
+        self.assertEqual(self.registry.dispatch("explode", {}).message, "unknown command")
+        self.assertIn("side", self.registry.dispatch("show_hint", {}).message or "")
+        self.assertEqual(self.hints, [])
+
+    def test_duplicate_names_are_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.registry.command("noop", title="Again")(lambda _params: None)
+
+    def test_failing_handler_replies_not_ok(self) -> None:
+        @self.registry.command("broken", title="Broken")
+        def broken(_params: object) -> None:
+            raise RuntimeError("boom")
+
+        self.assertEqual(self.registry.dispatch("broken", {}), Reply(ok=False, message="boom"))
 
 
 class RemoteControlTests(unittest.TestCase):
@@ -71,36 +166,67 @@ class RemoteControlTests(unittest.TestCase):
         self.scheduler = FakeScheduler()
         self.rewarder = FakeRewarder()
         self.events: list[str] = []
-        self.proxy = FakeProxy([])
+        self.proxy = FakeProxy()
         self.connects = 0
 
-    def _connect(self) -> FakeProxy:
+    def _connect(self, descriptions: Sequence[CommandDescription]) -> FakeProxy:
         self.connects += 1
+        self.proxy.descriptions = descriptions
         return self.proxy
+
+    def _registry(self) -> CommandRegistry:
+        return CommandRegistry(
+            builtin_commands(
+                scheduler=self.scheduler,
+                rewarder=self.rewarder,  # type: ignore[arg-type]
+                on_capture=lambda: self.events.append("screenshot"),
+                on_quit=lambda: self.events.append("quit"),
+                stages=["detect", "train"],
+            )
+        )
 
     def _remote(self, **kwargs: object) -> RemoteControl:
         return RemoteControl(
-            scheduler=self.scheduler,
-            rewarder=self.rewarder,
-            on_capture=lambda: self.events.append("screenshot"),
-            on_quit=lambda: self.events.append("quit"),
+            self._registry(),
             connect=self._connect,  # type: ignore[arg-type]
             **kwargs,  # type: ignore[arg-type]
         )
 
+    def test_describes_builtin_commands(self) -> None:
+        self._remote().poll()
+        by_name = {d.name: d for d in self.proxy.descriptions}
+        self.assertEqual(
+            list(by_name),
+            [
+                "level_up",
+                "level_down",
+                "next_stage",
+                "prev_stage",
+                "switch_stage",
+                "reward",
+                "pause",
+                "resume",
+                "screenshot",
+                "quit",
+            ],
+        )
+        self.assertIsNone(by_name["pause"].params)
+        self.assertTrue(by_name["quit"].confirm)
+        stage = (by_name["switch_stage"].params or {})["properties"]
+        self.assertEqual(stage["stage"]["enum"], ["detect", "train"])  # type: ignore[index]
+        self.assertEqual(
+            (by_name["reward"].params or {})["required"], ["duration_ms"]
+        )
+
     def test_dispatches_every_command(self) -> None:
-        self.proxy.commands = [
-            {"command": "level_up"},
-            {"command": "level_down"},
-            {"command": "next_stage"},
-            {"command": "prev_stage"},
-            {"command": "switch_stage", "stage": "detect"},
-            {"command": "pause"},
-            {"command": "resume"},
-            {"command": "reward", "duration_ms": 300},
-            {"command": "screenshot"},
-            {"command": "quit"},
-        ]
+        for name in ["level_up", "level_down", "next_stage", "prev_stage"]:
+            self.proxy.push(name)
+        self.proxy.push("switch_stage", stage="detect")
+        self.proxy.push("pause")
+        self.proxy.push("resume")
+        self.proxy.push("reward", duration_ms=300)
+        self.proxy.push("screenshot")
+        self.proxy.push("quit")
         remote = self._remote()
 
         remote.poll()
@@ -119,20 +245,19 @@ class RemoteControlTests(unittest.TestCase):
         )
         self.assertEqual(self.rewarder.rewards, [300])
         self.assertEqual(self.events, ["screenshot", "quit"])
+        self.assertTrue(all(ok for _, ok, _, _ in self.proxy.replies))
+        self.assertIn(("reward", True, "gave a 300 ms reward", None), self.proxy.replies)
 
-    def test_invalid_commands_are_ignored(self) -> None:
-        remote = self._remote()
+    def test_invalid_commands_reply_not_ok(self) -> None:
+        self.proxy.push("explode")
+        self.proxy.push("switch_stage")
+        self.proxy.push("switch_stage", stage="unknown")
+        self.proxy.push("reward", duration_ms=0)
+        self.proxy.push("reward", duration_ms=60_000)
+        self._remote().poll()
 
-        for body in [
-            None,
-            "level_up",
-            {"command": "explode"},
-            {"command": "switch_stage"},
-            {"command": "reward", "duration_ms": 0},
-            {"command": "reward", "duration_ms": 60_000},
-        ]:
-            remote.dispatch(body)
-
+        self.assertEqual(len(self.proxy.replies), 5)
+        self.assertFalse(any(ok for _, ok, _, _ in self.proxy.replies))
         self.assertEqual(self.scheduler.calls, [])
         self.assertEqual(self.rewarder.rewards, [])
 
@@ -141,34 +266,29 @@ class RemoteControlTests(unittest.TestCase):
             raise RuntimeError("boom")
 
         self.scheduler.level_up = broken  # type: ignore[method-assign]
-        remote = self._remote()
-
-        remote.dispatch({"command": "level_up"})
-        remote.dispatch({"command": "level_down"})
+        self.proxy.push("level_up")
+        self.proxy.push("level_down")
+        self._remote().poll()
 
         self.assertEqual(self.scheduler.calls, ["level_down"])
+        self.assertEqual(self.proxy.replies[0], ("level_up", False, "boom", None))
 
     def test_poll_handles_a_bounded_burst(self) -> None:
-        burst: list[JsonValue] = [{"command": "level_up"} for _ in range(25)]
-        self.proxy.commands = burst
-        remote = self._remote()
-
-        remote.poll()
+        for _ in range(25):
+            self.proxy.push("level_up")
+        self._remote().poll()
 
         self.assertEqual(len(self.scheduler.calls), 10)
 
     def test_retries_connecting_after_the_interval(self) -> None:
         attempts: list[int] = []
 
-        def refuse() -> FakeProxy:
+        def refuse(_descriptions: Sequence[CommandDescription]) -> FakeProxy:
             attempts.append(1)
             raise ConnectionRefusedError("cogmoteGO is not running")
 
         remote = RemoteControl(
-            scheduler=self.scheduler,
-            rewarder=self.rewarder,
-            on_capture=lambda: None,
-            on_quit=lambda: None,
+            self._registry(),
             connect=refuse,  # type: ignore[arg-type]
             retry_interval_s=0.0,
         )
@@ -177,10 +297,7 @@ class RemoteControlTests(unittest.TestCase):
         self.assertEqual(len(attempts), 2)
 
         slow = RemoteControl(
-            scheduler=self.scheduler,
-            rewarder=self.rewarder,
-            on_capture=lambda: None,
-            on_quit=lambda: None,
+            self._registry(),
             connect=refuse,  # type: ignore[arg-type]
             retry_interval_s=60.0,
         )
