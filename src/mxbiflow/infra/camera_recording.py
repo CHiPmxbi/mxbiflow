@@ -1,6 +1,6 @@
 """Record the rig camera during a session (#195), with trial subtitles (#197).
 
-MediaMTX serves the Pi camera on path ``mystream`` and already encodes it for
+MediaMTX serves the camera on path ``live`` and already encodes it for
 live viewing, so recording only remuxes to disk. Recording is switched on for
 the session through MediaMTX's local API and off at its end; the fMP4 segments
 it wrote and one WebVTT subtitle file per segment are then uploaded as session
@@ -24,10 +24,10 @@ import httpx
 
 from ..utils.logger import logger
 
-#: MediaMTX's API, enabled on loopback only by CHiPmxbi/setup.
+#: MediaMTX's API, enabled on loopback only by ``cagelab.cogmote``.
 MEDIAMTX_API = "http://127.0.0.1:9997"
-#: The MediaMTX path of the Pi camera.
-CAMERA_PATH = "mystream"
+#: The MediaMTX path of the camera.
+CAMERA_PATH = "live"
 #: MediaMTX runs in the desktop account's home with ``recordPath: ./recordings/%path/...``.
 RECORDINGS_DIR = Path.home() / "recordings" / CAMERA_PATH
 

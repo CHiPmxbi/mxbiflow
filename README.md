@@ -251,11 +251,10 @@ is not recorded.
 
 With **Record the camera** on in the device's cogmote configuration
 (`recording.record_camera`), the rig records its own camera during the game
-loop (`mxbiflow.infra.camera_recording`). MediaMTX serves the Pi camera on path
-`mystream`; mxbiflow switches its recording on and off through MediaMTX's
-loopback API (`PATCH /v3/config/paths/patch/mystream`). MediaMTX writes fMP4
-segments to `~/recordings/mystream/` (CHiPmxbi/setup configures it, with the
-device code and time burned into the image).
+loop (`mxbiflow.infra.camera_recording`). MediaMTX serves the camera on path
+`live`; mxbiflow switches its recording on and off through MediaMTX's
+loopback API (`PATCH /v3/config/paths/patch/live`). MediaMTX writes fMP4
+segments to `~/recordings/live/` (`cagelab.cogmote`'s `mediamtx` role configures it).
 
 At the end of the run mxbiflow writes a WebVTT subtitle file next to each
 segment with one cue per published trial (trial, animal, `stage@level`,

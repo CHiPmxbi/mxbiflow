@@ -69,8 +69,8 @@ class CameraRecordingTests(unittest.TestCase):
         self.assertEqual(
             mediamtx.requests,
             [
-                ("PATCH", "/v3/config/paths/patch/mystream", {"record": True}),
-                ("PATCH", "/v3/config/paths/patch/mystream", {"record": False}),
+                ("PATCH", "/v3/config/paths/patch/live", {"record": True}),
+                ("PATCH", "/v3/config/paths/patch/live", {"record": False}),
             ],
         )
         self.assertEqual(files, [new, new.with_suffix(".vtt")])
