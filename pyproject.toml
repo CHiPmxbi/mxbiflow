@@ -46,7 +46,7 @@ reportPrivateUsage = "error"
 # Pinned to the mx_eye commit that changed the py-mx-eye SDK contract
 # (PJendritza/mx_eye#29). There is no compatibility layer, so the driver and
 # the tracker have to be updated together.
-py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "44b684b56a413ba776aa8bea511c3864f7e36e0c" }
+py-mx-eye = { git = "https://github.com/PJendritza/mx_eye.git", subdirectory = "packages/py-mx-eye", rev = "746868a010685341002ae4a75d206d3485530932" }
 pymotego = { git = "https://github.com/cagelab/pymoteGO.git", rev = "466243f56828a518ac1c74deaa51ea7cafb27273" }
 cogmatrix = { git = "https://github.com/cagelab/cogmatrix-python.git", subdirectory = "packages/sdk", rev = "2c3c156e5545684e31b2349ea02dcaecd5b56860" }
 
