@@ -156,9 +156,8 @@ when the game loop quits.
 Operators configure a run in cogmote instead of the wizard: the cage's
 animals with stage and level, and the parameters. The form is generated from
 the JSON Schema of `mxbiflow.models.ExperimentConfig`, which
-`mxbiflow schema` prints and the experiment manifest carries as `config_schema`;
-cogmote keeps a copy pinned to an mxbiflow commit for devices that report no
-manifest yet. Fields marked `x-mxbi-stage` name a registered stage and get a
+`mxbiflow schema` prints and the experiment manifest carries as its `session`
+setting. Fields marked `x-mxbi-stage` name a registered stage and get a
 stage picker, and each object lists its property order in `x-mxbi-order`.
 cogmote fills in each animal's CogMatrix name and RFID tags and sends the
 configuration to the rig with the device config.
@@ -196,12 +195,33 @@ names the rig in report and CogMatrix session titles.
 ## Experiment manifest and stage configurations
 
 `--describe` (`uv run main.py --describe`) prints the experiment's manifest as
-JSON and exits without a window, hardware or run. The rig's setup writes it
-next to the installed experiment, and cogmote reads it for stage and level
-choices, titles and the stage editor. It holds `manifest_version`, the name and
-version from `pyproject.toml`, the experiment configuration schema, the
-hardware configuration schema (`hardware_schema`), and the stages in registration order with their title, description, levels, stage
+JSON and exits without a window, hardware or run. Deploying writes it to the
+experiment's entry, and cogmote reads it for the settings forms, stage and level
+choices, titles and the stage editor. It holds `manifest_version`,
+`framework: mxbiflow`, the name and version from `pyproject.toml`, the settings
+with their JSON Schemas (`hardware` with scope `device`, `session` with scope
+`run`), and the stages in registration order with their title, description, levels, stage
 configuration schema and `config.json` template.
+
+## What an experiment gets by default
+
+An experiment written with mxbiflow declares nothing to be deployed and started
+(cagelab/cogmote ADR 0005). Its framework gives the defaults:
+
+| | Command |
+| --- | --- |
+| install | `uv sync --locked` |
+| describe | `uv run --locked main.py --describe` |
+| run | `uv run main.py --from-cogmote` |
+
+To change one, put a `cogmote.yaml` in the repository's root. It overrides what it
+names, as an argument list that doesn't go through a shell:
+
+```yaml
+run: [uv, run, --locked, main.py, --from-cogmote]
+```
+
+Changing a command takes a commit and a deploy, so what runs is always a commit.
 
 A stage describes itself with class attributes:
 

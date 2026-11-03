@@ -57,6 +57,7 @@ class RemoteCommand[P: BaseModel]:
     params: type[P]
     description: str | None = None
     confirm: bool = False
+    stop: bool = False
 
     def describe(self) -> CommandDescription:
         return CommandDescription.from_model(
@@ -65,6 +66,7 @@ class RemoteCommand[P: BaseModel]:
             title=self.title,
             description=self.description,
             confirm=self.confirm,
+            stop=self.stop,
         )
 
 
@@ -95,6 +97,7 @@ class CommandRegistry:
         params: type[P] = NoParams,
         description: str | None = None,
         confirm: bool = False,
+        stop: bool = False,
     ) -> Callable[[Handler[P]], Handler[P]]:
         """Register the decorated function as the handler of command ``name``."""
 
@@ -107,6 +110,7 @@ class CommandRegistry:
                     params=params,
                     description=description,
                     confirm=confirm,
+                    stop=stop,
                 )
             )
             return handler
@@ -125,7 +129,9 @@ class CommandRegistry:
                 {"command": command, "params": params}
             )
         except ValidationError as error:
-            logger.warning("remote command rejected: %s %s (%s)", command, params, error)
+            logger.warning(
+                "remote command rejected: %s %s (%s)", command, params, error
+            )
             return Reply(ok=False, message=_reason(error))
 
         logger.info("remote command: %s %s", command, params)

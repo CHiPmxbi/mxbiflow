@@ -124,8 +124,9 @@ class RegistryTests(unittest.TestCase):
                     "title": "Show hint",
                     "params": Hint.model_json_schema(),
                     "confirm": True,
+                    "stop": False,
                 },
-                {"name": "noop", "title": "No-op", "confirm": False},
+                {"name": "noop", "title": "No-op", "confirm": False, "stop": False},
             ],
         )
 
@@ -145,7 +146,9 @@ class RegistryTests(unittest.TestCase):
             reply = self.registry.dispatch(command, params)
             self.assertFalse(reply.ok, (command, params))
             self.assertTrue(reply.message)
-        self.assertEqual(self.registry.dispatch("explode", {}).message, "unknown command")
+        self.assertEqual(
+            self.registry.dispatch("explode", {}).message, "unknown command"
+        )
         self.assertIn("side", self.registry.dispatch("show_hint", {}).message or "")
         self.assertEqual(self.hints, [])
 
@@ -158,7 +161,9 @@ class RegistryTests(unittest.TestCase):
         def broken(_params: object) -> None:
             raise RuntimeError("boom")
 
-        self.assertEqual(self.registry.dispatch("broken", {}), Reply(ok=False, message="boom"))
+        self.assertEqual(
+            self.registry.dispatch("broken", {}), Reply(ok=False, message="boom")
+        )
 
 
 class RemoteControlTests(unittest.TestCase):
@@ -212,11 +217,10 @@ class RemoteControlTests(unittest.TestCase):
         )
         self.assertIsNone(by_name["pause"].params)
         self.assertTrue(by_name["quit"].confirm)
+        self.assertEqual([c.name for c in by_name.values() if c.stop], ["quit"])
         stage = (by_name["switch_stage"].params or {})["properties"]
         self.assertEqual(stage["stage"]["enum"], ["detect", "train"])  # type: ignore[index]
-        self.assertEqual(
-            (by_name["reward"].params or {})["required"], ["duration_ms"]
-        )
+        self.assertEqual((by_name["reward"].params or {})["required"], ["duration_ms"])
 
     def test_dispatches_every_command(self) -> None:
         for name in ["level_up", "level_down", "next_stage", "prev_stage"]:
@@ -246,7 +250,9 @@ class RemoteControlTests(unittest.TestCase):
         self.assertEqual(self.rewarder.rewards, [300])
         self.assertEqual(self.events, ["screenshot", "quit"])
         self.assertTrue(all(ok for _, ok, _, _ in self.proxy.replies))
-        self.assertIn(("reward", True, "gave a 300 ms reward", None), self.proxy.replies)
+        self.assertIn(
+            ("reward", True, "gave a 300 ms reward", None), self.proxy.replies
+        )
 
     def test_invalid_commands_reply_not_ok(self) -> None:
         self.proxy.push("explode")
