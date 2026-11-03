@@ -120,11 +120,17 @@ class DescribeTests(unittest.TestCase):
                 run.run_experiment(scenes, argv=["--describe"])
 
         manifest = json.loads(out.getvalue())
-        self.assertEqual(manifest["manifest_version"], 1)
+        self.assertEqual(manifest["manifest_version"], 2)
+        self.assertEqual(manifest["framework"], "mxbiflow")
+        for removed in ("config_schema", "hardware_schema", "mxbiflow_version"):
+            self.assertNotIn(removed, manifest)
+        settings = {setting["key"]: setting for setting in manifest["settings"]}
+        self.assertEqual(settings["hardware"]["scope"], "device")
+        self.assertEqual(settings["session"]["scope"], "run")
         self.assertEqual(
             (manifest["name"], manifest["version"]), ("touch-task", "1.4.0")
         )
-        self.assertIn("animals", manifest["config_schema"]["properties"])
+        self.assertIn("animals", settings["session"]["schema"]["properties"])
         touch, plain = manifest["stages"]
         self.assertEqual(touch["name"], "touch")
         self.assertEqual(touch["title"], "Touchscreen training")
@@ -138,7 +144,7 @@ class DescribeTests(unittest.TestCase):
         self.assertEqual(plain["title"], "Plain")
         self.assertEqual(plain["levels"], [{"id": 1}, {"id": 2}, {"id": 3}])
         self.assertIsNone(plain["schema"])
-        hardware = manifest["hardware_schema"]
+        hardware = settings["hardware"]["schema"]
         self.assertEqual(
             set(hardware["properties"]),
             {"screen_size", "rewarders", "detectors", "eyetrackers"},

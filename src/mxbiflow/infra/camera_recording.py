@@ -96,7 +96,7 @@ class CameraRecording:
         try:
             self._set_record(False)
         except httpx.HTTPError as error:
-            # mxbi-run.service switches it off again when the run stops.
+            # experiment.service switches it off again when the run stops.
             logger.warning("cannot stop the camera recording: %s", error)
         finally:
             self._http.close()

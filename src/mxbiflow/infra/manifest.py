@@ -1,15 +1,14 @@
 """The experiment manifest that ``run_experiment --describe`` prints (CHiPmxbi/mxbiflow#201).
 
-It describes what cogmote needs of an installed experiment: its stages in
-registration order with titles, levels, configuration schema and ``config.json``
-template, the schema of the cogmote experiment configuration and of the rig
-hardware configuration (#210). It is
-written at install time, so describing touches no window, hardware or run.
+It describes what cogmote needs of an installed experiment: its framework, its settings
+with their JSON Schemas (the rig hardware configuration per device, #210, and the
+experiment configuration per run), and its stages in registration order with titles,
+levels, configuration schema and ``config.json`` template. It is written at deploy
+time, so describing touches no window, hardware or run.
 """
 
 import json
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +18,7 @@ from ..models.stage_config import DEFAULT_KEY
 from ..scene import Scene, SceneManager
 from ..scene.idle.idle import IDLE
 
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 
 
 def describe(scene_manager: SceneManager, base_path: Path) -> dict[str, Any]:
@@ -27,11 +26,21 @@ def describe(scene_manager: SceneManager, base_path: Path) -> dict[str, Any]:
     project = _project(base_path)
     return {
         "manifest_version": MANIFEST_VERSION,
+        "framework": "mxbiflow",
         "name": project["name"],
         "version": project["version"],
-        "mxbiflow_version": version("mxbiflow"),
-        "config_schema": experiment_config_schema(),
-        "hardware_schema": inlined_json_schema(MXBIModel),
+        "settings": [
+            {
+                "key": "hardware",
+                "scope": "device",
+                "schema": inlined_json_schema(MXBIModel),
+            },
+            {
+                "key": "session",
+                "scope": "run",
+                "schema": experiment_config_schema(),
+            },
+        ],
         "stages": [
             describe_stage(scene)
             for scene in scene_manager.scenes.values()

@@ -3,8 +3,8 @@
 The game loop registers the command proxy `mxbiflow` with the local cogmoteGO
 (`pymotego.CommandProxy`) and runs its commands once per frame. When it
 connects, it describes every command it accepts: a name, a title, an optional
-description, a JSON Schema for the params and whether to confirm. cogmote
-lists them from `GET /api/proxies` on cogmoteGO and renders one control per
+description, a JSON Schema for the params, whether to confirm and whether it
+is the run's graceful stop. cogmote lists them from `GET /api/proxies` on cogmoteGO and renders one control per
 command, with a form for its params. Nothing in cogmoteGO or cogmote knows
 mxbiflow's commands.
 
@@ -45,7 +45,7 @@ curl -X POST http://127.0.0.1:9011/api/proxies/mxbiflow/requests \
 | `pause` | | Show IDLE and start no task; a running trial is aborted. |
 | `resume` | | Resume scheduling; the present animal's task starts. |
 | `screenshot` | | Save a screenshot to the session screenshot directory. |
-| `quit` | | End the run, as `Esc` does; cogmote asks to confirm. |
+| `quit` | | End the run, as `Esc` does; cogmote asks to confirm. It is marked `stop`, so cogmoteGO sends it when asked to stop the experiment. |
 
 Level and stage commands act on the animal currently at the device and are
 no-ops when none is present. The keyboard [shortcuts](shortcuts.md) run the

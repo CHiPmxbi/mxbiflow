@@ -115,6 +115,7 @@ def builtin_commands(
             on_quit,
             description="End the run, as Esc does.",
             confirm=True,
+            stop=True,
         ),
     ]
     return commands
