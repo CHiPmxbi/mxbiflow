@@ -39,10 +39,6 @@ class RemoteScheduler(Protocol):
 
     def switch_stage(self, stage: str) -> None: ...
 
-    def pause(self) -> None: ...
-
-    def resume(self) -> None: ...
-
 
 class RewardParams(BaseModel):
     duration_ms: int = Field(gt=0, le=10_000, title="Duration (ms)")
@@ -101,13 +97,6 @@ def builtin_commands(
             handler=reward,
             params=RewardParams,
         ),
-        simple(
-            "pause",
-            "Pause",
-            scheduler.pause,
-            description="Show IDLE and start no task; a running trial is aborted.",
-        ),
-        simple("resume", "Resume", scheduler.resume),
         simple("screenshot", "Screenshot", on_capture),
         simple(
             "quit",

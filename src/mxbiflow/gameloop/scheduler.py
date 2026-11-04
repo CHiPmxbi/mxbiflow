@@ -21,7 +21,6 @@ class Scheduler:
 
         self._need_refresh = False
         self._pending_animal: str | None = None
-        self._paused = False
 
     def _mark_refresh(self) -> None:
         self._need_refresh = True
@@ -88,28 +87,6 @@ class Scheduler:
             logger.warning("manual stage target not registered: %s", stage)
             return
         self._session.set_current_stage(stage)
-        self._mark_refresh()
-
-    @property
-    def paused(self) -> bool:
-        return self._paused
-
-    def pause(self) -> None:
-        """Show IDLE and start no task until :meth:`resume`.
-
-        A running trial is aborted. Detector events still track the current
-        animal, so resuming starts the task of the animal that is present.
-        """
-        if self._paused:
-            return
-        self._paused = True
-        self._mark_refresh()
-
-    def resume(self) -> None:
-        """Resume scheduling after :meth:`pause`."""
-        if not self._paused:
-            return
-        self._paused = False
         self._mark_refresh()
 
     def _handle_fault_event(self) -> None:
@@ -199,7 +176,7 @@ class Scheduler:
     def _refresh_by_state(self) -> None:
         animal = self._session.current_animal
 
-        if animal is None or self._paused:
+        if animal is None:
             if not isinstance(self._scene_manager.current, IDLE):
                 self._scene_manager.switch(self._scenes[IDLE.name()])
             return

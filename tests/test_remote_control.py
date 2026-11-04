@@ -28,12 +28,6 @@ class FakeScheduler:
     def switch_stage(self, stage: str) -> None:
         self.calls.append(f"switch_stage:{stage}")
 
-    def pause(self) -> None:
-        self.calls.append("pause")
-
-    def resume(self) -> None:
-        self.calls.append("resume")
-
 
 class FakeRewarder:
     def __init__(self) -> None:
@@ -209,13 +203,11 @@ class RemoteControlTests(unittest.TestCase):
                 "prev_stage",
                 "switch_stage",
                 "reward",
-                "pause",
-                "resume",
                 "screenshot",
                 "quit",
             ],
         )
-        self.assertIsNone(by_name["pause"].params)
+        self.assertIsNone(by_name["screenshot"].params)
         self.assertTrue(by_name["quit"].confirm)
         self.assertEqual([c.name for c in by_name.values() if c.stop], ["quit"])
         stage = (by_name["switch_stage"].params or {})["properties"]
@@ -226,8 +218,6 @@ class RemoteControlTests(unittest.TestCase):
         for name in ["level_up", "level_down", "next_stage", "prev_stage"]:
             self.proxy.push(name)
         self.proxy.push("switch_stage", stage="detect")
-        self.proxy.push("pause")
-        self.proxy.push("resume")
         self.proxy.push("reward", duration_ms=300)
         self.proxy.push("screenshot")
         self.proxy.push("quit")
@@ -243,8 +233,6 @@ class RemoteControlTests(unittest.TestCase):
                 "next_stage",
                 "prev_stage",
                 "switch_stage:detect",
-                "pause",
-                "resume",
             ],
         )
         self.assertEqual(self.rewarder.rewards, [300])
