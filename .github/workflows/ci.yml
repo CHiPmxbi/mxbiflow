@@ -25,7 +25,9 @@ jobs:
             libportaudio2 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
             xvfb
       # Private git dependencies, read with a one-hour token of the cogsoma-ci GitHub App.
+      # A fork has no App: it sets a CAGELAB_TOKEN secret that can read them.
       - id: cagelab-token
+        if: vars.CI_APP_CLIENT_ID != ''
         uses: actions/create-github-app-token@v3.3.0
         with:
           client-id: ${{ vars.CI_APP_CLIENT_ID }}
@@ -34,7 +36,7 @@ jobs:
           repositories: cogmatrix-python,pymoteGO
       - name: Grant read access to private git dependencies
         env:
-          CAGELAB_TOKEN: ${{ steps.cagelab-token.outputs.token }}
+          CAGELAB_TOKEN: ${{ steps.cagelab-token.outputs.token || secrets.CAGELAB_TOKEN }}
         run: >-
           git config --global
           url."https://x-access-token:${CAGELAB_TOKEN}@github.com/cagelab/".insteadOf
