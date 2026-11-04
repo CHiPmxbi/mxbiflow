@@ -77,6 +77,73 @@ def make_session() -> Session:
     )
 
 
+class AddUploadTests(unittest.TestCase):
+    def setUp(self) -> None:
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name) / "data"
+        self.session = make_session()
+        self.session.start(self.root)
+        self.run_dir = self.session.absolute_animal_data_path("animal-1")
+
+    def named(self) -> list[tuple[str, Path]]:
+        seen: list[tuple[str, Path]] = []
+        self.session.on_upload(lambda name, path: seen.append((name, path)))
+        return seen
+
+    def test_the_asset_name_has_no_slashes_or_date(self) -> None:
+        seen = self.named()
+        nested = self.run_dir / "s" / "a" / "b.csv"
+        shot = self.session.absolute_screenshot_data_path / "x.png"
+        own = self.session.absolute_data_path
+        assert own is not None
+
+        self.session.add_upload(nested)
+        self.session.add_upload(shot)
+        self.session.add_upload(own / "notes.txt")
+
+        self.assertEqual(
+            [name for name, _ in seen],
+            ["animal-1-s-a-b.csv", "screenshot-x.png", "notes.txt"],
+        )
+
+    def test_naming_a_file_again_is_not_an_error(self) -> None:
+        seen = self.named()
+
+        self.session.add_upload(self.run_dir / "s" / "a.csv")
+        self.session.add_upload(self.run_dir / "s" / "a.csv")
+
+        self.assertEqual(len(seen), 1)
+
+    def test_two_files_with_one_asset_name_are_an_error_when_named(self) -> None:
+        self.session.add_upload(self.run_dir / "s" / "a-b.csv")
+
+        with self.assertRaisesRegex(ValueError, "both upload as animal-1-s-a-b.csv"):
+            self.session.add_upload(self.run_dir / "s" / "a" / "b.csv")
+
+    def test_a_path_outside_the_run_is_an_error(self) -> None:
+        for path in [
+            self.root.parent / "other.csv",
+            self.root / "animal-1" / "20200101" / "9" / "other.csv",
+            self.run_dir / ".." / ".." / ".." / "other.csv",
+            self.root / "other.csv",
+            self.run_dir,
+        ]:
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "outside"):
+                self.session.add_upload(path)
+
+    def test_the_snapshot_asset_is_taken(self) -> None:
+        own = self.session.absolute_data_path
+        assert own is not None
+
+        with self.assertRaisesRegex(ValueError, "session snapshot"):
+            self.session.add_upload(own / "session.json")
+
+    def test_a_session_not_started_has_no_uploads(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "not started"):
+            make_session().add_upload("a.csv")
+
+
 class RuntimeStateStoreTests(unittest.TestCase):
     def test_session_ids_persist_in_one_file(self) -> None:
         with TemporaryDirectory() as directory:

@@ -8,8 +8,9 @@ animals are the subjects. Every step is kept in a local record under
 offline or whose uploads failed is completed at the next start.
 
 The node registers as an uploader of the session when it creates it and
-uploads with ``sessions.upload_data`` (#216): the results with the list kept
-open, then the camera recordings (#195), closing it. CogMatrix skips what it
+uploads with ``sessions.upload_data`` (#216): the results and the files the
+experiment named (``MXBIFlow.upload_file``, kept in the record as soon as they
+are named) with the list kept open, then the camera recordings (#195), closing it. CogMatrix skips what it
 already has, so a retry uploads only the rest, and marks the session's data
 complete once every file arrived. Recordings are deleted locally once
 CogMatrix has them; a recording that MediaMTX's retention already removed is
@@ -46,7 +47,7 @@ from pydantic import BaseModel, Field, JsonValue
 from pymotego import Client
 
 from ..core.path import get_base_path, get_internal_state_path
-from ..models.session import Session
+from ..models.session import SNAPSHOT_ASSET, Session
 from ..utils.logger import logger
 from .run_end import (
     COGMATRIX_STEPS,
@@ -89,6 +90,8 @@ class PendingRun(BaseModel):
     registered: bool = False
     """The node is an uploader of the session, so CogMatrix waits for its files."""
     files: list[str] = Field(default_factory=list)
+    named_files: dict[str, str] = Field(default_factory=dict)
+    """Files the experiment named, by asset name."""
     recordings: list[str] = Field(default_factory=list)
 
 
@@ -161,7 +164,16 @@ class CogMatrixRecorder:
         run_dir = self._state_dir / str(session.data_path).replace("/", "-")
         _save(run_dir, run)
         self._current = run_dir
+        session.on_upload(self._keep_named_file)
         self._sync(run_dir)
+
+    def _keep_named_file(self, name: str, path: Path) -> None:
+        if self._current is None:
+            logger.warning("%s named after the run ended; not uploaded", path)
+            return
+        run = _load(self._current)
+        run.named_files[name] = str(path)
+        _save(self._current, run)
 
     def finish(
         self,
@@ -272,11 +284,13 @@ class CogMatrixRecorder:
                     steps.done(
                         END_SESSION, url=session_url(run.endpoint, run.session_id)
                     )
-                    steps.start(UPLOAD_RESULTS, done=0, total=len(run.files))
+                files = _result_files(run, run_dir)
+                if steps is not None:
+                    steps.start(UPLOAD_RESULTS, done=0, total=len(files))
                 repository_id = _repository_id(run.config)
                 client.sessions.upload_data(
                     session_id,
-                    {_asset_name(file, run_dir): Path(file) for file in run.files},
+                    files,
                     repository_id=repository_id,
                     complete=False,
                 )
@@ -285,7 +299,7 @@ class CogMatrixRecorder:
                     logger.warning("camera recording %s is gone", gone)
                 recordings = [f for f in recordings if f.is_file()]
                 if steps is not None:
-                    steps.progress(UPLOAD_RESULTS, len(run.files))
+                    steps.progress(UPLOAD_RESULTS, len(files))
                     steps.done(UPLOAD_RESULTS)
                     total = sum(f.stat().st_size for f in recordings)
                     steps.start(UPLOAD_RECORDING, done=0, total=total, unit=True)
@@ -321,13 +335,25 @@ def _end_abandoned(run_dir: Path) -> None:
     if run.data_root is not None and run.data_path is not None:
         # <data root>/<animal>/<data path>/<stage>/result.jsonl
         results = sorted(Path(run.data_root).glob(f"*/{run.data_path}/*/result.jsonl"))
-    last = max((p.stat().st_mtime for p in results), default=None)
+    named = [p for p in map(Path, run.named_files.values()) if p.is_file()]
+    last = max((p.stat().st_mtime for p in [*results, *named]), default=None)
     ended = datetime.fromtimestamp(last, UTC) if last else run.started_at
     run.ended_at = _milliseconds(max(ended, run.started_at))
     run.status = ExperimentSessionStatus.aborted
     run.files = [str(p) for p in results]
     _save(run_dir, run)
     logger.info("run %s never ended; ending it as aborted", run_dir.name)
+
+
+def _result_files(run: PendingRun, run_dir: Path) -> dict[str, Path]:
+    """The files that upload with the results, by asset name; gone ones are skipped."""
+    files = {_asset_name(file, run_dir): Path(file) for file in run.files}
+    files |= {name: Path(file) for name, file in run.named_files.items()}
+    for name, path in list(files.items()):
+        if not path.is_file():
+            logger.warning("%s named for upload is gone: %s", name, path)
+            del files[name]
+    return files
 
 
 def _reason(error: Exception) -> str:
@@ -356,7 +382,7 @@ def _repository_id(config: dict[str, JsonValue]) -> UUID:
 def _asset_name(file: str, run_dir: Path) -> str:
     path = Path(file)
     if path.parent == run_dir:
-        return path.name
+        return SNAPSHOT_ASSET
     # <data root>/<animal>/<date>/<session>/<stage>/result.jsonl; CogMatrix names are
     # file names without slashes, and the session already fixes date and session.
     animal, _date, _session, stage, name = path.parts[-5:]

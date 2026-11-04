@@ -1,7 +1,7 @@
 import json
 import os
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -88,6 +88,22 @@ class SessionConfig(BaseModel):
         return self
 
 
+def upload_name(path: Path, data_root: Path, data_path: Path) -> str:
+    """The asset name of a file of the run ``data_path``: a file name without slashes.
+
+    Files are under ``<data root>/<data path>/`` or ``<data root>/<animal>/<data path>/``,
+    and the session already fixes the date and number in the data path. Raises
+    ``ValueError`` for a file outside the run's data directory.
+    """
+    parts = path.relative_to(data_root).parts if path.is_relative_to(data_root) else ()
+    run = data_path.parts
+    for start in (0, 1):
+        end = start + len(run)
+        if parts[start:end] == run and len(parts) > end:
+            return "-".join(parts[:start] + parts[end:])
+    raise ValueError(f"{path} is outside the run's data directory")
+
+
 class SessionConfigStore(Protocol):
     @property
     def value(self) -> SessionConfig: ...
@@ -110,6 +126,10 @@ class SessionState(ContextState):
         if value is None:
             return None
         return value.astimezone().isoformat(timespec="microseconds")
+
+
+#: The asset of the session snapshot, which every run uploads.
+SNAPSHOT_ASSET = "session.json"
 
 
 class SessionRuntimeState(BaseModel):
@@ -198,6 +218,8 @@ class Session(BaseModel):
         default_factory=dict
     )
     _data_root: Path | None = PrivateAttr(default=None)
+    _uploads: dict[str, Path] = PrivateAttr(default_factory=dict)
+    _upload_listener: Callable[[str, Path], None] | None = PrivateAttr(default=None)
 
     @property
     def experimenter(self) -> str:
@@ -327,6 +349,29 @@ class Session(BaseModel):
         paths_by_animal[animal] = path
         self.checkpoint()
         return path
+
+    def add_upload(self, path: Path | str) -> None:
+        """Name a file to upload with this run; see ``MXBIFlow.upload_file``."""
+        if self._data_root is None or self.state.data_path is None:
+            raise RuntimeError("Session is not started")
+        resolved = Path(path).resolve()
+        name = upload_name(resolved, self._data_root, self.state.data_path)
+        if name == SNAPSHOT_ASSET:
+            raise ValueError(f"{resolved}: {name} is the session snapshot's asset")
+        known = self._uploads.get(name)
+        if known == resolved:
+            return
+        if known is not None:
+            raise ValueError(f"{resolved} and {known} would both upload as {name}")
+        self._uploads[name] = resolved
+        if self._upload_listener is not None:
+            self._upload_listener(name, resolved)
+
+    def on_upload(self, listener: Callable[[str, Path], None]) -> None:
+        """Call ``listener`` for each file named so far and from now on."""
+        self._upload_listener = listener
+        for name, path in self._uploads.items():
+            listener(name, path)
 
     def set_session_store(self, store: RuntimeStateStore) -> None:
         self._session_store = store

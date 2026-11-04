@@ -308,9 +308,24 @@ loop starts, mxbiflow creates the session with `create_from_device`, using:
   as its implementation;
 - the operator from the config.
 
-When the game loop quits, mxbiflow ends the session and uploads each animal's
-`result.jsonl` and the session snapshot to the storage repository picked in
-cogmote. Every step is kept under `.mxbiflow/state/cogmatrix/` until CogMatrix
+When the game loop quits, mxbiflow ends the session and uploads the results to
+the storage repository picked in cogmote: by default each `DataLogger`'s file,
+with whatever name and type it has, and the session snapshot, then any camera
+recordings. To add a file, such as one the experiment writes itself, name it:
+
+```python
+flow = get_mxbiflow()
+stage_dir = flow.session.absolute_animal_data_path(animal) / stage
+flow.upload_file(stage_dir / "fit.csv")
+```
+
+The file has to be under the run's data directory, and uploads under the name
+`<animal>-<stage>-<file>`. Two files with the same name in a run are an error at
+that call, and so is a path outside the data directory. A file named but gone at
+upload time logs a warning and the others still upload. There is no setting to
+turn uploads off and no pattern matching: an experiment names what it wants.
+
+Every step is kept under `.mxbiflow/state/cogmatrix/` until CogMatrix
 has it, so a run that started offline or whose uploads failed is completed in
 the background of the next run. Without an experiment config in cogmote the run
 is not recorded.
