@@ -1,14 +1,10 @@
-from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
-from io import BytesIO
-from pathlib import Path
 
 from loguru import logger
-from matplotlib.figure import Figure
 from pydantic import BaseModel
-from pymotego import Block, Client, Heading, Image, KeyValue, Paragraph, Stats, Table
+from pymotego import Block, Client, Heading, KeyValue, Paragraph, Stats, Table
 
 from ..models.animal import AnimalSessionState
 from ..models.session import Session
@@ -24,9 +20,7 @@ class StageSummary(BaseModel):
 
 class AnimalSummary(BaseModel):
     name: str
-    rfid_tags: tuple[str, ...] = ()
     total_trials: int
-    animal_sessions: int
     total_duration_seconds: float
     stages: list[StageSummary]
 
@@ -41,67 +35,6 @@ class SessionSummary(BaseModel):
     total_animals: int
     note: str = ""
     animals: list[AnimalSummary]
-
-
-@dataclass(frozen=True)
-class PostProcessingResult:
-    """One stage's section of the daily report.
-
-    ``blocks`` are pymoteGO report blocks (cogmote renders them); ``figures`` are PNG images
-    keyed by the names ``Image`` blocks use. Names only need to be unique within the stage.
-    """
-
-    blocks: Sequence[Block]
-    figures: Mapping[str, bytes] = field(default_factory=dict[str, bytes])
-
-
-#: Width in inches of a report figure: the email shows images 560 px wide.
-FIGURE_WIDTH_IN = 5.6
-
-
-def report_figure(height_in: float = 3.5) -> Figure:
-    """A blank figure that reads well at the email's 560 px image width."""
-    return Figure(figsize=(FIGURE_WIDTH_IN, height_in), layout="constrained")
-
-
-def figure_png(figure: Figure, *, dpi: int = 200) -> bytes:
-    """Return ``figure`` as PNG bytes, at twice the 560 px width for sharp screens.
-
-    Build figures with :func:`report_figure` (a ``matplotlib.figure.Figure`` rather than
-    pyplot, so no GUI backend is involved and nothing has to be closed).
-    """
-    buffer = BytesIO()
-    figure.savefig(buffer, format="png", dpi=dpi, bbox_inches="tight")
-    return buffer.getvalue()
-
-
-class StagePostProcessor(ABC):
-    """Builds one stage's section of the daily report.
-
-    mxbiflow writes the fixed part (title, session stats, animals, session details);
-    a stage's section follows this convention so every report reads the same:
-
-    - a ``Heading`` with the stage name;
-    - one line of key numbers (trials, accuracy, median reaction time, ...) as a
-      ``Stats`` block of at most six items, or a ``KeyValue`` block;
-    - one or more figures, each an ``Image`` block with a caption; draw them on
-      :func:`report_figure` and encode them with :func:`figure_png`.
-
-    Tables of per-animal details may follow. Round numbers yourself: blocks show values
-    as given.
-
-    Figures go to cogmote with the report and from there inline into the email, once;
-    they are not stored in CogMatrix. This is the interim path: long-term analysis
-    figures come from the CI/CD analysis pipeline, but the capability stays.
-    """
-
-    @abstractmethod
-    def process(
-        self,
-        session: Session,
-        stage_data_paths: Mapping[str, Path],
-    ) -> PostProcessingResult:
-        """Build the report section for one stage."""
 
 
 def _format_timestamp(dt: datetime | None) -> str:
@@ -180,9 +113,7 @@ def summarize(session: Session) -> SessionSummary:
         animal_summaries.append(
             AnimalSummary(
                 name=name,
-                rfid_tags=animal.config.rfid_tags,
                 total_trials=animal.trial_id,
-                animal_sessions=len(animal.animal_sessions),
                 total_duration_seconds=_calc_animal_duration(animal.animal_sessions),
                 stages=stages,
             )
@@ -258,89 +189,33 @@ class SessionReport:
     title: str
     summary: str
     blocks: list[Block]
-    images: dict[str, bytes]
-
-
-def _stage_section(index: int, result: PostProcessingResult) -> PostProcessingResult:
-    """Prefix the stage's image names so stages may reuse them."""
-
-    def name(image: str) -> str:
-        return f"s{index}-{image}"[:64]
-
-    blocks = [
-        replace(block, image=name(block.image)) if isinstance(block, Image) else block
-        for block in result.blocks
-    ]
-    return PostProcessingResult(
-        blocks, {name(image): png for image, png in result.figures.items()}
-    )
 
 
 def build_session_report(
     session: Session,
-    stage_post_processors: Mapping[str, StagePostProcessor],
     trials: Sequence[TrialMark] = (),
     task: str = "",
 ) -> SessionReport:
-    """Build the daily report: the fixed part, then each stage's section.
+    """Build the daily report.
 
     ``trials`` are the run's published trials, for accuracy; ``task`` names the
     experiment in the subtitle.
     """
     summary = summarize(session)
-    blocks = session_overview(summary, trials, task)
-    images: dict[str, bytes] = {}
-
-    if session.data_root is not None:
-        for index, (stage_name, paths_by_animal) in enumerate(
-            session.stage_data_paths.items()
-        ):
-            post_processor = stage_post_processors.get(stage_name)
-            if post_processor is None:
-                logger.warning("skipping stage without post-processor: {}", stage_name)
-                continue
-
-            stage_paths = {
-                animal: session.data_root / path
-                for animal, path in paths_by_animal.items()
-            }
-            section = _stage_section(
-                index, post_processor.process(session, stage_paths)
-            )
-            blocks.extend(section.blocks)
-            images.update(section.figures)
-
     total = sum(animal.total_trials for animal in summary.animals)
     return SessionReport(
         title=f"{session.device_name} daily report",
         summary=f"Session #{summary.session_id}: {summary.total_animals} animals, "
         f"{total} trials, {_format_duration(summary.duration_seconds)}",
-        blocks=blocks,
-        images=images,
+        blocks=session_overview(summary, trials, task),
     )
-
-
-def send_session_report(
-    session: Session,
-    stage_post_processors: Mapping[str, StagePostProcessor],
-) -> None:
-    """Send the completed session report when the session config asks for it."""
-    if session.send_email:
-        try:
-            report = build_session_report(session, stage_post_processors)
-        except Exception:
-            logger.exception("failed to build session report")
-            raise
-        deliver_session_report(report)
 
 
 def deliver_session_report(report: SessionReport) -> str:
     """Send ``report`` to the device's subscribers and return its URL."""
     try:
         with Client() as client:
-            receipt = client.report(
-                report.title, report.blocks, report.images, summary=report.summary
-            )
+            receipt = client.report(report.title, report.blocks, summary=report.summary)
         logger.info("session report sent: {} url={}", report.title, receipt.url)
         return receipt.url
     except Exception:

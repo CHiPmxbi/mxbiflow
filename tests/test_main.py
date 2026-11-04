@@ -90,11 +90,7 @@ class RunExperimentTests(unittest.TestCase):
         self.mocks["init_gameloop"].assert_not_called()
 
     def test_headless_run_skips_the_wizard_and_dialogs(self) -> None:
-        processors = {"idle": Mock()}
-
-        run.run_experiment(
-            SceneManager(), post_processors=processors, argv=["--from-cogmote"]
-        )
+        run.run_experiment(SceneManager(), argv=["--from-cogmote"])
 
         self.mocks["run_wizard"].assert_not_called()
         stages = self.mocks["apply_cogmote_config"].call_args.args[0]
@@ -104,7 +100,7 @@ class RunExperimentTests(unittest.TestCase):
             self.mocks["run_summary"].return_value
         )
         self.mocks["build_session_report"].assert_called_once_with(
-            self.session, processors, run.get_mxbiflow().trials, "task"
+            self.session, run.get_mxbiflow().trials, "task"
         )
         self.mocks["deliver_session_report"].assert_called_once_with(
             self.mocks["build_session_report"].return_value

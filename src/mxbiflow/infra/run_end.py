@@ -53,7 +53,7 @@ class AnimalRun(BaseModel):
 
 
 class RunSummary(BaseModel):
-    """What the old post-processing panel showed, per animal."""
+    """What a run did, per animal."""
 
     session_id: int
     started_at: datetime | None
