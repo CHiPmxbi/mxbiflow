@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from pydantic import ValidationError
 from PySide6.QtWidgets import QApplication
 
+from mxbiflow.core.config_store import ConfigStore
 from mxbiflow.core.path import (
     get_applied_cogmote_config_path,
     get_config_session_path,
@@ -34,6 +35,7 @@ EXPERIMENT = {
         {"id": "a1", "name": "Mira", "rfid_tags": ["t1", "t2"], "stage": "idle"},
         {"id": "b2", "name": "Kiwi", "rfid_tags": [], "stage": "idle"},
     ],
+    "parameters": {"unknown_animal_as": "Mira"},
 }
 
 
@@ -79,7 +81,11 @@ def experiment(stage: str = "detect", level: int = 1) -> ExperimentConfig:
                     "level": level,
                 }
             ],
-            "parameters": {"reward_type": "m_juice", "fullscreen": False},
+            "parameters": {
+                "reward_type": "m_juice",
+                "fullscreen": False,
+                "unknown_animal_as": "Mira",
+            },
         }
     )
 
@@ -118,6 +124,22 @@ class SessionConfigFromExperimentTests(unittest.TestCase):
         self.assertEqual(config.capture_latency_ms, 40)
         self.assertTrue(config.with_animals(()).record_camera)
 
+    def test_the_fallback_animal_is_mapped(self) -> None:
+        config = session_config_from_experiment(experiment(), stages=self.stages)
+
+        self.assertEqual(config.unknown_animal_as, "Mira")
+
+    def test_a_fallback_animal_the_configuration_lacks_is_rejected(self) -> None:
+        parameters = experiment().parameters.model_copy(
+            update={"unknown_animal_as": "Kiwi"}
+        )
+
+        with self.assertRaisesRegex(CogmoteConfigError, "'Kiwi'.*Mira"):
+            session_config_from_experiment(
+                experiment().model_copy(update={"parameters": parameters}),
+                stages=self.stages,
+            )
+
     def test_unknown_stages_are_rejected(self) -> None:
         with self.assertRaisesRegex(CogmoteConfigError, "unknown stages typo"):
             session_config_from_experiment(experiment("typo"), stages=self.stages)
@@ -151,11 +173,12 @@ class SessionConfigFromExperimentTests(unittest.TestCase):
 
     def test_local_progress_survives_until_the_operator_changes_it(self) -> None:
         progressed = SessionConfig(
+            unknown_animal_as="Mira",
             animals=(
                 AnimalConfig(
                     cogmatrix_id="a1", name="Mira", stage="discriminate", level=4
                 ),
-            )
+            ),
         )
 
         kept = session_config_from_experiment(
@@ -189,6 +212,11 @@ class ApplyCogmoteConfigTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self._temporary_directory.cleanup()
+
+    def test_a_configuration_without_the_fallback_animal_refuses_to_start(self) -> None:
+        without = {**EXPERIMENT, "parameters": {}}
+        with self.assertRaisesRegex(CogmoteConfigError, "unknown_animal_as"):
+            apply_cogmote_config(("idle",), client({"experiment": without}))
 
     def test_writes_the_session_config_and_remembers_the_applied_one(self) -> None:
         fake = client({"experiment": experiment().model_dump(mode="json")})
@@ -251,11 +279,53 @@ class WizardAnimalsTests(unittest.TestCase):
         ):
             panel = ExperimentPanel(SceneManager())
         stale = AnimalConfig(name="Mira", rfid_tags=("old",))
-        panel.group_animals.load_config(SessionConfig(animals=(stale,)))
+        panel.group_animals.load_config(
+            SessionConfig(unknown_animal_as=stale.name, animals=(stale,))
+        )
 
         animal = panel.group_animals.result()[-1]
         self.assertEqual(animal.name, "Mira")
         self.assertEqual(animal.rfid_tags, ("t1", "t2"))
+        panel.close()
+
+    def test_the_fallback_animal_is_offered_and_saved(self) -> None:
+        with patch(
+            "mxbiflow.ui.experiment_panel.read_experiment_config",
+            return_value=ExperimentConfig.model_validate(EXPERIMENT),
+        ):
+            panel = ExperimentPanel(SceneManager())
+        combo = panel.group_scene.combo_unknown_animal_as
+
+        self.assertEqual(
+            [combo.itemText(i) for i in range(combo.count())], ["Mira", "Kiwi"]
+        )
+        kiwi = AnimalConfig(name="Kiwi")
+        config = SessionConfig(unknown_animal_as="Kiwi", animals=(kiwi,))
+        panel.group_scene.load_config(config)
+        panel.group_animals.load_config(config)
+        panel.button_continue.click()
+        saved = ConfigStore(get_config_session_path(), SessionConfig).value
+        self.assertEqual(saved.unknown_animal_as, "Kiwi")
+        panel.close()
+
+    def test_a_fallback_animal_without_a_card_is_refused_with_the_reason(self) -> None:
+        with patch(
+            "mxbiflow.ui.experiment_panel.read_experiment_config",
+            return_value=ExperimentConfig.model_validate(EXPERIMENT),
+        ):
+            panel = ExperimentPanel(SceneManager())
+        kiwi = AnimalConfig(name="Kiwi")
+        panel.group_animals.load_config(
+            SessionConfig(unknown_animal_as="Kiwi", animals=(kiwi,))
+        )
+        panel.group_scene.combo_unknown_animal_as.setCurrentText("Mira")
+
+        panel.button_continue.click()
+
+        self.assertIn("unknown_animal_as", panel.label_error.text())
+        self.assertEqual(panel.result(), 0)
+        saved = ConfigStore(get_config_session_path(), SessionConfig).value
+        self.assertEqual(saved.animals, ())
         panel.close()
 
     def test_wizard_opens_without_cogmote(self) -> None:
@@ -265,7 +335,9 @@ class WizardAnimalsTests(unittest.TestCase):
         ):
             panel = ExperimentPanel(SceneManager())
         stale = AnimalConfig(name="Mira", rfid_tags=("old",))
-        panel.group_animals.load_config(SessionConfig(animals=(stale,)))
+        panel.group_animals.load_config(
+            SessionConfig(unknown_animal_as=stale.name, animals=(stale,))
+        )
 
         self.assertEqual(panel.group_animals.result()[-1].rfid_tags, ())
         panel.close()

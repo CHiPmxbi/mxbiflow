@@ -77,43 +77,85 @@ class StageC(StageA):
     pass
 
 
-class SchedulerTests(unittest.TestCase):
-    def test_unknown_animal_starts_no_task(self) -> None:
-        animal_config = AnimalConfig(name="fallback", stage="target_stage")
-        animal = Animal(
-            config=animal_config,
-            current_stage_name="target_stage",
-            stages={"target_stage": StageState(stage_name="target_stage")},
+class UnknownAnimalTests(unittest.TestCase):
+    def setUp(self) -> None:
+        configs = (
+            AnimalConfig(name="fallback", stage="stage_a"),
+            AnimalConfig(name="identified", stage="stage_b"),
         )
-        session = Session(
-            config=SessionConfig(
-                animals=(animal_config,),
-            ),
+        animals = {
+            config.name: Animal(
+                config=config,
+                current_stage_name=config.stage,
+                stages={config.stage: StageState(stage_name=config.stage)},
+            )
+            for config in configs
+        }
+        self.session = Session(
+            config=SessionConfig(unknown_animal_as="fallback", animals=configs),
             mxbi_config=MXBIModel(),
-            state=SessionState(animals={animal.name: animal}),
+            state=SessionState(animals=animals),
         )
-        scene_manager = SceneManager()
-        scene_manager.register([TargetStage])
-        self.assertIs(scene_manager.scenes["target_stage"], TargetStage)
-        scene_manager.register({"idle": HeadlessIdle})
-        scheduler = Scheduler(session, scene_manager)
-        session.set_current_animal("fallback")
+        self.manager = SceneManager()
+        self.manager.register([StageA, StageB])
+        self.manager.register({"idle": HeadlessIdle})
+        self.scheduler = Scheduler(self.session, self.manager)
+
+    def send(self, kind: DetectorEvent, animal: str | None = None) -> None:
+        self.scheduler.handle_event(
+            Event(EVT_DETECTOR, msg=DetectorMsg(kind=kind, animal=animal))
+        )
+        self.scheduler.update()
+        self.manager.apply_pending()
+
+    def test_starts_the_fallback_task_and_a_later_read_moves_to_the_real_animal(
+        self,
+    ) -> None:
+        for name, tag in [("missed read", None), ("tag outside", "other-tag")]:
+            with self.subTest(name):
+                self.send(DetectorEvent.UNKNOWN_ANIMAL_ENTERED, tag)
+                fallback = self.session.require_current_animal()
+                self.assertEqual(fallback.name, "fallback")
+                self.assertIsInstance(self.manager.current, StageA)
+
+                # The running trial stays the fallback animal's.
+                self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
+                self.assertEqual(self.session.require_current_animal().name, "fallback")
+                self.session.add_trial()
+                trials = fallback.trial_id
+                assert self.manager.current is not None
+                self.manager.current.quit()
+                self.scheduler.update()
+                self.manager.apply_pending()
+
+                self.assertEqual(
+                    self.session.require_current_animal().name, "identified"
+                )
+                self.assertIsInstance(self.manager.current, StageB)
+                self.assertEqual(fallback.trial_id, trials)
+                self.send(DetectorEvent.ANIMAL_LEFT)
+
+    def test_a_session_without_animals_stays_idle(self) -> None:
+        session = Session(
+            config=SessionConfig(),
+            mxbi_config=MXBIModel(),
+            state=SessionState(),
+        )
+        manager = SceneManager()
+        manager.register({"idle": HeadlessIdle})
+        scheduler = Scheduler(session, manager)
 
         scheduler.handle_event(
             Event(
                 EVT_DETECTOR,
                 msg=DetectorMsg(
-                    kind=DetectorEvent.UNKNOWN_ANIMAL_ENTERED,
-                    animal="unrecognized-rfid",
+                    kind=DetectorEvent.UNKNOWN_ANIMAL_ENTERED, animal="tag"
                 ),
             )
         )
         scheduler.update()
-        scene_manager.apply_pending()
 
         self.assertIsNone(session.current_animal)
-        self.assertIsNotNone(animal.animal_sessions[0].end_at)
-        self.assertIsInstance(scene_manager.current, HeadlessIdle)
 
 
 class ManualControlTests(unittest.TestCase):
@@ -137,6 +179,7 @@ class ManualControlTests(unittest.TestCase):
         )
         session = Session(
             config=SessionConfig(
+                unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
             mxbi_config=MXBIModel(),
@@ -268,7 +311,7 @@ class IdentityUpdateTests(unittest.TestCase):
             for config in configs
         }
         self.session = Session(
-            config=SessionConfig(animals=configs),
+            config=SessionConfig(unknown_animal_as="fallback", animals=configs),
             mxbi_config=MXBIModel(),
             state=SessionState(animals=animals),
         )
@@ -365,7 +408,7 @@ class IdentityUpdateTests(unittest.TestCase):
         self.manager.current.quit()
         self.scheduler.update()
         self.manager.apply_pending()
-        self.assertIsNone(self.session.current_animal)
+        self.assertEqual(self.session.require_current_animal().name, "fallback")
 
     def test_fault_cancels_pending_identity(self) -> None:
         self.send(DetectorEvent.ANIMAL_IDENTIFIED, "identified")
