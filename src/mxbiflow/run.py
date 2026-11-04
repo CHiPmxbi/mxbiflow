@@ -2,7 +2,7 @@
 
 import json
 import signal
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
@@ -21,11 +21,7 @@ from .infra.crash_report import send_crash_report
 from .infra.hardware_config import sync_hardware_config
 from .infra.manifest import describe, experiment_name
 from .infra.notify import notify
-from .infra.post_processing import (
-    StagePostProcessor,
-    build_session_report,
-    deliver_session_report,
-)
+from .infra.post_processing import build_session_report, deliver_session_report
 from .infra.run_end import (
     COGMATRIX_STEPS,
     END_SESSION,
@@ -86,7 +82,6 @@ def _parse_flags(argv: Sequence[str] | None) -> RunFlags | None:
 def run_experiment(
     scene_manager: SceneManager,
     *,
-    post_processors: Mapping[str, StagePostProcessor] | None = None,
     argv: Sequence[str] | None = None,
     max_fps: int = 60,
     recorder: CogMatrixRecorder | None = None,
@@ -130,7 +125,6 @@ def run_experiment(
     if flags.describe:
         print(json.dumps(describe(scene_manager, get_base_path()), indent=2))
         return
-    processors = post_processors or {}
 
     session: Session | None = None
     camera: CameraRecording | None = None
@@ -164,7 +158,6 @@ def run_experiment(
             recorder,
             recordings,
             session.send_email and not is_offline(),
-            processors,
         )
     except CogmoteConfigError as error:
         logger.error("run not started: %s", error)
@@ -185,7 +178,6 @@ def _finish(
     recorder: CogMatrixRecorder,
     recordings: list[Path],
     send_report: bool,
-    processors: Mapping[str, StagePostProcessor],
 ) -> None:
     session = mxbiflow.session
     summary = run_summary(session, mxbiflow.trials)
@@ -211,7 +203,6 @@ def _finish(
             try:
                 report = build_session_report(
                     session,
-                    processors,
                     mxbiflow.trials,
                     experiment_name(get_base_path()),
                 )

@@ -1,41 +1,21 @@
 import unittest
 from datetime import UTC, datetime
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-from matplotlib.figure import Figure
-from pymotego import Heading, Image, KeyValue, Paragraph, Stats, Table
+from pymotego import Heading, KeyValue, Paragraph, Stats, Table
 
 from mxbiflow.infra.camera_recording import TrialMark
 from mxbiflow.infra.post_processing import (
     AnimalSummary,
-    PostProcessingResult,
     SessionReport,
     SessionSummary,
-    StagePostProcessor,
     StageSummary,
     accuracy,
     build_session_report,
-    figure_png,
-    report_figure,
-    send_session_report,
+    deliver_session_report,
     session_overview,
     summarize,
 )
-
-PNG = b"\x89PNG\r\n\x1a\n-figure"
-
-
-class StubPostProcessor(StagePostProcessor):
-    def __init__(self, result: PostProcessingResult) -> None:
-        self.result = result
-        self.calls: list[tuple[object, object]] = []
-
-    def process(
-        self, session: object, stage_data_paths: object
-    ) -> PostProcessingResult:  # type: ignore[override]
-        self.calls.append((session, stage_data_paths))
-        return self.result
 
 
 def _summary(animals: list[AnimalSummary]) -> SessionSummary:
@@ -92,9 +72,7 @@ class SessionReportTests(unittest.TestCase):
             [
                 AnimalSummary(
                     name="m1",
-                    rfid_tags=("rfid-1",),
                     total_trials=3,
-                    animal_sessions=2,
                     total_duration_seconds=125,
                     stages=[
                         StageSummary(
@@ -105,7 +83,6 @@ class SessionReportTests(unittest.TestCase):
                 AnimalSummary(
                     name="m2",
                     total_trials=1,
-                    animal_sessions=1,
                     total_duration_seconds=10,
                     stages=[
                         StageSummary(
@@ -170,83 +147,36 @@ class SessionReportTests(unittest.TestCase):
 
     @patch("mxbiflow.infra.post_processing.session_overview")
     @patch("mxbiflow.infra.post_processing.summarize")
-    def test_build_dispatches_resolved_stage_paths_and_prefixes_images(
-        self,
-        summarize_: Mock,
-        overview: Mock,
-    ) -> None:
+    def test_build_is_the_fixed_part(self, summarize_: Mock, overview: Mock) -> None:
         summarize_.return_value = _summary([])
         overview.return_value = [Paragraph("Session #3")]
-        session = MagicMock()
-        session.device_name = "mxbi-1"
-        session.data_root = Path("data")
-        session.stage_data_paths = {
-            "stage": {"m1": Path("m1/stage")},
-            "other": {"m1": Path("m1/other")},
-        }
-        section = PostProcessingResult(
-            [Heading("Stage"), Paragraph("ok"), Image("accuracy.png", "Accuracy")],
-            {"accuracy.png": PNG},
-        )
-        processor = StubPostProcessor(section)
-
+        session = MagicMock(device_name="mxbi-1")
         trials = [_mark("m1", True)]
-        report = build_session_report(
-            session, {"stage": processor, "other": processor}, trials, "task"
-        )
+
+        report = build_session_report(session, trials, "task")
 
         overview.assert_called_once_with(summarize_.return_value, trials, "task")
-        self.assertEqual(report.title, "mxbi-1 daily report")
-        self.assertEqual(report.summary, "Session #3: 0 animals, 0 trials, N/A")
         self.assertEqual(
-            report.blocks,
-            [
-                Paragraph("Session #3"),
-                Heading("Stage"),
-                Paragraph("ok"),
-                Image("s0-accuracy.png", "Accuracy"),
-                Heading("Stage"),
-                Paragraph("ok"),
-                Image("s1-accuracy.png", "Accuracy"),
-            ],
-        )
-        self.assertEqual(
-            report.images, {"s0-accuracy.png": PNG, "s1-accuracy.png": PNG}
-        )
-        self.assertEqual(processor.calls[0], (session, {"m1": Path("data/m1/stage")}))
-
-    @patch("mxbiflow.infra.post_processing.logger.warning")
-    @patch("mxbiflow.infra.post_processing.session_overview", return_value=[])
-    @patch("mxbiflow.infra.post_processing.summarize")
-    def test_build_skips_unregistered_stage(
-        self,
-        summarize_: Mock,
-        _overview: Mock,
-        warning: Mock,
-    ) -> None:
-        summarize_.return_value = _summary([])
-        session = MagicMock(data_root=Path("data"))
-        session.stage_data_paths = {"future": {"m1": Path("m1/future")}}
-
-        report = build_session_report(session, {})
-
-        self.assertEqual(report.blocks, [])
-        warning.assert_called_once_with(
-            "skipping stage without post-processor: {}", "future"
+            report,
+            SessionReport(
+                "mxbi-1 daily report",
+                "Session #3: 0 animals, 0 trials, N/A",
+                [Paragraph("Session #3")],
+            ),
         )
 
     @patch("mxbiflow.infra.post_processing.Client")
-    @patch("mxbiflow.infra.post_processing.build_session_report")
-    def test_send_reports_through_cogmotego(self, build: Mock, client: Mock) -> None:
-        build.return_value = SessionReport(
-            "mxbi-1 daily report", "summary", [Paragraph("x")], {"a.png": PNG}
+    def test_deliver_reports_through_cogmotego(self, client: Mock) -> None:
+        report_ = client.return_value.__enter__.return_value.report
+        report_.return_value.url = "https://mote/r/1"
+
+        url = deliver_session_report(
+            SessionReport("mxbi-1 daily report", "summary", [Paragraph("x")])
         )
-        session = Mock(send_email=True, session_id=7)
 
-        send_session_report(session, {})
-
-        client.return_value.__enter__.return_value.report.assert_called_once_with(
-            "mxbi-1 daily report", [Paragraph("x")], {"a.png": PNG}, summary="summary"
+        self.assertEqual(url, "https://mote/r/1")
+        report_.assert_called_once_with(
+            "mxbi-1 daily report", [Paragraph("x")], summary="summary"
         )
 
     def test_accuracy_counts_judged_trials(self) -> None:
@@ -256,30 +186,12 @@ class SessionReportTests(unittest.TestCase):
         self.assertIsNone(accuracy(trials, "m3"))
 
     @patch("mxbiflow.infra.post_processing.Client")
-    @patch("mxbiflow.infra.post_processing.build_session_report")
-    def test_send_failure_is_raised(self, build: Mock, client: Mock) -> None:
-        build.return_value = SessionReport("t", "s", [], {})
+    def test_deliver_failure_is_raised(self, client: Mock) -> None:
         client.return_value.__enter__.return_value.report.side_effect = RuntimeError(
             "503"
         )
         with self.assertRaises(RuntimeError):
-            send_session_report(Mock(send_email=True), {})
-
-    @patch("mxbiflow.infra.post_processing.Client")
-    def test_disabled_report_does_not_send(self, client: Mock) -> None:
-        send_session_report(Mock(send_email=False), {})
-        client.assert_not_called()
-
-    def test_figure_png(self) -> None:
-        figure = Figure(figsize=(2, 1))
-        figure.add_subplot().plot([0, 1], [1, 0])
-        self.assertTrue(figure_png(figure).startswith(b"\x89PNG\r\n\x1a\n"))
-
-    def test_report_figure_is_twice_the_email_width(self) -> None:
-        figure = report_figure()
-        figure.add_subplot().plot([0, 1], [1, 0])
-        width = int.from_bytes(figure_png(figure)[16:20])
-        self.assertAlmostEqual(width, 1120, delta=40)
+            deliver_session_report(SessionReport("t", "s", []))
 
 
 if __name__ == "__main__":

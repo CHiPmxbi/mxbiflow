@@ -50,14 +50,14 @@ setup_logging()
 scene_manager = SceneManager()
 scene_manager.register([IDLE, Detect, Discriminate])
 
-run_experiment(scene_manager, post_processors=STAGE_POST_PROCESSORS, max_fps=120)
+run_experiment(scene_manager, max_fps=120)
 ```
 
 `run_experiment` runs the wizard, plays the session, finishes the run (see
 [Run end](#run-end)) and reports crashes. With `--from-cogmote` on the command line
 (`uv run main.py --from-cogmote`, or `mxbiflow run --from-cogmote`) it starts
 from the cogmote configuration instead, without any dialog. The building
-blocks (`run_wizard`, `init_gameloop`, `run_session_post_processing`) stay
+blocks (`run_wizard`, `init_gameloop`) stay
 available for custom flows.
 
 ### Starting without `--from-cogmote`
@@ -372,18 +372,12 @@ Crash reports (`mxbiflow.infra.send_crash_report`) and "run not started"
 notices are plain-text notifications sent through cogmoteGO's
 `POST /notifications`, cut to the 10 KB limit.
 
-The daily session report (`mxbiflow.ui.run_session_post_processing`) is a
-structured report sent with pymoteGO's `Client.report` through cogmoteGO's
-`POST /reports`: an overview (session details, then per animal its trials,
-sessions, duration, stages and levels) followed by one section per stage from
-its `StagePostProcessor`. A post-processor returns `PostProcessingResult(blocks,
-figures)`: pymoteGO blocks (`Heading`, `Paragraph`, `KeyValue`, `Table`,
-`Image`) and PNG figures keyed by the names its `Image` blocks use; draw them
-with `matplotlib.figure.Figure` and convert with
-`mxbiflow.infra.post_processing.figure_png`. cogmote shows the report with its
-figures on the device's report page and emails subscribers the blocks with a
-link there. Limits: 200 blocks and 20 figures of at most 2 MiB per report.
-Experiment data stays on the device.
+The daily session report is a structured report sent with pymoteGO's
+`Client.report` through cogmoteGO's `POST /reports`: its title, the session
+stats, a table of the animals and the session details, the same for every
+experiment. cogmote shows it on the device's report page and emails subscribers
+the blocks with a link there. Analysis belongs in the CogMatrix analysis
+pipelines, not in the report.
 
 ## Installation
 
