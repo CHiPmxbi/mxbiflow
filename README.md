@@ -60,6 +60,41 @@ from the cogmote configuration instead, without any dialog. The building
 blocks (`run_wizard`, `init_gameloop`, `run_session_post_processing`) stay
 available for custom flows.
 
+### Starting without `--from-cogmote`
+
+`uv run main.py` opens the wizard. Its first panel has an **Offline** checkbox,
+remembered in `config/mxbi_panel.json`, which picks one of two modes.
+
+**Online** (off) reads cogmote through cogmoteGO: the hardware preset is synced
+to `~/.config/mxbi/mxbi.json` and the animals come from the experiment
+configuration. Without configured animals, because cogmoteGO is unreachable or
+nothing is configured, Continue and Save refuse and say why.
+
+**Offline** (on) needs no cogmoteGO, cogmote or CogMatrix, for developing and
+testing an experiment on your own machine:
+
+| What | Where |
+| --- | --- |
+| Hardware | `<experiment>/config/mxbi.json` |
+| Session | `<experiment>/config/session.json` |
+| Experimenters and animals | `~/.config/mxbi/db.json` |
+| Wizard settings | `<experiment>/config/mxbi_panel.json` |
+| Frequency response table | `~/.config/mxbi/frequency_response_table.json` |
+
+`db.json` lists the experimenters and maps each RFID tag to an animal's name:
+
+```json
+{ "experimenter": ["me"], "animals": { "0001": "Mira", "0002": "Kiwi" } }
+```
+
+The run makes no request to cogmoteGO: no hardware sync, status, trials,
+summary, command proxy, CogMatrix session or upload, report or notification. A
+crash is logged and raised. Trial data still goes to `<experiment>/data` and the
+run end screen shows the summary.
+
+Toggling the checkbox reloads the panel from the matching file, and neither
+hardware file changes until Save or Continue.
+
 Each scene implements `SceneProtocol`:
 
 ```python
@@ -190,7 +225,7 @@ cogmote views do not replay the previous run.
 The rig hardware (screen size, rewarders, detectors, eye trackers; the
 `MXBIModel` in `mxbiflow.driver`) belongs to the device, not to an experiment.
 cogmote keeps named hardware presets per device and sends the current one
-under `hardware` in the device config. At each start, wizard or headless,
+under `hardware` in the device config. At each online start, wizard or headless,
 mxbiflow copies it to `~/.config/mxbi/mxbi.json`, which every experiment on the
 rig reads and the wizard's MXBI panel edits
 (`mxbiflow.infra.hardware_config`). When cogmote has no preset or cogmoteGO is

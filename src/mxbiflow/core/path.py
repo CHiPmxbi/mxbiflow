@@ -29,8 +29,8 @@ def get_mxbi_config_path() -> Path:
     return Path.home() / ".config" / "mxbi" / MXBI_CONFIG_FILENAME
 
 
-def get_legacy_mxbi_config_path() -> Path:
-    """Where each experiment kept its own hardware configuration before."""
+def get_offline_mxbi_config_path() -> Path:
+    """The experiment's own hardware configuration, used in offline mode."""
     return get_config_dir_path() / MXBI_CONFIG_FILENAME
 
 

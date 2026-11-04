@@ -7,6 +7,7 @@ from mxbiflow.driver import MXBI
 
 from ..commands import CommandRegistry
 from ..core.context import MXBIFlow, set_mxbiflow
+from ..core.offline import is_offline
 from ..core.path import get_data_dir_path
 from ..models.session import Session
 from ..scene import SceneManager
@@ -64,8 +65,12 @@ class Game:
             on_quit=self.request_quit,
             stages=[name for name in scene_manager.scenes if name != IDLE.name()],
         )
-        self._remote_control = RemoteControl(
-            CommandRegistry([*builtins, *scene_manager.commands.commands])
+        self._remote_control = (
+            None
+            if is_offline()
+            else RemoteControl(
+                CommandRegistry([*builtins, *scene_manager.commands.commands])
+            )
         )
 
         self._mxbiflow = MXBIFlow(self._session, self._mxbi)
@@ -100,7 +105,8 @@ class Game:
             dt = self._clock.tick(self._max_fps) / 1000.0
 
             self._detector_binder.emit_pygame_event()
-            self._remote_control.poll()
+            if self._remote_control is not None:
+                self._remote_control.poll()
 
             for event in pygame.event.get():
                 self._handle_event(event)
@@ -157,7 +163,8 @@ class Game:
         if self._scene_manager.current is not None:
             self._scene_manager.current.quit()
         self._session.end()
-        self._remote_control.close()
+        if self._remote_control is not None:
+            self._remote_control.close()
         self._mxbiflow.close()
         self._mxbi.quit()
         if pygame.display.get_init():

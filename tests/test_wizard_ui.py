@@ -1,13 +1,17 @@
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QDialog
 
+from mxbiflow.core.offline import is_offline, set_offline
+from mxbiflow.core.path import set_base_path
 from mxbiflow.ui.application import require_application
 from mxbiflow.ui.wizard import run_wizard
 
@@ -32,6 +36,15 @@ class ApplicationTests(unittest.TestCase):
 
 
 class WizardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        set_base_path(Path(self.directory.name))
+        self.addCleanup(set_offline, False)
+        sync = patch("mxbiflow.ui.wizard.sync_hardware_config")
+        self.sync = sync.start()
+        self.addCleanup(sync.stop)
+
     @patch("mxbiflow.ui.wizard.ExperimentPanel")
     @patch("mxbiflow.ui.wizard.MXBIPanel")
     @patch("mxbiflow.ui.wizard.require_application")
@@ -81,8 +94,12 @@ class WizardTests(unittest.TestCase):
             events.append("experiment") or QDialog.DialogCode.Accepted
         )
 
+        mxbi_panel_class.return_value.offline = True
+
         self.assertTrue(run_wizard(Mock()))
         self.assertEqual(events, ["mxbi", "experiment"])
+        self.sync.assert_called_once_with()
+        self.assertTrue(is_offline())
 
     def test_application_is_created_and_kept_available(self) -> None:
         code = """

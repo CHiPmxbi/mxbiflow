@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import NamedTuple
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtWidgets import (
@@ -11,11 +12,18 @@ from PySide6.QtWidgets import (
 )
 
 from ...models.animal import AnimalConfig
-from ...models.experiment import ExperimentAnimal
 from .card import CardFrame
 
 # stage_name -> {animal_name -> [level_ids]}
 StageLevelTables = dict[str, dict[str, list[int]]]
+
+
+class AnimalOption(NamedTuple):
+    """An animal the wizard offers: from cogmote, or offline from ``db.json``."""
+
+    id: str
+    name: str
+    rfid_tags: tuple[str, ...]
 
 
 class AnimalCard(CardFrame):
@@ -24,7 +32,7 @@ class AnimalCard(CardFrame):
     def __init__(
         self,
         parent: QWidget | None,
-        animals: Sequence[ExperimentAnimal],
+        animals: Sequence[AnimalOption],
         stage_level_tables: StageLevelTables,
     ) -> None:
         super().__init__(parent=parent, object_name="card")
@@ -115,6 +123,11 @@ class AnimalCard(CardFrame):
 
     def load_config(self, config: AnimalConfig) -> None:
         self._stage_order = config.stage_order
+        # A saved animal keeps its name and tags even when it is no longer offered.
+        if config.name and self.combo_animal_name.findText(config.name) < 0:
+            self._animal_ids.append(config.cogmatrix_id)
+            self._animal_tags.append(config.rfid_tags)
+            self.combo_animal_name.addItem(config.name)
         self.combo_animal_name.setCurrentText(config.name)
         self.combo_stage.setCurrentText(config.stage)
         self.combo_level.setCurrentText(str(config.level))

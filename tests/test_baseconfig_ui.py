@@ -58,17 +58,18 @@ class BaseConfigTests(unittest.TestCase):
         self.assertNotIn("mxbi_id", saved)
         panel.close()
 
-    def test_missing_mxbi_config_creates_default(self) -> None:
+    def test_missing_mxbi_config_is_written_on_continue(self) -> None:
         # Regression: on a fresh machine without config/mxbi.json, the
         # wizard must be able to generate a default config instead of
         # crashing on required fields.
         panel = MXBIPanel()
         config_path = get_mxbi_config_path()
-        self.assertTrue(config_path.is_file())
+        self.assertFalse(config_path.exists())
+        panel.continue_button.click()
         MXBIModel.model_validate_json(config_path.read_text(encoding="utf-8"))
         panel.close()
 
-    def test_legacy_database_options_are_ignored_and_not_exported(self) -> None:
+    def test_legacy_database_options_are_ignored(self) -> None:
         database = MXBIDatabase.model_validate(
             {
                 "mxbis": ["mxbi1"],
@@ -79,8 +80,7 @@ class BaseConfigTests(unittest.TestCase):
 
         exported = database.model_dump()
         self.assertNotIn("mxbis", exported)
-        # Animals come from the cogmote configuration now (#173).
-        self.assertNotIn("animals", exported)
+        self.assertEqual(exported["animals"], {"abcd": "mouse"})
         self.assertEqual(exported["experimenter"], ["tester"])
 
 

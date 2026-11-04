@@ -15,9 +15,8 @@ from PySide6.QtWidgets import (
 )
 
 from ...models.animal import AnimalConfig
-from ...models.experiment import ExperimentAnimal
 from ...models.session import RewardEnum, SessionConfig
-from .animal import AnimalCard
+from .animal import AnimalCard, AnimalOption
 
 
 class ExperimentConfigGroup(QGroupBox):
@@ -142,7 +141,7 @@ class ExperimentAnimalsGroup(QGroupBox):
         self,
         parent: QWidget | None = None,
         *,
-        animals: Sequence[ExperimentAnimal],
+        animals: Sequence[AnimalOption],
         stage_level_tables: dict[str, dict[str, list[int]]],
     ) -> None:
         super().__init__("Animals", parent)

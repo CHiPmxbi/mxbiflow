@@ -10,6 +10,7 @@ from threading import Thread
 
 from .bootstrap import init_gameloop
 from .core.context import MXBIFlow, get_mxbiflow
+from .core.offline import is_offline
 from .core.path import get_base_path
 from .infra.camera_recording import CameraRecording
 from .infra.cogmatrix_sync import CogMatrixRecorder
@@ -75,6 +76,11 @@ def run_experiment(
     device-global copy of the last one (:mod:`mxbiflow.infra.hardware_config`);
     without either the run does not start.
 
+    With the wizard's Offline checkbox on, the run makes no request to
+    cogmoteGO: no status, trials, summary, command proxy, CogMatrix, report or
+    notification. Trial data goes to the data directory as usual, the rig screen
+    shows the summary, and a crash is logged and raised.
+
     ``--describe`` prints the experiment manifest (:mod:`mxbiflow.infra.manifest`)
     and returns without a window, hardware or run.
     """
@@ -101,32 +107,42 @@ def run_experiment(
     try:
         if args.from_cogmote:
             apply_cogmote_config(scene_manager.scenes.keys())
-        sync_hardware_config()
-        if not args.from_cogmote and not run_wizard(scene_manager):
+            sync_hardware_config()
+        elif not run_wizard(scene_manager):
             return
         game = init_gameloop(scene_manager, max_fps)
         signal.signal(signal.SIGTERM, lambda *_: game.request_quit())
         mxbiflow = get_mxbiflow()
         session = mxbiflow.session
-        clear_trials()
-        begin_run(session)
-        recorder.start(session)
-        # Earlier runs' uploads, recordings among them, must not delay this one.
-        Thread(
-            target=recorder.retry_pending, name="cogmatrix-retry", daemon=True
-        ).start()
-        if session.config.record_camera:
-            camera = CameraRecording()
-            camera.start()
+        if not is_offline():
+            clear_trials()
+            begin_run(session)
+            recorder.start(session)
+            # Earlier runs' uploads, recordings among them, must not delay this one.
+            Thread(
+                target=recorder.retry_pending, name="cogmatrix-retry", daemon=True
+            ).start()
+            if session.config.record_camera:
+                camera = CameraRecording()
+                camera.start()
         game.play()
         recordings = _stop_camera(camera, mxbiflow)
         camera = None
-        _finish(mxbiflow, recorder, recordings, session.send_email, processors)
+        _finish(
+            mxbiflow,
+            recorder,
+            recordings,
+            session.send_email and not is_offline(),
+            processors,
+        )
     except CogmoteConfigError as error:
         logger.error("run not started: %s", error)
         _report_not_started(str(error))
         raise SystemExit(1) from error
     except Exception as exc:
+        if is_offline():
+            logger.exception("the run crashed")
+            raise
         send_crash_report(exc, session)
         if session is not None:
             _finish_aborted(recorder, session, camera)
@@ -142,7 +158,8 @@ def _finish(
 ) -> None:
     session = mxbiflow.session
     summary = run_summary(session, mxbiflow.trials)
-    publish_summary(summary)
+    if not is_offline():
+        publish_summary(summary)
     names: list[str] = []
     if recorder.recording:
         names += [END_SESSION, UPLOAD_RESULTS] + (
@@ -186,6 +203,8 @@ def _finish(
 
 
 def _report_not_started(reason: str) -> None:
+    if is_offline():
+        return
     try:
         notify("mxbiflow run not started", reason, severity="critical")
     except Exception:  # noqa: BLE001 - the log keeps the reason when cogmoteGO is absent

@@ -1,7 +1,10 @@
+import logging
 import os
 from pathlib import Path
 
 from pydantic import BaseModel
+
+logger = logging.getLogger("mxbiflow")
 
 
 class ConfigStore[T: BaseModel]:
@@ -28,15 +31,6 @@ class ConfigStore[T: BaseModel]:
         if not os.access(self._config_path, os.R_OK):
             raise PermissionError(f"Config file {self._config_path} is not readable")
 
-    def _create_default_config(self) -> T:
-        config = self._config_class()
-        self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        self._config_path.write_text(
-            config.model_dump_json(indent=4),
-            encoding="utf-8",
-        )
-        return config
-
     def _load_config(self) -> T:
         try:
             self._ensure_config_readable()
@@ -44,7 +38,12 @@ class ConfigStore[T: BaseModel]:
             return self._config_class.model_validate_json(text)
         except Exception as e:
             if self._create_default:
-                return self._create_default_config()
+                # Only save() writes: loading never changes the file.
+                if self._config_path.exists():
+                    logger.warning(
+                        "using defaults: %s is invalid: %s", self._config_path, e
+                    )
+                return self._config_class()
             raise RuntimeError(
                 f"Failed to load config file {self._config_path}: {e}"
             ) from e

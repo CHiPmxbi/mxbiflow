@@ -5,7 +5,8 @@ under the ``hardware`` key of the device configuration that cogmoteGO caches
 (cagelab/cogmote#439). At each start it is copied to the device-global file
 (:func:`~mxbiflow.core.path.get_mxbi_config_path`), which the wizard's MXBI
 panel also edits; the file is used as is when cogmote has no preset or
-cogmoteGO is unreachable.
+cogmoteGO is unreachable. Offline, the run reads the experiment's own
+``config/mxbi.json`` and asks cogmote nothing.
 """
 
 import shutil
@@ -14,7 +15,8 @@ import socket
 from pydantic import ValidationError
 from pymotego import Client
 
-from ..core.path import get_legacy_mxbi_config_path, get_mxbi_config_path
+from ..core.offline import is_offline
+from ..core.path import get_mxbi_config_path, get_offline_mxbi_config_path
 from ..driver import MXBIModel
 from ..utils.logger import logger
 from .cogmote_config import CogmoteConfigError
@@ -32,7 +34,7 @@ def sync_hardware_config(client: Client | None = None) -> None:
     Raises :class:`HardwareConfigError` for a preset mxbiflow cannot read.
     """
     path = get_mxbi_config_path()
-    legacy = get_legacy_mxbi_config_path()
+    legacy = get_offline_mxbi_config_path()
     if not path.exists() and legacy.is_file():
         path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(legacy, path)
@@ -58,11 +60,11 @@ def sync_hardware_config(client: Client | None = None) -> None:
 
 
 def read_hardware_config() -> MXBIModel:
-    """Return the device-global hardware configuration.
+    """Return the hardware configuration: the device-global one, or offline the experiment's.
 
     Raises :class:`HardwareConfigError` when there is none or it is invalid.
     """
-    path = get_mxbi_config_path()
+    path = get_offline_mxbi_config_path() if is_offline() else get_mxbi_config_path()
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError as error:
@@ -80,6 +82,8 @@ def read_hardware_config() -> MXBIModel:
 
 def device_name(client: Client | None = None) -> str:
     """Return the device name in cogmote, or the host name without one."""
+    if is_offline():
+        return socket.gethostname()
     try:
         device = (client if client is not None else Client()).get_config().get("device")
         if isinstance(device, dict) and isinstance(name := device.get("name"), str):

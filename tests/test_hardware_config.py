@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from mxbiflow.core.path import (
-    get_legacy_mxbi_config_path,
+    get_offline_mxbi_config_path,
     get_mxbi_config_path,
     set_base_path,
 )
@@ -70,12 +70,12 @@ class HardwareConfigTests(unittest.TestCase):
         self.assertEqual(read_hardware_config().screen_size, (1280, 800))
 
     def test_experiment_config_is_migrated_once(self) -> None:
-        self.write(get_legacy_mxbi_config_path(), {"mxbi_id": "rig", **PRESET})
+        self.write(get_offline_mxbi_config_path(), {"mxbi_id": "rig", **PRESET})
 
         sync_hardware_config(unreachable())
         self.assertEqual(read_hardware_config().screen_size, (1280, 800))
 
-        self.write(get_legacy_mxbi_config_path(), {"screen_size": [800, 480]})
+        self.write(get_offline_mxbi_config_path(), {"screen_size": [800, 480]})
         sync_hardware_config(unreachable())
         self.assertEqual(read_hardware_config().screen_size, (1280, 800))
 
