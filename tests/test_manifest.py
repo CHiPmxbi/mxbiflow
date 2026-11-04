@@ -147,7 +147,13 @@ class DescribeTests(unittest.TestCase):
         hardware = settings["hardware"]["schema"]
         self.assertEqual(
             set(hardware["properties"]),
-            {"screen_size", "rewarders", "detectors", "eyetrackers"},
+            {
+                "screen_size",
+                "rewarders",
+                "detectors",
+                "eyetrackers",
+                "frequency_response_table",
+            },
         )
         self.assertNotIn("$defs", hardware)
         self.assertNotIn("$ref", json.dumps(hardware))

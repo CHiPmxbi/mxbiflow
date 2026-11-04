@@ -1,6 +1,9 @@
+from typing import Annotated
+
 from py_mx_eye import MxEye, MxEyeConfig
 from pydantic import BaseModel, Field
 
+from ..audioplayer.frequency_response_table import FrequencyResponseTable
 from ..detector import (
     BeambreakContinuousDetector,
     Detector,
@@ -38,6 +41,15 @@ class MXBIModel(BaseModel):
     eyetrackers: list[EyetrackerModel] = Field(
         default_factory=list, title="Eye trackers"
     )
+    frequency_response_table: dict[int, Annotated[int, Field(ge=0, le=100)]] = Field(
+        default_factory=dict,
+        title="Frequency response table",
+        description="Master volume for each tone frequency, for this rig's speaker",
+        json_schema_extra={
+            "propertyNames": {"pattern": "^[1-9][0-9]*$"},
+            "x-mxbi-columns": ["Frequency (Hz)", "Master volume (%)"],
+        },
+    )
 
 
 def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
@@ -46,6 +58,10 @@ def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
         _build_rewarders(config.rewarders, logger),
         _build_detectors(config.detectors),
         _build_eyetrackers(config.eyetrackers),
+        # An empty table is no table: stages test for None before looking up a volume.
+        FrequencyResponseTable(config.frequency_response_table)
+        if config.frequency_response_table
+        else None,
     )
 
 
