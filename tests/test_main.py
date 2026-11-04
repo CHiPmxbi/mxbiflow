@@ -1,5 +1,8 @@
+import json
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import timedelta
+from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -212,6 +215,30 @@ class RunExperimentTests(unittest.TestCase):
         handler(15, None)
         self.game.request_quit.assert_called_once_with()
 
+    def test_help_lists_the_flags_and_starts_nothing(self) -> None:
+        out = StringIO()
+        with redirect_stdout(out):
+            run.run_experiment(SceneManager(), argv=["--help"])
+
+        self.assertIn("--from-cogmote", out.getvalue())
+        self.assertIn("--describe", out.getvalue())
+        self.mocks["run_wizard"].assert_not_called()
+        self.mocks["apply_cogmote_config"].assert_not_called()
+
+    def test_argv_defaults_to_the_command_line(self) -> None:
+        with patch("sys.argv", ["main.py", "--from-cogmote"]):
+            run.run_experiment(SceneManager())
+
+        self.mocks["apply_cogmote_config"].assert_called_once()
+        self.mocks["run_wizard"].assert_not_called()
+
+    def test_an_unknown_flag_exits_without_a_run(self) -> None:
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
+            run.run_experiment(SceneManager(), argv=["--no-describe"])
+
+        self.assertEqual(raised.exception.code, 2)
+        self.mocks["run_wizard"].assert_not_called()
+
 
 class CliTests(unittest.TestCase):
     @patch.object(cli, "setup_logging")
@@ -221,12 +248,34 @@ class CliTests(unittest.TestCase):
         self, run_experiment: Mock, _set_base_path: Mock, _setup_logging: Mock
     ) -> None:
         cli.main(["run", "--from-cogmote"])
+        cli.main(["run", "--describe"])
+        cli.main(["--from-cogmote"])
+        cli.main(["run"])
         cli.main([])
 
         self.assertEqual(
             [call.kwargs["argv"] for call in run_experiment.call_args_list],
-            [["--from-cogmote"], []],
+            [["--from-cogmote"], ["--describe"], ["--from-cogmote"], [], []],
         )
+
+    @patch.object(cli, "run_experiment")
+    def test_schema_prints_json_without_a_run(self, run_experiment: Mock) -> None:
+        out = StringIO()
+        with redirect_stdout(out):
+            cli.main(["schema"])
+
+        self.assertIn("properties", json.loads(out.getvalue()))
+        run_experiment.assert_not_called()
+
+    @patch.object(cli, "run_experiment")
+    def test_help_lists_the_commands_and_flags(self, run_experiment: Mock) -> None:
+        out = StringIO()
+        with redirect_stdout(out):
+            cli.main(["--help"])
+
+        for name in ("run", "schema", "--from-cogmote", "--describe"):
+            self.assertIn(name, out.getvalue())
+        run_experiment.assert_not_called()
 
 
 if __name__ == "__main__":

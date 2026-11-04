@@ -1,25 +1,26 @@
 from time import sleep
 
-import typer
+from cyclopts import App
+from rich.prompt import Confirm, FloatPrompt, IntPrompt
 
-app = typer.Typer()
+app = App(version_flags=[], result_action="return_value")
 
 
-def prompt_sensor_config():
-    pin = typer.prompt("GPIO pin", type=int, default=17)
+def prompt_sensor_config() -> tuple[int, float, bool]:
+    pin = IntPrompt.ask("GPIO pin", default=17)
     if pin < 0:
-        raise typer.BadParameter("pin must be >= 0")
+        raise SystemExit("pin must be >= 0")
 
-    debounce_time = typer.prompt("Debounce time (seconds)", type=float, default=0.05)
+    debounce_time = FloatPrompt.ask("Debounce time (seconds)", default=0.05)
     if debounce_time < 0:
-        raise typer.BadParameter("debounce_time must be >= 0")
+        raise SystemExit("debounce_time must be >= 0")
 
-    normally_open = typer.confirm("Normally open?", default=True)
+    normally_open = Confirm.ask("Normally open?", default=True)
     return pin, debounce_time, normally_open
 
 
-@app.command()
-def run():
+@app.default
+def run() -> None:
     from .rpi_ir_break_beam_sensor import RPIIRBreakBeamSensor
 
     pin, debounce_time, normally_open = prompt_sensor_config()
