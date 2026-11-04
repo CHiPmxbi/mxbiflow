@@ -394,8 +394,9 @@ pinned to a commit:
 uv add "mxbiflow @ git+https://github.com/CHiPmxbi/mxbiflow.git@<commit>"
 ```
 
-Some of its dependencies (pymoteGO, py-mx-eye) are private git repositories,
-so the installing machine needs read access to them.
+Two of its dependencies (pymoteGO, cogmatrix-python) are private git
+repositories, so the installing machine needs read access to them. CI on a fork
+reads them with a `CAGELAB_TOKEN` secret, a token of an account with that access.
 
 Hardware interfaces and drivers are available under `mxbiflow.driver`:
 
