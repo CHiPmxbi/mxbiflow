@@ -234,6 +234,12 @@ unreachable, that file is used as it is; an experiment's old
 hardware configuration the run does not start. The device name in cogmote
 names the rig in report and CogMatrix session titles.
 
+The speaker's frequency response table is part of it: `frequency_response_table`
+maps a tone frequency to a master volume, entered as a table in the preset, and
+stages read it from `mxbi.aplayer.frequency_response_table`. Without a table that
+is `None`, and tones play at the volume of their unit. Offline, the table comes
+from `~/.config/mxbi/frequency_response_table.json` instead.
+
 ## Experiment manifest and stage configurations
 
 `--describe` (`uv run main.py --describe`) prints the experiment's manifest as

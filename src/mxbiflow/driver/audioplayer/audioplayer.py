@@ -82,7 +82,12 @@ class PlayTask:
 
 
 class AudioPlayer:
-    def __init__(self, *, blocksize: int = 1024):
+    def __init__(
+        self,
+        *,
+        blocksize: int = 1024,
+        frequency_response_table: FrequencyResponseTable | None = None,
+    ):
         if blocksize <= 0:
             raise ValueError("blocksize must be positive")
         self._blocksize = blocksize
@@ -90,7 +95,7 @@ class AudioPlayer:
         self._active_tasks: set[PlayTask] = set()
         self._done_lock = Lock()
         self._done_deque: deque[tuple[PlayTask, PlayResult]] = deque()
-        self._frequency_response_table = FrequencyResponseTable.from_file()
+        self._frequency_response_table = frequency_response_table
 
     @property
     def frequency_response_table(self) -> FrequencyResponseTable | None:

@@ -18,6 +18,7 @@ from pymotego import Client
 from ..core.offline import is_offline
 from ..core.path import get_mxbi_config_path, get_offline_mxbi_config_path
 from ..driver import MXBIModel
+from ..driver.audioplayer.frequency_response_table import FrequencyResponseTable
 from ..utils.logger import logger
 from .cogmote_config import CogmoteConfigError
 
@@ -73,11 +74,21 @@ def read_hardware_config() -> MXBIModel:
             "in cogmote, or configure the rig in the MXBI panel"
         ) from error
     try:
-        return MXBIModel.model_validate_json(text)
+        config = MXBIModel.model_validate_json(text)
     except ValidationError as error:
         raise HardwareConfigError(
             f"the hardware configuration {path} is invalid: {error}"
         ) from error
+    if is_offline():
+        # Offline the table comes from its own file, shared by the experiments.
+        try:
+            table = FrequencyResponseTable.from_file()
+        except ValidationError as error:
+            raise HardwareConfigError(
+                f"the frequency response table is invalid: {error}"
+            ) from error
+        config.frequency_response_table = table.root if table else {}
+    return config
 
 
 def device_name(client: Client | None = None) -> str:

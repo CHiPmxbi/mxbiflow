@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ..audioplayer import AudioPlayer
+from ..audioplayer.frequency_response_table import FrequencyResponseTable
 from ..detector.detector import Detector
 from ..eyetracker.eyetracker import Eyetracker
 from ..rewarder.rewarder import Rewarder
@@ -15,6 +16,7 @@ class MXBI:
         rewarder: Rewarder | dict[int, Rewarder],
         detector: Detector | dict[int, Detector],
         eyetracker: Eyetracker | dict[int, Eyetracker] | None = None,
+        frequency_response_table: FrequencyResponseTable | None = None,
     ):
         if not isinstance(screen_size, Screen):
             screen_size = Screen(width=screen_size[0], height=screen_size[1])
@@ -24,7 +26,7 @@ class MXBI:
         self._eyetracker: dict[int, Eyetracker] = self._normalize_optional(
             eyetracker, "eyetracker"
         )
-        self._aplayer = AudioPlayer()
+        self._aplayer = AudioPlayer(frequency_response_table=frequency_response_table)
 
     @staticmethod
     def _normalize(obj, name: str) -> dict[int, Any]:
