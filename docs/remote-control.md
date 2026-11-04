@@ -29,7 +29,7 @@ On the rig, through the loopback listener:
 
 ```bash
 curl -X POST http://127.0.0.1:9011/api/proxies/mxbiflow/requests \
-  -H 'Content-Type: application/json' -d '{"command": "pause"}'
+  -H 'Content-Type: application/json' -d '{"command": "level_up"}'
 ```
 
 ## Built-in commands
@@ -42,8 +42,6 @@ curl -X POST http://127.0.0.1:9011/api/proxies/mxbiflow/requests \
 | `prev_stage` | | Previous stage in the animal's `stage_order`. |
 | `switch_stage` | `stage`: one of the registered stages | Move the current animal to any registered stage. |
 | `reward` | `duration_ms`: 1–10000 | Give a manual reward on rewarder 0. |
-| `pause` | | Show IDLE and start no task; a running trial is aborted. |
-| `resume` | | Resume scheduling; the present animal's task starts. |
 | `screenshot` | | Save a screenshot to the session screenshot directory. |
 | `quit` | | End the run, as `Esc` does; cogmote asks to confirm. It is marked `stop`, so cogmoteGO sends it when asked to stop the experiment. |
 

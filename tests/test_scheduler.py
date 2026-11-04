@@ -252,34 +252,6 @@ class ManualControlTests(unittest.TestCase):
 
         self.assertEqual(session.require_current_animal().current_stage_name, "stage_a")
 
-    def test_pause_shows_idle_and_resume_restarts_task(self) -> None:
-        session, _animal = self._make_session(stage="stage_a")
-        scheduler, scene_manager = self._make_scheduler(session)
-        scene_manager.register({IDLE.name(): HeadlessIdle})
-        scheduler = Scheduler(session, scene_manager)
-        session.set_current_animal("animal-a")
-        scheduler.level_up()
-        scheduler.update()
-        scene_manager.apply_pending()
-        self.assertIsInstance(scene_manager.current, StageA)
-
-        scheduler.pause()
-        scheduler.update()
-        scene_manager.apply_pending()
-        self.assertTrue(scheduler.paused)
-        self.assertIsInstance(scene_manager.current, IDLE)
-
-        scheduler.level_up()
-        scheduler.update()
-        scene_manager.apply_pending()
-        self.assertIsInstance(scene_manager.current, IDLE)
-
-        scheduler.resume()
-        scheduler.update()
-        scene_manager.apply_pending()
-        self.assertFalse(scheduler.paused)
-        self.assertIsInstance(scene_manager.current, StageA)
-
 
 class IdentityUpdateTests(unittest.TestCase):
     def setUp(self) -> None:
