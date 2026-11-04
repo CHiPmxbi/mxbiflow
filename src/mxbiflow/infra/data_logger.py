@@ -66,11 +66,12 @@ class DataLogger:
     def _get_path(self, suffix: str) -> Path:
         return self._data_dir / f"{self._filename}{suffix}"
 
-    def _register_data_path(self) -> None:
+    def _register_data_path(self, path: Path | None = None) -> None:
         self._session.register_stage_data_path(
             animal=self._animal,
             stage=self._stage,
         )
+        self._session.add_upload(path or self._data_path)
 
     def save(self, data: LogRecord) -> None:
         match self._type:
@@ -134,4 +135,4 @@ class DataLogger:
             logger.error("Failed to write CSV row to %s: %s", csv_path, e)
             raise
 
-        self._register_data_path()
+        self._register_data_path(csv_path)

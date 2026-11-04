@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace, TracebackType
 from typing import Any, Self
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 from uuid import UUID, uuid4
 
 import httpx
@@ -19,6 +19,7 @@ from test_session import make_session
 
 from mxbiflow.core.path import set_base_path
 from mxbiflow.infra.cogmatrix_sync import CogMatrixRecorder, PendingRun
+from mxbiflow.infra.data_logger import DataLogger, DataLoggerType
 from mxbiflow.infra.run_end import (
     END_SESSION,
     UPLOAD_RECORDING,
@@ -419,6 +420,120 @@ class CogMatrixRecorderTests(unittest.TestCase):
         create = self.fake.calls[0][1]
         self.assertGreater(end.ended_at, create["started_at"])
         self.assertEqual(list(self.state.iterdir()), [])
+
+    def named_file(self, session: Session, name: str = "fit.csv") -> Path:
+        """A file the experiment wrote in the stage directory of animal-1, and named."""
+        path = session.absolute_animal_data_path("animal-1") / "s" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("a,b\n", encoding="utf-8")
+        session.add_upload(path)
+        return path
+
+    def run_named(self, recorder: CogMatrixRecorder) -> Path:
+        session = make_session()
+        session.start(self.root / "data")
+        recorder.start(session)
+        path = self.named_file(session)
+        session.end()
+        recorder.finish(session)
+        return path
+
+    def test_a_named_file_uploads_with_the_results(self) -> None:
+        path = self.run_named(self.recorder())
+
+        self.assertEqual(
+            {u["name"]: u["path"] for u in self.fake.uploads},
+            {"animal-1-s-fit.csv": path, "session.json": ANY},
+        )
+        self.assertEqual(self.data_calls()[1]["complete"], False)
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_file_named_before_the_recorder_started_is_kept(self) -> None:
+        session = make_session()
+        session.start(self.root / "data")
+        self.named_file(session)
+
+        self.recorder().start(session)
+
+        [run_dir] = list(self.state.iterdir())
+        self.assertIn(
+            "animal-1-s-fit.csv",
+            json.loads((run_dir / "run.json").read_text())["named_files"],
+        )
+
+    def test_a_retry_uploads_the_named_file(self) -> None:
+        self.fake.fail = {"upload"}
+        path = self.run_named(self.recorder())
+        self.assertEqual(self.fake.uploads, [])
+
+        self.recorder().retry_pending()
+
+        self.assertIn(
+            ("animal-1-s-fit.csv", path),
+            [(u["name"], u["path"]) for u in self.fake.uploads],
+        )
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_crashed_run_uploads_its_named_files(self) -> None:
+        session = make_session()
+        session.start(self.root / "data")
+        self.recorder().start(session)
+        path = self.named_file(session)
+        # The process dies here; there is no result.jsonl, only the named file.
+
+        self.recorder().retry_pending()
+
+        self.assertEqual(
+            [(u["name"], u["path"]) for u in self.fake.uploads],
+            [("animal-1-s-fit.csv", path)],
+        )
+        end = next(value for name, value in self.fake.calls if name == "end")
+        self.assertEqual(end.status, ExperimentSessionStatus.aborted)
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_named_file_gone_at_upload_does_not_fail_the_others(self) -> None:
+        session = make_session()
+        session.start(self.root / "data")
+        recorder = self.recorder()
+        recorder.start(session)
+        self.named_file(session).unlink()
+        kept = self.named_file(session, "kept.csv")
+        session.end()
+
+        with self.assertLogs("mxbiflow", "WARNING") as logs:
+            recorder.finish(session)
+
+        self.assertIn("is gone", "".join(logs.output))
+        self.assertIn(kept, [u["path"] for u in self.fake.uploads])
+        self.assertNotIn("animal-1-s-fit.csv", [u["name"] for u in self.fake.uploads])
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_data_logger_uploads_its_file_with_any_name_and_type(self) -> None:
+        for name, kind, asset in [
+            ("trials", DataLoggerType.CSV, "animal-1-s-trials.csv"),
+            ("summary", DataLoggerType.JSON, "animal-1-s-summary.json"),
+            ("result", DataLoggerType.JSONL, "animal-1-s-result.jsonl"),
+        ]:
+            with self.subTest(asset):
+                self.fake.uploads.clear()
+                self.fake.arrived.clear()
+                session = make_session()
+                session.start(self.root / "data")
+                recorder = self.recorder()
+                recorder.start(session)
+                logger = DataLogger(
+                    session, animal="animal-1", stage="s", filename=name, type=kind
+                )
+                logger.save({"trial": 1})
+                logger.save({"trial": 2})
+                session.end()
+
+                recorder.finish(session)
+
+                self.assertEqual(
+                    sorted(u["name"] for u in self.fake.uploads),
+                    sorted([asset, "session.json"]),
+                )
 
     def test_without_an_experiment_config_nothing_is_recorded(self) -> None:
         config = {**CONFIG, "experiment": None}

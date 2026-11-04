@@ -87,6 +87,19 @@ class MXBIFlow:
             self._trial_publisher = TrialPublisher(self._session)
         self._trial_publisher.publish(record, correct=correct)
 
+    def upload_file(self, path: Path | str) -> None:
+        """Upload a file with the current run's results.
+
+        The file is under the run's data directory, and is read when the run
+        uploads, so it can still grow. It is kept in the run's local record at
+        once, so a retry or a crashed run uploads it too; a file gone by then
+        logs a warning. Its asset name drops the date and session number from
+        the path: ``<animal>-<stage>-<file>``. Raises ``ValueError`` for a path
+        outside the data directory and for two files with the same asset name.
+        :class:`~mxbiflow.infra.data_logger.DataLogger` names its own file.
+        """
+        self._session.add_upload(path)
+
     def update(self) -> None:
         self._timer.update()
 
