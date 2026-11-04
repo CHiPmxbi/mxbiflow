@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from pymotego import Broadcast, Client, State, Step
 from pymotego.errors import ProblemError
 
+from ..core.offline import is_offline
 from ..models.session import Session
 from ..utils.logger import logger
 from .camera_recording import TrialMark
@@ -208,6 +209,8 @@ class RunEnd:
         return True
 
     def _send(self, state: State) -> None:
+        if is_offline():
+            return
         self._sent_at = time.monotonic()
         try:
             self._client.patch_status(state=state, steps=self.steps)

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.config_store import ConfigStore
+from ..core.offline import is_offline
 from ..core.path import (
     get_config_session_path,
     get_database_path,
@@ -17,11 +18,11 @@ from ..core.path import (
 )
 from ..infra.cogmote_config import read_experiment_config
 from ..models.database import MXBIDatabase
-from ..models.experiment import ExperimentAnimal
 from ..models.panel import MXBIPanelConfig
 from ..models.session import SessionConfig
 from ..scene import SceneManager
 from ..utils.logger import logger
+from .components.animal import AnimalOption
 from .components.countdown import AutoAcceptCountdown
 from .components.experiment_groups import (
     ExperimentAnimalsGroup,
@@ -46,17 +47,21 @@ class ExperimentPanel(QDialog):
         )
         layout_main.addWidget(self.group_config)
 
-        animals = _configured_animals()
+        self._animals = (
+            _database_animals(self._database.value)
+            if is_offline()
+            else _configured_animals()
+        )
         self.group_scene = ExperimentSceneGroup(
             self,
             stages=list(self._stage_level_tables.keys()),
-            animals=[animal.name for animal in animals],
+            animals=[animal.name for animal in self._animals],
         )
         layout_main.addWidget(self.group_scene)
 
         self.group_animals = ExperimentAnimalsGroup(
             self,
-            animals=animals,
+            animals=self._animals,
             stage_level_tables=self._stage_level_tables,
         )
         layout_main.addWidget(self.group_animals)
@@ -113,11 +118,24 @@ class ExperimentPanel(QDialog):
 
     def _on_save(self) -> bool:
         """Save the configuration, or say why it cannot be saved."""
+        if not is_offline() and not self._animals:
+            self.label_error.setText(
+                "cogmote offers no animals: cogmoteGO is unreachable or no experiment "
+                "is configured. Turn on Offline on the first panel to use the local "
+                "configuration."
+            )
+            return False
         try:
             config = self._collect_result()
         except ValidationError as error:
             self.label_error.setText(
                 "; ".join(detail["msg"] for detail in error.errors())
+            )
+            return False
+        if any(not animal.name for animal in config.animals):
+            self.label_error.setText(
+                "every animal card needs an animal; offline they come from the "
+                f"animals in {get_database_path()}"
             )
             return False
         self.label_error.clear()
@@ -144,7 +162,15 @@ class ExperimentPanel(QDialog):
         super().done(result)
 
 
-def _configured_animals() -> tuple[ExperimentAnimal, ...]:
+def _database_animals(database: MXBIDatabase) -> tuple[AnimalOption, ...]:
+    """The animals of ``db.json``, each with its RFID tags."""
+    tags: dict[str, list[str]] = {}
+    for tag, name in database.animals.items():
+        tags.setdefault(name, []).append(tag)
+    return tuple(AnimalOption("", name, tuple(t)) for name, t in tags.items())
+
+
+def _configured_animals() -> tuple[AnimalOption, ...]:
     """The cage's animals from the cogmote configuration, with their RFID tags."""
     try:
         experiment = read_experiment_config()
@@ -156,4 +182,7 @@ def _configured_animals() -> tuple[ExperimentAnimal, ...]:
             "no experiment is configured in cogmote; the wizard has no animals"
         )
         return ()
-    return experiment.animals
+    return tuple(
+        AnimalOption(animal.id, animal.name, animal.rfid_tags)
+        for animal in experiment.animals
+    )

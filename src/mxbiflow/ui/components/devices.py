@@ -54,6 +54,10 @@ class Devices[T: (RewarderModel, DetectorModel)](QGroupBox):
     def results(self) -> list[T]:
         return [card.result for card in self._cards]
 
+    def clear(self) -> None:
+        for card in self.cards:
+            self._on_remove_requested(card)
+
     def load_models(self, models: Sequence[T]) -> None:
         for model in models:
             self.add_model(model)

@@ -11,6 +11,7 @@ from ..infra.camera_recording import TrialMark
 from ..infra.timer import FrameTimer
 from ..infra.trial_status import TrialPublisher
 from ..models.session import Session
+from .offline import is_offline
 from .path import get_data_dir_path
 
 
@@ -64,6 +65,7 @@ class MXBIFlow:
         Patches the device status (animal, ``stage@level``, trial count and
         accuracy) and publishes ``record`` to the ``trials`` broadcast. Call it
         once per trial; ``correct=None`` leaves the trial out of accuracy.
+        Offline, nothing is sent; the trial still counts in the run summary.
         Pass the record model, not its dump: its ``AnimalBaseInfo`` becomes the
         event's context and its fields the table's schema hint
         (:mod:`mxbiflow.models.trial`).
@@ -79,6 +81,8 @@ class MXBIFlow:
                 correct=correct,
             )
         )
+        if is_offline():
+            return
         if self._trial_publisher is None:
             self._trial_publisher = TrialPublisher(self._session)
         self._trial_publisher.publish(record, correct=correct)

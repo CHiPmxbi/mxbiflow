@@ -19,6 +19,7 @@ from ..core.path import (
     get_database_path,
     get_mxbi_config_path,
     get_mxbi_panel_config_path,
+    get_offline_mxbi_config_path,
 )
 from ..models.database import MXBIDatabase
 from ..models.panel import MXBIPanelConfig
@@ -49,9 +50,9 @@ class MXBIPanel(QDialog):
 
     def __init__(self) -> None:
         super().__init__()
-        self._config = ConfigStore(get_mxbi_config_path(), MXBIModel)
         self._database = ConfigStore(get_database_path(), MXBIDatabase)
         self._panel_config = ConfigStore(get_mxbi_panel_config_path(), MXBIPanelConfig)
+        self._config = _hardware_store(self._panel_config.value.offline)
 
         self._build_ui()
         self._load_from_config()
@@ -107,14 +108,28 @@ class MXBIPanel(QDialog):
 
         return layout
 
+    @property
+    def offline(self) -> bool:
+        return self.base_config.check_offline.isChecked()
+
     def _load_from_config(self) -> None:
-        self.base_config.load_from_model(self._config.value)
+        self.base_config.check_offline.setChecked(self._panel_config.value.offline)
         self.base_config.load_auto_accept_timeout(
             self._panel_config.value.auto_accept_timeout_seconds
         )
+        self._load_hardware()
 
+    def _load_hardware(self) -> None:
+        self.base_config.load_from_model(self._config.value)
         self.rewarders_group.load_models(self._config.value.rewarders)
         self.detectors_group.load_models(self._config.value.detectors)
+
+    def _on_offline_toggled(self, offline: bool) -> None:
+        # Each mode has its own file; neither is written until Save or Continue.
+        self._config = _hardware_store(offline)
+        self.rewarders_group.clear()
+        self.detectors_group.clear()
+        self._load_hardware()
 
     def _collect_result(self) -> None:
         self.base_config.apply_to_model(self._config.value)
@@ -125,24 +140,24 @@ class MXBIPanel(QDialog):
     def _on_save(self) -> None:
         self._collect_result()
         self._config.save()
-        self._save_auto_accept_timeout()
+        self._save_panel_config()
 
     def _on_continue(self) -> None:
-        self._collect_result()
-        self._config.save()
-        self._save_auto_accept_timeout()
+        self._on_save()
         self.accept()
 
-    def _save_auto_accept_timeout(self) -> None:
+    def _save_panel_config(self) -> None:
         self._panel_config.value.auto_accept_timeout_seconds = (
             self.base_config.auto_accept_timeout
         )
+        self._panel_config.value.offline = self.offline
         self._panel_config.save()
 
     def _start_auto_accept_countdown(self) -> None:
         self._countdown.start(self._panel_config.value.auto_accept_timeout_seconds)
 
     def _bind_events(self) -> None:
+        self.base_config.check_offline.toggled.connect(self._on_offline_toggled)
         self.cancel_button.clicked.connect(self._on_cancel)
         self.save_button.clicked.connect(self._on_save)
         self.continue_button.clicked.connect(self._on_continue)
@@ -158,3 +173,8 @@ class MXBIPanel(QDialog):
     def done(self, result: int) -> None:
         self._countdown.stop()
         super().done(result)
+
+
+def _hardware_store(offline: bool) -> ConfigStore[MXBIModel]:
+    path = get_offline_mxbi_config_path() if offline else get_mxbi_config_path()
+    return ConfigStore(path, MXBIModel)

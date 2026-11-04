@@ -18,7 +18,7 @@ class DatabaseTests(unittest.TestCase):
                     Path(home) / ".config" / "mxbi" / "db.json",
                 )
 
-    def test_missing_database_is_created_with_empty_data(self) -> None:
+    def test_missing_database_loads_empty_and_is_not_created(self) -> None:
         with (
             tempfile.TemporaryDirectory() as home,
             patch("mxbiflow.core.path.Path.home", return_value=Path(home)),
@@ -27,11 +27,7 @@ class DatabaseTests(unittest.TestCase):
             database = ConfigStore(path, MXBIDatabase).value
 
             self.assertEqual(database, MXBIDatabase())
-            self.assertTrue(path.is_file())
-            self.assertEqual(
-                MXBIDatabase.model_validate_json(path.read_text(encoding="utf-8")),
-                database,
-            )
+            self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":

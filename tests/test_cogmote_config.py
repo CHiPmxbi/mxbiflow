@@ -334,12 +334,13 @@ class WizardAnimalsTests(unittest.TestCase):
             side_effect=ConnectionError("cogmoteGO is not running"),
         ):
             panel = ExperimentPanel(SceneManager())
-        stale = AnimalConfig(name="Mira", rfid_tags=("old",))
+        saved = AnimalConfig(name="Mira", rfid_tags=("old",))
         panel.group_animals.load_config(
-            SessionConfig(unknown_animal_as=stale.name, animals=(stale,))
+            SessionConfig(unknown_animal_as="Mira", animals=(saved,))
         )
 
-        self.assertEqual(panel.group_animals.result()[-1].rfid_tags, ())
+        self.assertEqual(panel.group_animals.result()[-1].name, "Mira")
+        self.assertEqual(panel.group_animals.result()[-1].rfid_tags, ("old",))
         panel.close()
 
 

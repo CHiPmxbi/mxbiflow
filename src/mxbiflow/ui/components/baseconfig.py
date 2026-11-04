@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QGroupBox,
@@ -21,6 +22,11 @@ class BaseConfig(QGroupBox):
 
         self._layout = QFormLayout()
         self.setLayout(self._layout)
+
+        self.check_offline = QCheckBox(
+            "use the local configuration, without cogmoteGO, cogmote or CogMatrix"
+        )
+        self._layout.addRow(QLabel("offline:"), self.check_offline)
 
         self._label_screen = QLabel("screen:")
         self._combo_screen = QComboBox()
