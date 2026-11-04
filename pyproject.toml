@@ -7,6 +7,7 @@ authors = [{ name = "HuYang", email = "huyangcommit@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "cogmatrix",
+    "cyclopts>=5.3.3",
     "gpiozero>=2.0.1.post3",
     "httpx>=0.28.1",
     "inflection>=0.5.1",
@@ -28,7 +29,6 @@ dependencies = [
     "sounddevice>=0.5.6",
     "soundfile>=0.14.0",
     "stamina>=26.1.0",
-    "typer>=0.27.1",
     "varname>=1.0.0",
 ]
 

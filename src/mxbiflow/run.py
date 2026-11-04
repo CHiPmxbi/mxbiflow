@@ -1,12 +1,14 @@
 """Run an experiment: through the wizard, or headless from the cogmote configuration."""
 
-import argparse
 import json
 import signal
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from threading import Thread
+
+from cyclopts import App, Parameter
 
 from .bootstrap import init_gameloop
 from .core.context import MXBIFlow, get_mxbiflow
@@ -41,6 +43,44 @@ from .scene import SceneManager
 from .ui import run_wizard
 from .ui.run_end_screen import show_run_end
 from .utils.logger import logger
+
+
+@Parameter(name="*")
+@dataclass(frozen=True, kw_only=True)
+class RunFlags:
+    """The command-line flags of a run."""
+
+    from_cogmote: bool = False
+    """Start from the cogmote configuration without the wizard."""
+
+    describe: bool = False
+    """Print the experiment manifest as JSON and exit, without a run."""
+
+    def argv(self) -> list[str]:
+        return [
+            flag
+            for flag, on in (
+                ("--from-cogmote", self.from_cogmote),
+                ("--describe", self.describe),
+            )
+            if on
+        ]
+
+
+def _parse_flags(argv: Sequence[str] | None) -> RunFlags | None:
+    """Return the flags in ``argv``, or ``None`` when it only asked for ``--help``."""
+    app = App(
+        help="Run the experiment.",
+        version_flags=[],
+        default_parameter=Parameter(negative=()),
+        result_action="return_value",
+    )
+
+    @app.default
+    def parse(flags: RunFlags = RunFlags()) -> RunFlags:
+        return flags
+
+    return app(argv)
 
 
 def run_experiment(
@@ -84,19 +124,10 @@ def run_experiment(
     ``--describe`` prints the experiment manifest (:mod:`mxbiflow.infra.manifest`)
     and returns without a window, hardware or run.
     """
-    parser = argparse.ArgumentParser(description="Run the experiment.")
-    parser.add_argument(
-        "--from-cogmote",
-        action="store_true",
-        help="start from the cogmote configuration without the wizard",
-    )
-    parser.add_argument(
-        "--describe",
-        action="store_true",
-        help="print the experiment manifest as JSON and exit, without a run",
-    )
-    args = parser.parse_args(argv)
-    if args.describe:
+    flags = _parse_flags(argv)
+    if flags is None:
+        return
+    if flags.describe:
         print(json.dumps(describe(scene_manager, get_base_path()), indent=2))
         return
     processors = post_processors or {}
@@ -105,7 +136,7 @@ def run_experiment(
     camera: CameraRecording | None = None
     recorder = recorder or CogMatrixRecorder()
     try:
-        if args.from_cogmote:
+        if flags.from_cogmote:
             apply_cogmote_config(scene_manager.scenes.keys())
             sync_hardware_config()
         elif not run_wizard(scene_manager):

@@ -1,38 +1,35 @@
-import typer
+from cyclopts import App
+from rich.prompt import FloatPrompt, IntPrompt, Prompt
 
-app = typer.Typer()
+app = App(version_flags=[], result_action="return_value")
 
 
 def prompt_detector_config() -> tuple[str, int, int, float, float]:
-    port = typer.prompt("RFID serial port", type=str, default="/dev/ttyUSB0")
+    port = Prompt.ask("RFID serial port", default="/dev/ttyUSB0")
     if not port.strip():
-        raise typer.BadParameter("port cannot be empty")
+        raise SystemExit("port cannot be empty")
 
-    baudrate = typer.prompt("RFID baudrate", type=int, default=9600)
+    baudrate = IntPrompt.ask("RFID baudrate", default=9600)
     if baudrate <= 0:
-        raise typer.BadParameter("baudrate must be > 0")
+        raise SystemExit("baudrate must be > 0")
 
-    pin = typer.prompt("Beam-break GPIO pin", type=int, default=17)
+    pin = IntPrompt.ask("Beam-break GPIO pin", default=17)
     if pin < 0:
-        raise typer.BadParameter("pin must be >= 0")
+        raise SystemExit("pin must be >= 0")
 
-    poll_interval = typer.prompt(
-        "Detector poll interval (seconds)", type=float, default=0.05
-    )
+    poll_interval = FloatPrompt.ask("Detector poll interval (seconds)", default=0.05)
     if poll_interval <= 0:
-        raise typer.BadParameter("poll_interval must be > 0")
+        raise SystemExit("poll_interval must be > 0")
 
-    rfid_timeout = typer.prompt(
-        "RFID timeout window (seconds)", type=float, default=10.0
-    )
+    rfid_timeout = FloatPrompt.ask("RFID timeout window (seconds)", default=10.0)
     if rfid_timeout <= 0:
-        raise typer.BadParameter("rfid_timeout must be > 0")
+        raise SystemExit("rfid_timeout must be > 0")
 
     return port, baudrate, pin, poll_interval, rfid_timeout
 
 
-@app.command()
-def run():
+@app.default
+def run() -> None:
     from time import sleep
 
     from ..peripheral.beam_break_sensor.rpi_ir_break_beam_sensor import (
@@ -59,22 +56,22 @@ def run():
 
     detector.begin()
 
-    typer.echo("Listening detector events... (Ctrl+C to stop)")
+    print("Listening detector events... (Ctrl+C to stop)")
     try:
         while True:
             sleep(1.0)
     except KeyboardInterrupt:
-        typer.echo("Exiting.")
+        print("Exiting.")
     finally:
         detector.quit()
 
 
 def print_animal_entered(result) -> None:
-    typer.echo(f"[ENTER] animal_id={result.animal_id}, error={result.error}")
+    print(f"[ENTER] animal_id={result.animal_id}, error={result.error}")
 
 
 def print_animal_exited(result) -> None:
-    typer.echo(f"[LEAVE] animal_id={result.animal_id}, error={result.error}")
+    print(f"[LEAVE] animal_id={result.animal_id}, error={result.error}")
 
 
 if __name__ == "__main__":
