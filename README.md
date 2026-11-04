@@ -158,14 +158,21 @@ animals with stage and level, and the parameters. The form is generated from
 the JSON Schema of `mxbiflow.models.ExperimentConfig`, which
 `mxbiflow schema` prints and the experiment manifest carries as its `session`
 setting. Fields marked `x-mxbi-stage` name a registered stage and get a
-stage picker, and each object lists its property order in `x-mxbi-order`.
+stage picker, fields marked `x-mxbi-animal` name one of the configuration's
+animals and get an animal picker, and each object lists its property order in
+`x-mxbi-order`.
 cogmote fills in each animal's CogMatrix name and RFID tags and sends the
 configuration to the rig with the device config.
 
 The rig never queries CogMatrix for animals: the wizard offers the animals of
 this configuration, read from cogmoteGO with `get_config()`, with their RFID
-tags (`mxbiflow.infra.cogmote_config.read_experiment_config`). A tag of no
-configured animal is logged and starts no task.
+tags (`mxbiflow.infra.cogmote_config.read_experiment_config`).
+
+RFID isn't reliable, and every animal at the device gets a task: a failed read
+and a tag of no configured animal both run as `unknown_animal_as`, a required
+parameter that names one of the configured animals. Trials during the fallback
+are recorded under that animal and `rfid.log` keeps the reads. When a later read
+gives a configured animal, the run moves to it at the end of the running trial.
 
 A headless run (`--from-cogmote`) is one session: it writes the session
 configuration from cogmote and starts the game loop, as the wizard does. An

@@ -67,6 +67,7 @@ def make_session() -> Session:
     config = SessionConfig(
         experimenter="tester",
         send_email=True,
+        unknown_animal_as=animal_config.name,
         animals=(animal_config,),
     )
     return Session(
@@ -145,12 +146,16 @@ class SessionModelTests(unittest.TestCase):
         self.assertEqual(legacy.rfid_tags, ("rfid-1",))
         self.assertEqual(empty.rfid_tags, ())
 
-    def test_session_config_ignores_the_retired_unknown_animal_mapping(self) -> None:
-        config = SessionConfig.model_validate(
-            {"unknown_animal_as": "animal-1", "animals": [{"name": "animal-1"}]}
-        )
+    def test_session_config_requires_a_configured_fallback_animal(self) -> None:
+        animal = AnimalConfig(name="animal-1")
 
-        self.assertNotIn("unknown_animal_as", config.model_dump())
+        self.assertEqual(SessionConfig().unknown_animal_as, "")
+        for name, message in [
+            ("", "must be set"),
+            ("animal-2", "must match"),
+        ]:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, message):
+                SessionConfig(unknown_animal_as=name, animals=(animal,))
 
     def test_session_config_with_animals_returns_validated_copy(self) -> None:
         animal = AnimalConfig(name="animal-1")
@@ -163,6 +168,7 @@ class SessionModelTests(unittest.TestCase):
             fault_fallback="fallback",
             hide_cursor=True,
             fullscreen=True,
+            unknown_animal_as=animal.name,
             animals=(animal,),
         )
 
@@ -228,6 +234,7 @@ class SessionModelTests(unittest.TestCase):
         ):
             session = init_session(
                 SessionConfig(
+                    unknown_animal_as=animal_config.name,
                     animals=(animal_config,),
                 ),
                 mxbi_config,
@@ -300,7 +307,7 @@ class SessionModelTests(unittest.TestCase):
         animal = state["animals"]["animal-1"]
         config = snapshot["config"]
         assert isinstance(config, dict)
-        self.assertNotIn("unknown_animal_as", config)
+        self.assertEqual(config["unknown_animal_as"], "animal-1")
         self.assertNotIn("unknown_animal_fallback", config)
         self.assertNotIn("unknown_animal_fallback_animal", config)
         self.assertEqual(
@@ -593,6 +600,7 @@ class SessionModelTests(unittest.TestCase):
             )
             other_config = AnimalConfig(name="animal-2", stage="other", level=4)
             config = SessionConfig(
+                unknown_animal_as=animal_config.name,
                 animals=(animal_config, other_config),
             )
             config_store = ConfigStore(config_path, SessionConfig)
@@ -679,6 +687,7 @@ class StageNavigationTests(unittest.TestCase):
         )
         session = Session(
             config=SessionConfig(
+                unknown_animal_as=animal_config.name,
                 animals=(animal_config,),
             ),
             mxbi_config=MXBIModel(),

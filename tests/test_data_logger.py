@@ -24,6 +24,7 @@ def make_session(*, session_id: int = 7) -> Session:
     stage = StageState(stage_name="stage-1")
     return Session(
         config=SessionConfig(
+            unknown_animal_as=animal_config.name,
             animals=(animal_config,),
         ),
         mxbi_config=MXBIModel(),

@@ -47,12 +47,17 @@ def session_config_from_experiment(
     while cogmote still has the stage and level that were ``applied`` at the
     last start; an operator's change in cogmote replaces it.
     Raises :class:`CogmoteConfigError` for stages the experiment does not
-    register.
+    register and a fallback animal the configuration does not have.
     """
     names = [animal.name for animal in experiment.animals]
     if len(set(names)) != len(names):
         raise CogmoteConfigError(f"animal names must be unique: {', '.join(names)}")
     parameters = experiment.parameters
+    if parameters.unknown_animal_as not in names:
+        raise CogmoteConfigError(
+            f"unknown_animal_as {parameters.unknown_animal_as!r} is not one of the "
+            f"configured animals: {', '.join(names)}"
+        )
     unknown = sorted(
         {animal.stage for animal in experiment.animals}.union(
             s for s in (parameters.default_scene, parameters.fault_fallback) if s
@@ -92,6 +97,7 @@ def session_config_from_experiment(
         send_email=parameters.send_email,
         note=parameters.note,
         default_scene=parameters.default_scene,
+        unknown_animal_as=parameters.unknown_animal_as,
         fault_fallback=parameters.fault_fallback,
         hide_cursor=parameters.hide_cursor,
         fullscreen=parameters.fullscreen,

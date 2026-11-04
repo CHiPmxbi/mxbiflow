@@ -6,8 +6,9 @@ configuration, where mxbiflow reads it with ``pymotego.Client().get_config()``.
 Fields marked ``readOnly`` are filled by cogmote, not by the operator,
 ``x-cogmatrix`` marks CogMatrix IDs that cogmote offers pickers for and checks,
 ``x-mxbi-stages`` marks the stage configurations that cogmote's stage editor
-writes (:mod:`mxbiflow.models.stage_config`), and ``x-mxbi-stage`` marks fields
-that name one of the experiment's registered stages.
+writes (:mod:`mxbiflow.models.stage_config`), ``x-mxbi-stage`` marks fields
+that name one of the experiment's registered stages, and ``x-mxbi-animal`` marks
+fields that name one of the configuration's animals.
 Every object lists its properties in declaration order in ``x-mxbi-order``, since
 stores such as PostgreSQL ``jsonb`` do not keep key order.
 """
@@ -20,6 +21,7 @@ from .reward import RewardEnum
 
 _SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 STAGE_MARKER = "x-mxbi-stage"
+ANIMAL_MARKER = "x-mxbi-animal"
 ORDER_MARKER = "x-mxbi-order"
 
 
@@ -85,6 +87,16 @@ class ExperimentParameters(BaseModel):
         description="Scene shown on a detector fault; empty uses idle",
         json_schema_extra={STAGE_MARKER: True},
     )
+    unknown_animal_as: str = Field(
+        min_length=1,
+        max_length=200,
+        title="Unknown animal as",
+        description=(
+            "Animal that runs when the RFID read fails or the tag is not configured; "
+            "its trials are recorded under this animal"
+        ),
+        json_schema_extra={ANIMAL_MARKER: True},
+    )
     fullscreen: bool = True
     hide_cursor: bool = Field(default=True, title="Hide cursor")
     send_email: bool = Field(
@@ -132,7 +144,7 @@ class ExperimentConfig(BaseModel):
         min_length=1,
         description="The cage's animals, fixed for the run; animal IDs are unique",
     )
-    parameters: ExperimentParameters = Field(default_factory=ExperimentParameters)
+    parameters: ExperimentParameters
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     stages: dict[str, dict[str, Any]] = Field(
         default_factory=dict,

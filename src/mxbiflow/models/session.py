@@ -14,6 +14,7 @@ from pydantic import (
     PrivateAttr,
     ValidationError,
     field_serializer,
+    model_validator,
 )
 
 from mxbiflow.driver import MXBIModel
@@ -39,6 +40,7 @@ class SessionConfig(BaseModel):
     note: str = Field(default="", max_length=1000)
 
     default_scene: str = ""
+    unknown_animal_as: str = ""
     fault_fallback: str = ""
 
     hide_cursor: bool = False
@@ -60,6 +62,7 @@ class SessionConfig(BaseModel):
             send_email=self.send_email,
             note=self.note,
             default_scene=self.default_scene,
+            unknown_animal_as=self.unknown_animal_as,
             fault_fallback=self.fault_fallback,
             hide_cursor=self.hide_cursor,
             fullscreen=self.fullscreen,
@@ -68,6 +71,21 @@ class SessionConfig(BaseModel):
             capture_latency_ms=self.capture_latency_ms,
             stage_configs=self.stage_configs,
         )
+
+    @model_validator(mode="after")
+    def _validate_unknown_animal_as(self) -> SessionConfig:
+        if not self.animals:
+            return self
+
+        if not self.unknown_animal_as:
+            raise ValueError(
+                "unknown_animal_as must be set when animals are configured"
+            )
+
+        animal_names = {animal.name for animal in self.animals}
+        if self.unknown_animal_as not in animal_names:
+            raise ValueError("unknown_animal_as must match a configured animal name")
+        return self
 
 
 class SessionConfigStore(Protocol):
@@ -200,6 +218,10 @@ class Session(BaseModel):
     @property
     def default_scene(self) -> str:
         return self.config.default_scene
+
+    @property
+    def unknown_animal_as(self) -> str:
+        return self.config.unknown_animal_as
 
     @property
     def fault_fallback(self) -> str:

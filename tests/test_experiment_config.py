@@ -29,7 +29,11 @@ class ExperimentConfigTests(unittest.TestCase):
                     },
                     {"id": "b2", "stage": "habituation"},
                 ],
-                "parameters": {"reward_type": "m_juice", "fullscreen": False},
+                "parameters": {
+                    "reward_type": "m_juice",
+                    "fullscreen": False,
+                    "unknown_animal_as": "Alice",
+                },
             }
         )
 
@@ -54,7 +58,14 @@ class ExperimentConfigTests(unittest.TestCase):
             {
                 **refs,
                 "animals": [{"id": "a1", "stage": "s"}],
-                "parameters": {"reward_type": "x"},
+                "parameters": {"reward_type": "x", "unknown_animal_as": "a"},
+            },
+            {**refs, "animals": [{"id": "a1", "stage": "s"}]},
+            {**refs, "animals": [{"id": "a1", "stage": "s"}], "parameters": {}},
+            {
+                **refs,
+                "animals": [{"id": "a1", "stage": "s"}],
+                "parameters": {"unknown_animal_as": ""},
             },
         ]:
             with self.subTest(data=data), self.assertRaises(ValidationError):
@@ -75,7 +86,9 @@ class ExperimentConfigTests(unittest.TestCase):
         reward = schema["properties"]["parameters"]["properties"]["reward_type"]
         self.assertEqual(reward["enum"], [member.value for member in RewardEnum])
         self.assertEqual(reward["default"], "agum_one_fifth")
-        self.assertEqual(schema["required"], ["protocol", "repository", "animals"])
+        self.assertEqual(
+            schema["required"], ["protocol", "repository", "animals", "parameters"]
+        )
         self.assertEqual(schema["properties"]["protocol"]["x-cogmatrix"], "protocol")
         self.assertEqual(
             schema["properties"]["repository"]["x-cogmatrix"], "repository"
@@ -90,6 +103,8 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertTrue(animal["properties"]["stage"]["x-mxbi-stage"])
         self.assertTrue(parameters["properties"]["default_scene"]["x-mxbi-stage"])
         self.assertTrue(parameters["properties"]["fault_fallback"]["x-mxbi-stage"])
+        self.assertTrue(parameters["properties"]["unknown_animal_as"]["x-mxbi-animal"])
+        self.assertEqual(parameters["required"], ["unknown_animal_as"])
         self.assertEqual(schema["x-mxbi-order"], list(schema["properties"]))
         self.assertEqual(animal["x-mxbi-order"], list(animal["properties"]))
         self.assertEqual(
