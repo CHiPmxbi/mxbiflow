@@ -11,6 +11,7 @@ from ..infra.camera_recording import TrialMark
 from ..infra.timer import FrameTimer
 from ..infra.trial_status import TrialPublisher
 from ..models.session import Session
+from ..models.trial import split_record
 from .offline import is_offline
 from .path import get_data_dir_path
 
@@ -68,16 +69,20 @@ class MXBIFlow:
         Offline, nothing is sent; the trial still counts in the run summary.
         Pass the record model, not its dump: its ``AnimalBaseInfo`` becomes the
         event's context and its fields the table's schema hint
-        (:mod:`mxbiflow.models.trial`).
+        (:mod:`mxbiflow.models.trial`). It also gives the subtitle's level and
+        trial, so a level-up trial shows the level it started with; without it
+        they come from the session.
         """
         animal = self._session.require_current_animal()
+        stage = animal.current_stage
+        base_info = split_record(record)[0] if isinstance(record, BaseModel) else None
         self._trials.append(
             TrialMark(
                 at=datetime.now(UTC),
                 animal=animal.name,
-                stage=animal.current_stage.stage_name,
-                level=animal.current_stage.level,
-                trial_id=animal.trial_id,
+                stage=stage.stage_name,
+                level=base_info.level if base_info else stage.level,
+                trial_id=base_info.trial_id if base_info else animal.trial_id,
                 correct=correct,
             )
         )
