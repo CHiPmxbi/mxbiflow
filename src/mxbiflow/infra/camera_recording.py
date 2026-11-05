@@ -2,30 +2,44 @@
 
 MediaMTX serves the camera on path ``live`` and already encodes it for
 live viewing, so recording only remuxes to disk. Recording is switched on for
-the session through MediaMTX's local API and off at its end; the fMP4 segments
-it wrote and one WebVTT subtitle file per segment are then uploaded as session
-data and deleted (:class:`~mxbiflow.infra.cogmatrix_sync.CogMatrixRecorder`).
+the session through MediaMTX's local API and off at its end. MediaMTX writes
+fragmented MP4, which keeps all but the last second after a crash but has no
+index, so a browser walks every fragment to open it. After the session
+:func:`export_recording` asks MediaMTX's playback server for standard MP4,
+without re-encoding, one file per recorded timespan with its WebVTT subtitles
+(#245). The exports are uploaded as session data and the segments deleted
+(:class:`~mxbiflow.infra.cogmatrix_sync.CogMatrixRecorder`).
 
 Segment names carry the segment start (``recordPath`` ends in
 ``%Y-%m-%d_%H-%M-%S-%f``, local time) and trials are stamped when they are
 published, both from the rig's clock, so no cross-device sync is needed. The
 start is when MediaMTX received the first frame, which the camera captured
 ``capture_latency`` earlier: a trial at ``t`` is at ``t - (start - latency)``
-in the video.
+in the video. An export starts at the first frame of its timespan and is named
+like a segment, by its own start.
+
+MediaMTX writes MP4 sizes and offsets in 32 bits, so a file over 4 GiB comes out
+corrupt while the request succeeds. A long timespan is split by its bitrate into
+files below ``_MP4_LIMIT``, and every export is checked before it gets its name.
 """
 
+import os
+import shutil
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
+from pydantic import BaseModel
 
 from ..utils.logger import logger
 
 #: MediaMTX's API, enabled on loopback only by ``cagelab.cogmote``.
 MEDIAMTX_API = "http://127.0.0.1:9997"
+#: MediaMTX's playback server, enabled on loopback only by ``cagelab.cogmote``.
+MEDIAMTX_PLAYBACK = "http://127.0.0.1:9996"
 #: The MediaMTX path of the camera.
 CAMERA_PATH = "live"
 #: MediaMTX runs in the desktop account's home with ``recordPath: ./recordings/%path/...``.
@@ -35,6 +49,10 @@ _SEGMENT_NAME_FORMAT = "%Y-%m-%d_%H-%M-%S-%f"
 # MediaMTX starts a segment at the first frame after recording is switched on.
 _START_TOLERANCE = timedelta(seconds=5)
 _CUE_DURATION = timedelta(seconds=5)
+# Well below 4 GiB, because the split assumes an even bitrate.
+_MP4_LIMIT = 3 * 2**30
+# MediaMTX reads every fragment's header before the first byte of a response.
+_EXPORT_TIMEOUT = httpx.Timeout(30.0, read=600.0)
 
 
 @dataclass(frozen=True)
@@ -55,6 +73,19 @@ class TrialMark:
             f"trial {self.trial_id} | {self.animal} | "
             f"{self.stage}@{self.level} | {result}"
         )
+
+
+class RecordedCamera(BaseModel):
+    """A session's recording, kept in the run's record until it is exported."""
+
+    segments: list[Path]
+    stopped: datetime
+    trials: list[TrialMark]
+    capture_latency: timedelta
+
+
+class ExportError(Exception):
+    """The recording cannot be exported now; its segments are kept for a retry."""
 
 
 class CameraRecording:
@@ -88,11 +119,11 @@ class CameraRecording:
 
     def stop(
         self, trials: Sequence[TrialMark], *, capture_latency: timedelta
-    ) -> list[Path]:
-        """Switch recording off and return the segments, each followed by its subtitles."""
+    ) -> RecordedCamera | None:
+        """Switch recording off and return what it wrote, if anything."""
         started, self._started = self._started, None
         if started is None:
-            return []
+            return None
         try:
             self._set_record(False)
         except httpx.HTTPError as error:
@@ -108,12 +139,156 @@ class CameraRecording:
             if (start := segment_start(path)) is not None
             and start >= started - _START_TOLERANCE
         ]
-        subtitles = write_subtitles(segments, trials, capture_latency=capture_latency)
         logger.info("camera recording stopped: %d segments", len(segments))
-        return [file for pair in zip(segments, subtitles) for file in pair]
+        if not segments:
+            return None
+        return RecordedCamera(
+            segments=segments,
+            stopped=datetime.now(UTC),
+            trials=list(trials),
+            capture_latency=capture_latency,
+        )
 
     def _set_record(self, record: bool) -> None:
         self._http.patch(self._url, json={"record": record}).raise_for_status()
+
+
+def export_recording(
+    recorded: RecordedCamera,
+    directory: Path,
+    *,
+    http: httpx.Client | None = None,
+    path: str = CAMERA_PATH,
+    on_bytes: Callable[[int], None] = lambda _: None,
+) -> None:
+    """Fill ``directory`` with the recording's standard MP4 files and their subtitles.
+
+    Raises :class:`ExportError` or :class:`OSError` with the segments untouched; a
+    retry starts over, so what an earlier attempt left in ``directory`` is removed.
+    """
+    shutil.rmtree(directory, ignore_errors=True)
+    directory.mkdir(parents=True)
+    segments = [segment for segment in recorded.segments if segment.is_file()]
+    for gone in set(recorded.segments) - set(segments):
+        logger.warning("camera recording %s is gone", gone)
+    if not segments:
+        return
+    size = sum(segment.stat().st_size for segment in segments)
+    free = shutil.disk_usage(directory).free
+    if free < size:
+        raise ExportError(
+            f"not enough disk space to export the camera recording: "
+            f"{size} bytes needed, {free} free"
+        )
+    if http is None:
+        http = httpx.Client(base_url=MEDIAMTX_PLAYBACK, timeout=_EXPORT_TIMEOUT)
+    try:
+        with http as client:
+            spans = _timespans(
+                client, path, min(map(_start, segments)), recorded.stopped
+            )
+            files = [
+                _export_part(client, path, start, duration, directory, on_bytes)
+                for start, duration in _split(spans, size)
+            ]
+    except httpx.HTTPError as error:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise ExportError(f"MediaMTX playback at {http.base_url}: {error}") from error
+    except ExportError, OSError:
+        # Two copies must not stay on a disk that may be full.
+        shutil.rmtree(directory, ignore_errors=True)
+        raise
+    write_subtitles(files, recorded.trials, capture_latency=recorded.capture_latency)
+    # The caller records that the export is done, which must not outlive these names.
+    descriptor = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _timespans(
+    http: httpx.Client, path: str, start: datetime, end: datetime
+) -> list[tuple[datetime, float]]:
+    response = http.get(
+        "/list",
+        params={"path": path, "start": start.isoformat(), "end": end.isoformat()},
+    )
+    response.raise_for_status()
+    return [
+        (datetime.fromisoformat(span["start"]), span["duration"])
+        for span in response.json()
+    ]
+
+
+def _split(
+    spans: Sequence[tuple[datetime, float]], size: int
+) -> list[tuple[datetime, float]]:
+    """Cut the timespans into pieces that stay below ``_MP4_LIMIT`` at their bitrate."""
+    longest = _MP4_LIMIT * sum(duration for _, duration in spans) / size
+    parts: list[tuple[datetime, float]] = []
+    for start, duration in spans:
+        offset = 0.0
+        while duration - offset > longest:
+            parts.append((start + timedelta(seconds=offset), longest))
+            offset += longest
+        parts.append((start + timedelta(seconds=offset), duration - offset))
+    return parts
+
+
+def _export_part(
+    http: httpx.Client,
+    path: str,
+    start: datetime,
+    duration: float,
+    directory: Path,
+    on_bytes: Callable[[int], None],
+) -> Path:
+    """Download one MP4; it appears under its name only once it is whole."""
+    name = start.astimezone().strftime(_SEGMENT_NAME_FORMAT)
+    target = directory / f"{name}.mp4"
+    partial = directory / f"{name}.mp4.part"
+    params = {
+        "path": path,
+        "start": start.isoformat(),
+        "duration": duration,
+        "format": "mp4",
+    }
+    with (
+        http.stream("GET", "/get", params=params) as response,
+        partial.open("wb") as file,
+    ):
+        response.raise_for_status()
+        for chunk in response.iter_bytes():
+            file.write(chunk)
+            on_bytes(len(chunk))
+        file.flush()
+        os.fsync(file.fileno())
+    _check_standard_mp4(partial)
+    partial.replace(target)
+    return target
+
+
+def _check_standard_mp4(file: Path) -> None:
+    """Refuse anything but a whole ``ftyp``, ``moov``, ``mdat`` file.
+
+    MediaMTX ends a response normally when reading a segment fails midway, and
+    wraps sizes over 4 GiB, so a clean response proves nothing.
+    """
+    size = file.stat().st_size
+    kinds: list[bytes] = []
+    offset = 0
+    with file.open("rb") as content:
+        while offset < size and len(kinds) < 4:
+            content.seek(offset)
+            header = content.read(8)
+            kinds.append(header[4:8])
+            offset += max(int.from_bytes(header[:4]), 8)
+    if kinds != [b"ftyp", b"moov", b"mdat"] or offset != size:
+        raise ExportError(
+            f"MediaMTX gave no whole standard MP4 for {file.stem}: "
+            f"boxes {kinds}, {offset} bytes of {size}"
+        )
 
 
 def segment_start(segment: Path) -> datetime | None:
@@ -131,10 +306,10 @@ def write_subtitles(
     *,
     capture_latency: timedelta,
 ) -> list[Path]:
-    """Write ``<segment>.vtt`` next to each segment with a cue per trial.
+    """Write ``<segment>.vtt`` next to each MP4 named by its start, with a cue per trial.
 
     A cue shows a trial from its end until the next trial, at most
-    ``_CUE_DURATION``. A segment holds the trials until the next one starts.
+    ``_CUE_DURATION``. A file holds the trials until the next one starts.
     """
     origins = [_start(segment) - capture_latency for segment in segments]
     written: list[Path] = []

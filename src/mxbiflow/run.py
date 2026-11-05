@@ -5,7 +5,6 @@ import signal
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from pathlib import Path
 from threading import Thread
 
 from cyclopts import App, Parameter
@@ -14,7 +13,7 @@ from .bootstrap import init_gameloop
 from .core.context import MXBIFlow, get_mxbiflow
 from .core.offline import is_offline
 from .core.path import get_base_path
-from .infra.camera_recording import CameraRecording
+from .infra.camera_recording import CameraRecording, RecordedCamera
 from .infra.cogmatrix_sync import CogMatrixRecorder
 from .infra.cogmote_config import CogmoteConfigError, apply_cogmote_config
 from .infra.crash_report import send_crash_report
@@ -26,6 +25,7 @@ from .infra.run_end import (
     COGMATRIX_STEPS,
     END_SESSION,
     SEND_REPORT,
+    EXPORT_RECORDING,
     UPLOAD_RECORDING,
     UPLOAD_RESULTS,
     RunEnd,
@@ -151,12 +151,12 @@ def run_experiment(
                 camera = CameraRecording()
                 camera.start()
         game.play()
-        recordings = _stop_camera(camera, mxbiflow)
+        recording = _stop_camera(camera, mxbiflow)
         camera = None
         _finish(
             mxbiflow,
             recorder,
-            recordings,
+            recording,
             session.send_email and not is_offline(),
         )
     except CogmoteConfigError as error:
@@ -176,7 +176,7 @@ def run_experiment(
 def _finish(
     mxbiflow: MXBIFlow,
     recorder: CogMatrixRecorder,
-    recordings: list[Path],
+    recording: RecordedCamera | None,
     send_report: bool,
 ) -> None:
     session = mxbiflow.session
@@ -186,7 +186,7 @@ def _finish(
     names: list[str] = []
     if recorder.recording:
         names += [END_SESSION, UPLOAD_RESULTS] + (
-            [UPLOAD_RECORDING] if recordings else []
+            [EXPORT_RECORDING, UPLOAD_RECORDING] if recording else []
         )
     if send_report:
         names.append(SEND_REPORT)
@@ -194,7 +194,7 @@ def _finish(
 
     def work() -> None:
         try:
-            recorder.finish(session, recordings=recordings, steps=steps)
+            recorder.finish(session, recording=recording, steps=steps)
         except Exception as error:  # noqa: BLE001 - the report still goes out
             logger.exception("cannot record the run in CogMatrix")
             steps.fail(COGMATRIX_STEPS, str(error), retry=False)
@@ -233,9 +233,11 @@ def _report_not_started(reason: str) -> None:
         logger.exception("cannot send the not-started notification")
 
 
-def _stop_camera(camera: CameraRecording | None, mxbiflow: MXBIFlow) -> list[Path]:
+def _stop_camera(
+    camera: CameraRecording | None, mxbiflow: MXBIFlow
+) -> RecordedCamera | None:
     if camera is None:
-        return []
+        return None
     latency = timedelta(milliseconds=mxbiflow.session.config.capture_latency_ms)
     return camera.stop(mxbiflow.trials, capture_latency=latency)
 
@@ -251,7 +253,7 @@ def _finish_aborted(
         recorder.finish(
             session,
             aborted=True,
-            recordings=_stop_camera(camera, get_mxbiflow()),
+            recording=_stop_camera(camera, get_mxbiflow()),
             steps=steps,
         )
     except Exception:  # noqa: BLE001 - the crash report is already out

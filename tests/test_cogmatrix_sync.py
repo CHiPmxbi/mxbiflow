@@ -1,6 +1,8 @@
 import json
 import tempfile
 import unittest
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace, TracebackType
 from typing import Any, Self
@@ -18,10 +20,12 @@ from pydantic import JsonValue
 from test_session import make_session
 
 from mxbiflow.core.path import set_base_path
+from mxbiflow.infra.camera_recording import ExportError, RecordedCamera
 from mxbiflow.infra.cogmatrix_sync import CogMatrixRecorder, PendingRun
 from mxbiflow.infra.data_logger import DataLogger, DataLoggerType
 from mxbiflow.infra.run_end import (
     END_SESSION,
+    EXPORT_RECORDING,
     UPLOAD_RECORDING,
     UPLOAD_RESULTS,
     RunEnd,
@@ -145,6 +149,13 @@ class CogMatrixRecorderTests(unittest.TestCase):
         code = patch("mxbiflow.infra.cogmatrix_sync.code_version", return_value=CODE)
         code.start()
         self.addCleanup(code.stop)
+        self.exports = 0
+        self.export_error: Exception | None = None
+        export = patch(
+            "mxbiflow.infra.cogmatrix_sync.export_recording", side_effect=self.export
+        )
+        export.start()
+        self.addCleanup(export.stop)
 
     def tearDown(self) -> None:
         self._temporary_directory.cleanup()
@@ -159,7 +170,7 @@ class CogMatrixRecorderTests(unittest.TestCase):
     def run_session(
         self,
         recorder: CogMatrixRecorder,
-        recordings: list[Path] | None = None,
+        recording: RecordedCamera | None = None,
         steps: RunEnd | None = None,
     ) -> Session:
         session = make_session()
@@ -172,15 +183,32 @@ class CogMatrixRecorderTests(unittest.TestCase):
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text('{"trial": 1}\n', encoding="utf-8")
         session.end()
-        recorder.finish(session, recordings=recordings or [], steps=steps)
+        recorder.finish(session, recording=recording, steps=steps)
         return session
 
-    def recordings(self) -> list[Path]:
-        files = [self.root / "2026-10-27_09-00-00-000000.mp4"]
-        files.append(files[0].with_suffix(".vtt"))
-        for file in files:
-            file.write_bytes(b"x")
-        return files
+    def recording(self) -> RecordedCamera:
+        segment = self.root / "2026-10-27_09-00-00-000000.mp4"
+        segment.write_bytes(b"fmp4")
+        return RecordedCamera(
+            segments=[segment],
+            stopped=datetime.now(UTC),
+            trials=[],
+            capture_latency=timedelta(),
+        )
+
+    def export(
+        self,
+        _recorded: RecordedCamera,
+        directory: Path,
+        on_bytes: Callable[[int], None] = lambda _: None,
+    ) -> None:
+        self.exports += 1
+        if self.export_error is not None:
+            raise self.export_error
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "2026-10-27_09-00-00-000000.mp4").write_bytes(b"x" * 1000)
+        (directory / "2026-10-27_09-00-00-000000.vtt").write_bytes(b"x")
+        on_bytes(1000)
 
     def names(self) -> list[str]:
         return [name for name, _ in self.fake.calls]
@@ -275,16 +303,16 @@ class CogMatrixRecorderTests(unittest.TestCase):
         )
         self.assertFalse(run_dir.exists())
 
-    def test_a_mismatch_keeps_the_run_and_its_recordings(self) -> None:
+    def test_a_mismatch_keeps_the_run_and_its_recording(self) -> None:
         steps = self.steps(Mock())
-        recordings = self.recordings()
+        recording = self.recording()
         self.fake.mismatch = {"session.json"}
 
-        self.run_session(self.recorder(), recordings, steps)
+        self.run_session(self.recorder(), recording, steps)
 
         [run_dir] = list(self.state.iterdir())
-        self.assertTrue(all(file.is_file() for file in recordings))
-        _, results, _ = steps.steps
+        self.assertTrue(recording.segments[0].is_file())
+        _, results, _, _ = steps.steps
         self.assertEqual((results.state, results.retry), ("failed", True))
         self.assertIn("session.json", results.reason or "")
 
@@ -292,14 +320,14 @@ class CogMatrixRecorderTests(unittest.TestCase):
         self.recorder().retry_pending()
 
         self.assertFalse(run_dir.exists())
-        self.assertFalse(any(file.exists() for file in recordings))
+        self.assertFalse(recording.segments[0].exists())
 
-    def test_recordings_are_uploaded_last_and_deleted(self) -> None:
-        recordings = self.recordings()
+    def test_the_exports_are_uploaded_last_and_the_segments_deleted(self) -> None:
+        recording = self.recording()
         self.fake.fail = {"upload"}
-        self.run_session(self.recorder(), recordings)
+        self.run_session(self.recorder(), recording)
 
-        self.assertTrue(all(file.is_file() for file in recordings))
+        self.assertTrue(recording.segments[0].is_file())
 
         self.recorder().retry_pending()
 
@@ -310,24 +338,67 @@ class CogMatrixRecorderTests(unittest.TestCase):
                 "camera-2026-10-27_09-00-00-000000.vtt",
             ],
         )
-        self.assertFalse(any(file.exists() for file in recordings))
+        self.assertFalse(recording.segments[0].exists())
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_failed_export_keeps_the_segments_and_retries_at_the_next_start(
+        self,
+    ) -> None:
+        steps = self.steps(Mock())
+        recording = self.recording()
+        self.export_error = ExportError("playback is off")
+
+        self.run_session(self.recorder(), recording, steps)
+
+        _, results, export, upload = steps.steps
+        self.assertEqual(results.state, "done")
+        self.assertEqual(
+            (export.state, export.reason, export.retry),
+            ("failed", "playback is off", True),
+        )
+        self.assertEqual(upload.state, "failed")
+        self.assertTrue(recording.segments[0].is_file())
+        self.assertEqual(len(self.fake.uploads), 2)  # nothing of the fMP4
+        self.assertFalse(self.data_calls()[-1]["complete"])
+
+        self.export_error = None
+        self.recorder().retry_pending()
+
+        self.assertEqual(len(self.fake.uploads), 4)
+        self.assertFalse(recording.segments[0].exists())
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_a_crash_between_export_and_upload_only_uploads_next_time(self) -> None:
+        recording = self.recording()
+        self.fake.arrived |= {"session.json", "animal-1-s-result.jsonl"}
+        self.fake.fail = {"upload"}
+        self.run_session(self.recorder(), recording)
+        [run_dir] = list(self.state.iterdir())
+        record = PendingRun.model_validate_json((run_dir / "run.json").read_text())
+        self.assertTrue(record.exported)
+        assert record.recording is not None
+        self.assertEqual(record.recording.segments, recording.segments)
+        self.export_error = ExportError("MediaMTX is down now")
+
+        self.recorder().retry_pending()
+
+        self.assertEqual(self.exports, 1)
         self.assertEqual(list(self.state.iterdir()), [])
 
     def test_a_recording_removed_by_retention_is_skipped(self) -> None:
-        recordings = self.recordings()
-        recordings[0].unlink()
+        recording = self.recording()
+        recording.segments[0].unlink()
 
-        self.run_session(self.recorder(), recordings)
+        self.run_session(self.recorder(), recording)
 
-        self.assertEqual(len(self.fake.uploads), 3)
         self.assertEqual(list(self.state.iterdir()), [])
 
     def test_recordings_of_a_run_not_in_cogmatrix_are_kept(self) -> None:
-        recordings = self.recordings()
+        recording = self.recording()
 
-        self.run_session(self.recorder({**CONFIG, "experiment": None}), recordings)
+        self.run_session(self.recorder({**CONFIG, "experiment": None}), recording)
 
-        self.assertTrue(all(file.is_file() for file in recordings))
+        self.assertTrue(recording.segments[0].is_file())
 
     def test_aborted_runs_end_as_aborted(self) -> None:
         recorder = self.recorder()
@@ -341,22 +412,26 @@ class CogMatrixRecorderTests(unittest.TestCase):
         self.assertEqual(end.status, ExperimentSessionStatus.aborted)
 
     def steps(self, client: Mock) -> RunEnd:
-        return RunEnd([END_SESSION, UPLOAD_RESULTS, UPLOAD_RECORDING], client=client)
+        return RunEnd(
+            [END_SESSION, UPLOAD_RESULTS, EXPORT_RECORDING, UPLOAD_RECORDING],
+            client=client,
+        )
 
     def test_finish_reports_each_step(self) -> None:
         client = Mock()
         steps = self.steps(client)
-        recordings = self.recordings()
-        recordings[0].write_bytes(b"x" * 1000)
+        self.run_session(self.recorder(), self.recording(), steps)
 
-        self.run_session(self.recorder(), recordings, steps)
-
-        end, results, recording = steps.steps
+        end, results, export, recording = steps.steps
         self.assertEqual(end.state, "done")
         self.assertEqual(
             end.url, f"https://matrix.example/sessions?session={UUID(int=7)}"
         )
         self.assertEqual((results.state, results.done, results.total), ("done", 2, 2))
+        self.assertEqual(
+            (export.state, export.done, export.total, export.unit),
+            ("done", 1000, 4, "bytes"),
+        )
         self.assertEqual(
             (recording.state, recording.done, recording.total, recording.unit),
             ("done", 1001, 1001, "bytes"),
@@ -369,15 +444,15 @@ class CogMatrixRecorderTests(unittest.TestCase):
         steps = self.steps(Mock())
         self.fake.fail = {"upload"}
 
-        self.run_session(self.recorder(), self.recordings(), steps)
+        self.run_session(self.recorder(), self.recording(), steps)
 
-        end, results, recording = steps.steps
+        end, results, export, recording = steps.steps
         self.assertEqual(end.state, "done")
         self.assertEqual(
             (results.state, results.reason, results.retry),
             ("failed", "upload failed", True),
         )
-        self.assertEqual(recording.state, "failed")
+        self.assertEqual((export.state, recording.state), ("failed", "failed"))
 
     def test_a_run_that_never_ended_is_ended_as_aborted_at_the_next_start(self) -> None:
         session = make_session()

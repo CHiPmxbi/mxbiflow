@@ -339,13 +339,21 @@ loop (`mxbiflow.infra.camera_recording`). MediaMTX serves the camera on path
 loopback API (`PATCH /v3/config/paths/patch/live`). MediaMTX writes fMP4
 segments to `~/recordings/live/` (`cagelab.cogmote`'s `mediamtx` role configures it).
 
-At the end of the run mxbiflow writes a WebVTT subtitle file next to each
-segment with one cue per published trial (trial, animal, `stage@level`,
-result), uploads the segments and subtitles to the session after its results
-as `camera-<segment>.mp4` and `.vtt`, and deletes them locally once uploaded.
-A cue's time is the trial time minus the capture of the segment's first frame:
-the segment start in its name minus `recording.capture_latency_ms`, the delay
-from the camera to MediaMTX, measured once by filming a millisecond clock.
+At the end of the run mxbiflow exports the recording to standard MP4, without
+re-encoding, through MediaMTX's playback server on `127.0.0.1:9996`: one file per
+recorded timespan, named by its start, so that a stream gap gives several. A
+timespan that would exceed 3 GiB is split, because MediaMTX corrupts MP4 files over
+4 GiB. Each MP4 gets a WebVTT subtitle file with one cue per published trial (trial,
+animal, `stage@level`, result). They upload to the session after its results as
+`camera-<start>.mp4` and `.vtt`, and the segments are deleted once CogMatrix has them.
+A cue's time is the trial time minus the capture of the file's first frame: its
+start minus `recording.capture_latency_ms`, the delay from the camera to MediaMTX,
+measured once by filming a millisecond clock.
+
+The exports wait in the run's record under `.mxbiflow/state/cogmatrix/`, on top of
+the segments until the upload ends, so a session needs about twice its recording in
+free disk space. A failed export, for lack of disk or because the playback server is
+off, shows in the run end steps and keeps the segments; the next start retries it.
 
 ## Run end
 
@@ -355,7 +363,7 @@ step (cagelab/cogmote#424):
 - the run summary (per animal: trials, accuracy, duration, stage levels) goes to
   cogmoteGO's `run-summary` broadcast;
 - the steps after the run (end the CogMatrix session, upload the results,
-  upload the camera recording, send the report) go to the device status as
+  export and upload the camera recording, send the report) go to the device status as
   `steps`, with `state: finishing`, then `failed` when a step failed, else
   `idle`. Failed CogMatrix steps are retried at the next start; a failed
   report is not;

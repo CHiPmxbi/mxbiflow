@@ -12,9 +12,13 @@ uploads with ``sessions.upload_data`` (#216): the results and the files the
 experiment named (``MXBIFlow.upload_file``, kept in the record as soon as they
 are named) with the list kept open, then the camera recordings (#195), closing it. CogMatrix skips what it
 already has, so a retry uploads only the rest, and marks the session's data
-complete once every file arrived. Recordings are deleted locally once
-CogMatrix has them; a recording that MediaMTX's retention already removed is
-skipped.
+complete once every file arrived.
+
+A recording is exported to standard MP4 inside the record's directory before it
+is uploaded (#245), which needs MediaMTX's playback server. A failure keeps the
+segments and retries from them at the next start; once the record says exported,
+a retry only uploads. MediaMTX's segments are deleted once CogMatrix has the
+exports; one that MediaMTX's retention already removed is skipped.
 
 A run that never ended, because the rig lost power or the process died (#193),
 is ended as ``aborted`` at the next start, at its last result write, with the
@@ -26,7 +30,7 @@ results it has.
 
 import json
 import shutil
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -49,9 +53,11 @@ from pymotego import Client
 from ..core.path import get_base_path, get_internal_state_path
 from ..models.session import SNAPSHOT_ASSET, Session
 from ..utils.logger import logger
+from .camera_recording import RecordedCamera, export_recording
 from .run_end import (
     COGMATRIX_STEPS,
     END_SESSION,
+    EXPORT_RECORDING,
     UPLOAD_RECORDING,
     UPLOAD_RESULTS,
     RunEnd,
@@ -92,7 +98,9 @@ class PendingRun(BaseModel):
     files: list[str] = Field(default_factory=list)
     named_files: dict[str, str] = Field(default_factory=dict)
     """Files the experiment named, by asset name."""
-    recordings: list[str] = Field(default_factory=list)
+    recording: RecordedCamera | None = None
+    exported: bool = False
+    """The exports of ``recording`` are complete in the record's directory."""
 
 
 def get_cogmatrix_state_path() -> Path:
@@ -180,19 +188,20 @@ class CogMatrixRecorder:
         session: Session,
         *,
         aborted: bool = False,
-        recordings: Sequence[Path] = (),
+        recording: RecordedCamera | None = None,
         steps: RunEnd | None = None,
     ) -> None:
-        """End the run's CogMatrix session and upload its results and recordings.
+        """End the run's CogMatrix session and upload its results and recording.
 
-        ``recordings`` are deleted once uploaded. ``steps`` receives the progress.
+        The recording's segments are deleted once uploaded. ``steps`` receives the
+        progress.
         """
         run_dir = self._current
         if run_dir is None:
-            if recordings:
+            if recording is not None:
                 logger.warning(
                     "camera recordings kept, the run is not in CogMatrix: %s",
-                    ", ".join(str(p) for p in recordings),
+                    ", ".join(str(p) for p in recording.segments),
                 )
             return
         run = _load(run_dir)
@@ -215,7 +224,7 @@ class CogMatrixRecorder:
             else ExperimentSessionStatus.completed
         )
         run.files = [str(p) for p in results if p.is_file()] + [str(snapshot)]
-        run.recordings = [str(p) for p in recordings]
+        run.recording = recording
         _save(run_dir, run)
         self._sync(run_dir, steps)
         self._current = None
@@ -294,13 +303,18 @@ class CogMatrixRecorder:
                     repository_id=repository_id,
                     complete=False,
                 )
-                recordings = [Path(f) for f in run.recordings]
-                for gone in [f for f in recordings if not f.is_file()]:
-                    logger.warning("camera recording %s is gone", gone)
-                recordings = [f for f in recordings if f.is_file()]
                 if steps is not None:
                     steps.progress(UPLOAD_RESULTS, len(files))
                     steps.done(UPLOAD_RESULTS)
+                exports = run_dir / "camera"
+                if run.recording is not None and not run.exported:
+                    _export(run.recording, exports, steps)
+                    run.exported = True
+                    _save(run_dir, run)
+                if steps is not None:
+                    steps.done(EXPORT_RECORDING)
+                recordings = sorted(exports.iterdir()) if exports.is_dir() else []
+                if steps is not None:
                     total = sum(f.stat().st_size for f in recordings)
                     steps.start(UPLOAD_RECORDING, done=0, total=total, unit=True)
                     sent = 0
@@ -309,8 +323,9 @@ class CogMatrixRecorder:
                     {f"camera-{f.name}": f for f in recordings},
                     repository_id=repository_id,
                 )
-                for recording in recordings:
-                    recording.unlink()
+                if run.recording is not None:
+                    for segment in run.recording.segments:
+                        segment.unlink(missing_ok=True)
                 if steps is not None:
                     steps.done(UPLOAD_RECORDING)
         except Exception as error:  # noqa: BLE001 - kept for the next start
@@ -321,6 +336,22 @@ class CogMatrixRecorder:
         shutil.rmtree(run_dir)
         logger.info("CogMatrix session %s complete", run.session_id)
         return True
+
+
+def _export(recording: RecordedCamera, exports: Path, steps: RunEnd | None) -> None:
+    if steps is None:
+        export_recording(recording, exports)
+        return
+    total = sum(s.stat().st_size for s in recording.segments if s.is_file())
+    steps.start(EXPORT_RECORDING, done=0, total=total, unit=True)
+    written = 0
+
+    def count_written(size: int) -> None:
+        nonlocal written
+        written += size
+        steps.progress(EXPORT_RECORDING, written)
+
+    export_recording(recording, exports, on_bytes=count_written)
 
 
 def _end_abandoned(run_dir: Path) -> None:

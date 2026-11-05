@@ -75,7 +75,7 @@ class RunExperimentTests(unittest.TestCase):
         self.recorder.start.assert_called_once_with(self.session)
         self.mocks["begin_run"].assert_called_once_with(self.session)
         self.recorder.finish.assert_called_once_with(
-            self.session, recordings=[], steps=self.steps
+            self.session, recording=None, steps=self.steps
         )
         self.mocks["CameraRecording"].assert_not_called()
         self.mocks["apply_cogmote_config"].assert_not_called()
@@ -166,7 +166,7 @@ class RunExperimentTests(unittest.TestCase):
         self.assertIsInstance(error, RuntimeError)
         self.assertIs(session, self.session)
         self.recorder.finish.assert_called_once_with(
-            self.session, aborted=True, recordings=[], steps=self.steps
+            self.session, aborted=True, recording=None, steps=self.steps
         )
         self.steps.fail.assert_called_once_with(
             ["run"], "the run crashed; see the crash report", retry=False
@@ -174,7 +174,7 @@ class RunExperimentTests(unittest.TestCase):
 
     def test_camera_is_recorded_when_configured(self) -> None:
         self.session.config.record_camera = True
-        self.camera.stop.return_value = [Path("a.mp4"), Path("a.vtt")]
+        self.camera.stop.return_value = "recorded"
 
         run.run_experiment(SceneManager(), argv=["--from-cogmote"])
 
@@ -184,13 +184,13 @@ class RunExperimentTests(unittest.TestCase):
             trials, capture_latency=timedelta(milliseconds=40)
         )
         self.recorder.finish.assert_called_once_with(
-            self.session, recordings=[Path("a.mp4"), Path("a.vtt")], steps=self.steps
+            self.session, recording="recorded", steps=self.steps
         )
         self.assertIn("upload_recording", self.mocks["RunEnd"].call_args.args[0])
 
     def test_a_crash_still_uploads_the_recording(self) -> None:
         self.session.config.record_camera = True
-        self.camera.stop.return_value = [Path("a.mp4"), Path("a.vtt")]
+        self.camera.stop.return_value = "recorded"
         self.game.play.side_effect = RuntimeError("boom")
 
         with self.assertRaises(RuntimeError):
@@ -199,7 +199,7 @@ class RunExperimentTests(unittest.TestCase):
         self.recorder.finish.assert_called_once_with(
             self.session,
             aborted=True,
-            recordings=[Path("a.mp4"), Path("a.vtt")],
+            recording="recorded",
             steps=self.steps,
         )
 

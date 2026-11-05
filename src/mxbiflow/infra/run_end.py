@@ -29,18 +29,20 @@ SUMMARY_BROADCAST = "run-summary"
 
 END_SESSION = "end_session"
 UPLOAD_RESULTS = "upload_results"
+EXPORT_RECORDING = "export_recording"
 UPLOAD_RECORDING = "upload_recording"
 SEND_REPORT = "send_report"
 
 LABELS = {
     END_SESSION: "End the CogMatrix session",
     UPLOAD_RESULTS: "Upload the results",
+    EXPORT_RECORDING: "Export the camera recording",
     UPLOAD_RECORDING: "Upload the camera recording",
     SEND_REPORT: "Send the report",
 }
 
 #: Steps that a CogMatrix sync retries at the next start.
-COGMATRIX_STEPS = (END_SESSION, UPLOAD_RESULTS, UPLOAD_RECORDING)
+COGMATRIX_STEPS = (END_SESSION, UPLOAD_RESULTS, EXPORT_RECORDING, UPLOAD_RECORDING)
 
 
 class AnimalRun(BaseModel):
