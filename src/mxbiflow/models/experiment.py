@@ -125,7 +125,7 @@ class RecordingConfig(BaseModel):
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(frozen=True, title="MXBI experiment")
 
-    experiment: str = Field(
+    experiment_name: str = Field(
         default="",
         max_length=200,
         description="Experiment name for operators; the rig runs its installed experiment",

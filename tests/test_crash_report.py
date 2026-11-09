@@ -27,7 +27,7 @@ class BuildCrashReportTests(unittest.TestCase):
         except ValueError as exc:
             report = build_crash_report(exc, _make_session())
 
-        self.assertEqual(report.subject, "mxbi5 Crash Report")
+        self.assertEqual(report.title, "mxbi5 Crash Report")
         self.assertIn("Crash Report - mxbi5", report.body)
         self.assertIn("Crash time:", report.body)
         self.assertIn("ValueError: boom", report.body)
@@ -78,7 +78,7 @@ class SendCrashReportTests(unittest.TestCase):
         build_report: Mock,
         notify: Mock,
     ) -> None:
-        report = SimpleNamespace(subject="mxbi5 Crash Report", body="boom")
+        report = SimpleNamespace(title="mxbi5 Crash Report", body="boom")
         build_report.return_value = report
         error = RuntimeError("boom")
         session = _make_session()
@@ -87,7 +87,7 @@ class SendCrashReportTests(unittest.TestCase):
         send_crash_report(error, session, log_file)
 
         build_report.assert_called_once_with(error, session, log_file)
-        notify.assert_called_once_with(report.subject, report.body, severity="critical")
+        notify.assert_called_once_with(report.title, report.body, severity="critical")
 
     @patch("mxbiflow.infra.crash_report.get_default_log_file_path")
     @patch("mxbiflow.infra.crash_report.notify")
