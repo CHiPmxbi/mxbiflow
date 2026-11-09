@@ -468,7 +468,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pygame-ce", specifier = ">=2.5.8" },
     { name = "pyglet", specifier = ">=2.1.16" },
-    { name = "pymotego", git = "https://github.com/cagelab/pymoteGO.git?rev=6d9c9d6022494880e458152c19681e870ee651d8" },
+    { name = "pymotego", git = "https://github.com/cagelab/pymoteGO.git?rev=e61b4e9fe44950f7f989f13f3c3354a58f298e0f" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyside6", specifier = ">=6.11.2" },
     { name = "qtawesome", specifier = ">=1.4.2" },
@@ -784,7 +784,7 @@ wheels = [
 [[package]]
 name = "pymotego"
 version = "0.2.2"
-source = { git = "https://github.com/cagelab/pymoteGO.git?rev=6d9c9d6022494880e458152c19681e870ee651d8#6d9c9d6022494880e458152c19681e870ee651d8" }
+source = { git = "https://github.com/cagelab/pymoteGO.git?rev=e61b4e9fe44950f7f989f13f3c3354a58f298e0f#e61b4e9fe44950f7f989f13f3c3354a58f298e0f" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
