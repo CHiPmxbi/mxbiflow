@@ -16,7 +16,7 @@ class ExperimentConfigTests(unittest.TestCase):
     def test_parses_the_cogmote_config(self) -> None:
         config = ExperimentConfig.model_validate(
             {
-                "experiment": "chip-std-task",
+                "experiment_name": "chip-std-task",
                 "protocol": {"id": "p1", "name": "Habituation"},
                 "repository": {"id": "r1"},
                 "animals": [

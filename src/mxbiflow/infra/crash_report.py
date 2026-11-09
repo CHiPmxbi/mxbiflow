@@ -30,7 +30,7 @@ _DEFAULT_LOG_FILE = _DefaultLogFile()
 class CrashReport:
     """A notification-ready crash report."""
 
-    subject: str
+    title: str
     body: str
 
 
@@ -111,7 +111,7 @@ def build_crash_report(
         if tail:
             body += heading + tail
 
-    return CrashReport(subject=f"{mxbi_id} Crash Report", body=body)
+    return CrashReport(title=f"{mxbi_id} Crash Report", body=body)
 
 
 def send_crash_report(
@@ -131,7 +131,7 @@ def send_crash_report(
             else log_file
         )
         report = build_crash_report(exc, session, resolved_log_file)
-        notify(report.subject, report.body, severity="critical")
-        logger.info("crash report sent: {}", report.subject)
+        notify(report.title, report.body, severity="critical")
+        logger.info("crash report sent: {}", report.title)
     except Exception:  # noqa: BLE001 - never mask the original exception
         logger.exception("failed to send crash report")

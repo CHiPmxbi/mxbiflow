@@ -16,7 +16,7 @@ def fit_body(body: str, limit: int = MAX_BODY_BYTES) -> str:
     return encoded[:keep].decode(errors="ignore") + _TRUNCATED
 
 
-def notify(subject: str, body: str, *, severity: Severity = "info") -> None:
+def notify(title: str, body: str, *, severity: Severity = "info") -> None:
     """Send a plain-text notification; raises when cogmoteGO rejects it."""
     with Client() as client:
-        client.notify(subject, fit_body(body), severity=severity)
+        client.notify(title, fit_body(body), severity=severity)

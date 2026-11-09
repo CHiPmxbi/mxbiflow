@@ -23,10 +23,10 @@ class NotifyTests(unittest.TestCase):
     def test_sends_fitted_body_with_severity(self, client_cls: Mock) -> None:
         client = client_cls.return_value.__enter__.return_value
 
-        notify("subject", "x" * (MAX_BODY_BYTES + 1), severity="critical")
+        notify("title", "x" * (MAX_BODY_BYTES + 1), severity="critical")
 
-        subject, body = client.notify.call_args.args
-        self.assertEqual(subject, "subject")
+        title, body = client.notify.call_args.args
+        self.assertEqual(title, "title")
         self.assertLessEqual(len(body.encode()), MAX_BODY_BYTES)
         self.assertEqual(client.notify.call_args.kwargs, {"severity": "critical"})
 
