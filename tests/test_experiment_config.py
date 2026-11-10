@@ -19,7 +19,7 @@ class ExperimentConfigTests(unittest.TestCase):
                 "experiment_name": "chip-std-task",
                 "protocol": {"id": "p1", "name": "Habituation"},
                 "repository": {"id": "r1"},
-                "animals": [
+                "subjects": [
                     {
                         "id": "a1",
                         "name": "Alice",
@@ -37,8 +37,8 @@ class ExperimentConfigTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(config.animals[0].rfid_tags, ("0001",))
-        self.assertEqual(config.animals[1].level, 0)
+        self.assertEqual(config.subjects[0].rfid_tags, ("0001",))
+        self.assertEqual(config.subjects[1].level, 0)
         self.assertEqual(config.parameters.reward_type, RewardEnum.M_JUICE)
         self.assertFalse(config.parameters.fullscreen)
         self.assertTrue(config.parameters.hide_cursor)
@@ -46,25 +46,25 @@ class ExperimentConfigTests(unittest.TestCase):
     def test_rejects_invalid_configs(self) -> None:
         refs = {"protocol": {"id": "p1"}, "repository": {"id": "r1"}}
         for data in [
-            {"animals": [{"id": "a1", "stage": "s"}]},
-            {**refs, "protocol": {"id": ""}, "animals": [{"id": "a1", "stage": "s"}]},
-            {**refs, "animals": []},
-            {**refs, "animals": [{"id": "a1", "stage": ""}]},
-            {**refs, "animals": [{"id": "a1", "stage": "s", "level": -1}]},
+            {"subjects": [{"id": "a1", "stage": "s"}]},
+            {**refs, "protocol": {"id": ""}, "subjects": [{"id": "a1", "stage": "s"}]},
+            {**refs, "subjects": []},
+            {**refs, "subjects": [{"id": "a1", "stage": ""}]},
+            {**refs, "subjects": [{"id": "a1", "stage": "s", "level": -1}]},
             {
                 **refs,
-                "animals": [{"id": "a1", "stage": "s"}, {"id": "a1", "stage": "t"}],
+                "subjects": [{"id": "a1", "stage": "s"}, {"id": "a1", "stage": "t"}],
             },
             {
                 **refs,
-                "animals": [{"id": "a1", "stage": "s"}],
+                "subjects": [{"id": "a1", "stage": "s"}],
                 "parameters": {"reward_type": "x", "unknown_animal_as": "a"},
             },
-            {**refs, "animals": [{"id": "a1", "stage": "s"}]},
-            {**refs, "animals": [{"id": "a1", "stage": "s"}], "parameters": {}},
+            {**refs, "subjects": [{"id": "a1", "stage": "s"}]},
+            {**refs, "subjects": [{"id": "a1", "stage": "s"}], "parameters": {}},
             {
                 **refs,
-                "animals": [{"id": "a1", "stage": "s"}],
+                "subjects": [{"id": "a1", "stage": "s"}],
                 "parameters": {"unknown_animal_as": ""},
             },
         ]:
@@ -79,7 +79,7 @@ class ExperimentConfigTests(unittest.TestCase):
         )
         self.assertNotIn("$ref", json.dumps(schema))
         self.assertNotIn("$defs", schema)
-        animal = schema["properties"]["animals"]["items"]
+        animal = schema["properties"]["subjects"]["items"]
         self.assertTrue(animal["properties"]["name"]["readOnly"])
         self.assertTrue(animal["properties"]["rfid_tags"]["readOnly"])
         self.assertEqual(animal["required"], ["id", "stage"])
@@ -87,23 +87,23 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertEqual(reward["enum"], [member.value for member in RewardEnum])
         self.assertEqual(reward["default"], "agum_one_fifth")
         self.assertEqual(
-            schema["required"], ["protocol", "repository", "animals", "parameters"]
+            schema["required"], ["protocol", "repository", "subjects", "parameters"]
         )
         self.assertEqual(schema["properties"]["protocol"]["x-cogmatrix"], "protocol")
         self.assertEqual(
             schema["properties"]["repository"]["x-cogmatrix"], "repository"
         )
-        self.assertEqual(animal["properties"]["id"]["x-cogmatrix"], "animal")
+        self.assertEqual(animal["properties"]["id"]["x-cogmatrix"], "subject")
 
     def test_schema_marks_stage_fields_and_order(self) -> None:
         schema = experiment_config_schema()
 
-        animal = schema["properties"]["animals"]["items"]
+        animal = schema["properties"]["subjects"]["items"]
         parameters = schema["properties"]["parameters"]
         self.assertTrue(animal["properties"]["stage"]["x-mxbi-stage"])
         self.assertTrue(parameters["properties"]["default_scene"]["x-mxbi-stage"])
         self.assertTrue(parameters["properties"]["fault_fallback"]["x-mxbi-stage"])
-        self.assertTrue(parameters["properties"]["unknown_animal_as"]["x-mxbi-animal"])
+        self.assertTrue(parameters["properties"]["unknown_animal_as"]["x-mxbi-subject"])
         self.assertEqual(parameters["required"], ["unknown_animal_as"])
         self.assertEqual(schema["x-mxbi-order"], list(schema["properties"]))
         self.assertEqual(animal["x-mxbi-order"], list(animal["properties"]))

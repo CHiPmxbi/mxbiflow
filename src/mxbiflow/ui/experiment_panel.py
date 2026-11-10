@@ -184,5 +184,5 @@ def _configured_animals() -> tuple[AnimalOption, ...]:
         return ()
     return tuple(
         AnimalOption(animal.id, animal.name, animal.rfid_tags)
-        for animal in experiment.animals
+        for animal in experiment.subjects
     )

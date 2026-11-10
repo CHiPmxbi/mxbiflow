@@ -13,7 +13,7 @@ from pymotego import Client
 from ..core.config_store import ConfigStore
 from ..core.path import get_applied_cogmote_config_path, get_config_session_path
 from ..models.animal import AnimalConfig
-from ..models.experiment import ExperimentAnimal, ExperimentConfig
+from ..models.experiment import ExperimentConfig, ExperimentSubject
 from ..models.session import SessionConfig
 
 
@@ -49,7 +49,7 @@ def session_config_from_experiment(
     Raises :class:`CogmoteConfigError` for stages the experiment does not
     register and a fallback animal the configuration does not have.
     """
-    names = [animal.name for animal in experiment.animals]
+    names = [animal.name for animal in experiment.subjects]
     if len(set(names)) != len(names):
         raise CogmoteConfigError(f"animal names must be unique: {', '.join(names)}")
     parameters = experiment.parameters
@@ -59,7 +59,7 @@ def session_config_from_experiment(
             f"configured animals: {', '.join(names)}"
         )
     unknown = sorted(
-        {animal.stage for animal in experiment.animals}.union(
+        {animal.stage for animal in experiment.subjects}.union(
             s for s in (parameters.default_scene, parameters.fault_fallback) if s
         )
         .union(experiment.stages)
@@ -72,9 +72,9 @@ def session_config_from_experiment(
         )
 
     local = {a.cogmatrix_id: a for a in previous.animals} if previous else {}
-    last = {a.id: a for a in applied.animals} if applied else {}
+    last = {a.id: a for a in applied.subjects} if applied else {}
 
-    def animal_config(animal: ExperimentAnimal) -> AnimalConfig:
+    def animal_config(animal: ExperimentSubject) -> AnimalConfig:
         config = AnimalConfig(
             cogmatrix_id=animal.id,
             rfid_tags=animal.rfid_tags,
@@ -101,7 +101,7 @@ def session_config_from_experiment(
         fault_fallback=parameters.fault_fallback,
         hide_cursor=parameters.hide_cursor,
         fullscreen=parameters.fullscreen,
-        animals=tuple(animal_config(animal) for animal in experiment.animals),
+        animals=tuple(animal_config(animal) for animal in experiment.subjects),
         record_camera=experiment.recording.record_camera,
         capture_latency_ms=experiment.recording.capture_latency_ms,
         stage_configs=experiment.stages,

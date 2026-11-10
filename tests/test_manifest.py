@@ -130,7 +130,7 @@ class DescribeTests(unittest.TestCase):
         self.assertEqual(
             (manifest["name"], manifest["version"]), ("touch-task", "1.4.0")
         )
-        self.assertIn("animals", settings["session"]["schema"]["properties"])
+        self.assertIn("subjects", settings["session"]["schema"]["properties"])
         touch, plain = manifest["stages"]
         self.assertEqual(touch["name"], "touch")
         self.assertEqual(touch["title"], "Touchscreen training")

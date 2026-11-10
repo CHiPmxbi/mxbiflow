@@ -302,8 +302,8 @@ class SessionLoadingTests(Panels):
         self.assert_survives_continue(ExperimentPanel(SceneManager()))
 
     def test_online_names_and_tags_survive_continue(self) -> None:
-        experiment = Mock(animals=(Mock(id="a1", rfid_tags=("t1",)),))
-        experiment.animals[0].name = "Mira"
+        experiment = Mock(subjects=(Mock(id="a1", rfid_tags=("t1",)),))
+        experiment.subjects[0].name = "Mira"
         with patch(
             "mxbiflow.ui.experiment_panel.read_experiment_config",
             return_value=experiment,

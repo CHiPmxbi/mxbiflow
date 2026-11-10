@@ -3,7 +3,9 @@
 The node writes as itself with the CogMatrix token cogmoteGO serves on loopback
 (``cogmatrix.auth.CogmoteTokenAuth``). The cogmote ``mxbi`` config names the
 endpoint, the protocol, the storage repository and the operator; all its
-animals are the subjects. Every step is kept in a local record under
+subjects are the session's subjects. CogMatrix links the session to the device
+of the token, which an administrator must have created; until then every sync
+fails with ``UnregisteredDeviceError`` and the record waits for the next start. Every step is kept in a local record under
 ``.mxbiflow/state/cogmatrix/`` until CogMatrix has it, so a run that started
 offline or whose uploads failed is completed at the next start.
 
@@ -43,6 +45,7 @@ from cogmatrix import (
     CogMatrixClient,
     EndExperimentSessionInput,
     ExperimentSessionStatus,
+    UnregisteredDeviceError,
 )
 from cogmatrix.auth import CogmoteTokenAuth
 from cogmatrix.git import code_version
@@ -263,7 +266,6 @@ class CogMatrixRecorder:
                         started_at=run.started_at,
                         title=run.title,
                         notes=run.notes,
-                        device_kind="mxbi",
                     )
                     run.session_id = str(created.id)
                     _save(run_dir, run)
@@ -329,7 +331,15 @@ class CogMatrixRecorder:
                 if steps is not None:
                     steps.done(UPLOAD_RECORDING)
         except Exception as error:  # noqa: BLE001 - kept for the next start
-            logger.warning("CogMatrix sync of %s deferred: %s", run_dir.name, error)
+            if isinstance(error, UnregisteredDeviceError):
+                logger.error(
+                    "CogMatrix sync of %s deferred: an administrator must create "
+                    "this rig's device in CogMatrix: %s",
+                    run_dir.name,
+                    error,
+                )
+            else:
+                logger.warning("CogMatrix sync of %s deferred: %s", run_dir.name, error)
             if steps is not None:
                 steps.fail(COGMATRIX_STEPS, _reason(error), retry=True)
             return False
