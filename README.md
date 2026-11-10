@@ -189,12 +189,12 @@ when the game loop quits.
 ## Experiment configuration in cogmote
 
 Operators configure a run in cogmote instead of the wizard: the cage's
-animals with stage and level, and the parameters. The form is generated from
+subjects (`subjects`) with stage and level, and the parameters. The form is generated from
 the JSON Schema of `mxbiflow.models.ExperimentConfig`, which
 `mxbiflow schema` prints and the experiment manifest carries as its `session`
 setting. Fields marked `x-mxbi-stage` name a registered stage and get a
-stage picker, fields marked `x-mxbi-animal` name one of the configuration's
-animals and get an animal picker, and each object lists its property order in
+stage picker, fields marked `x-mxbi-subject` name one of the configuration's
+subjects and get a subject picker, and each object lists its property order in
 `x-mxbi-order`.
 cogmote fills in each animal's CogMatrix name and RFID tags and sends the
 configuration to the rig with the device config.
@@ -303,7 +303,7 @@ Every run is recorded in CogMatrix by the rig itself, with the CogMatrix token
 cogmoteGO serves on loopback (`mxbiflow.infra.cogmatrix_sync`). When the game
 loop starts, mxbiflow creates the session with `create_from_device`, using:
 
-- every animal of the cogmote experiment config as a subject;
+- every subject of the cogmote experiment config;
 - the protocol picked in cogmote and the experiment repository's git version
   as its implementation;
 - the operator from the config.
@@ -329,6 +329,12 @@ Every step is kept under `.mxbiflow/state/cogmatrix/` until CogMatrix
 has it, so a run that started offline or whose uploads failed is completed in
 the background of the next run. Without an experiment config in cogmote the run
 is not recorded.
+
+The rig's device must exist in CogMatrix before its runs are recorded: an
+administrator creates it with the rig's cogmote code, and CogMatrix links each
+session to the device of the token that created it. Until then every run fails
+with `UnregisteredDeviceError`; mxbiflow logs the code to create and keeps the
+run's record, so the next start records it once the device exists.
 
 ## Camera recording
 

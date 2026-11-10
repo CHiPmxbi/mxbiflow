@@ -81,8 +81,8 @@ wheels = [
 
 [[package]]
 name = "cogmatrix"
-version = "0.1.0"
-source = { git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=e66a65db80ad07b5d99d2c6b8ee68de67ba86fd6#e66a65db80ad07b5d99d2c6b8ee68de67ba86fd6" }
+version = "0.3.0"
+source = { git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=22edf0f6233b2e24a98748569cc3b89eeefdb51c#22edf0f6233b2e24a98748569cc3b89eeefdb51c" }
 dependencies = [
     { name = "graphql-core" },
     { name = "httpx" },
@@ -454,7 +454,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cogmatrix", git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=e66a65db80ad07b5d99d2c6b8ee68de67ba86fd6" },
+    { name = "cogmatrix", git = "https://github.com/cagelab/cogmatrix-python.git?subdirectory=packages%2Fsdk&rev=22edf0f6233b2e24a98748569cc3b89eeefdb51c" },
     { name = "cyclopts", specifier = ">=5.3.3" },
     { name = "gpiozero", specifier = ">=2.0.1.post3" },
     { name = "httpx", specifier = ">=0.28.1" },
@@ -468,7 +468,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pygame-ce", specifier = ">=2.5.8" },
     { name = "pyglet", specifier = ">=2.1.16" },
-    { name = "pymotego", git = "https://github.com/cagelab/pymoteGO.git?rev=e61b4e9fe44950f7f989f13f3c3354a58f298e0f" },
+    { name = "pymotego", git = "https://github.com/cagelab/pymoteGO.git?rev=bafbbb7e28ea9af407a0557ad0224a5c48e8c7d8" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyside6", specifier = ">=6.11.2" },
     { name = "qtawesome", specifier = ">=1.4.2" },
@@ -783,8 +783,8 @@ wheels = [
 
 [[package]]
 name = "pymotego"
-version = "0.2.2"
-source = { git = "https://github.com/cagelab/pymoteGO.git?rev=e61b4e9fe44950f7f989f13f3c3354a58f298e0f#e61b4e9fe44950f7f989f13f3c3354a58f298e0f" }
+version = "0.3.0"
+source = { git = "https://github.com/cagelab/pymoteGO.git?rev=bafbbb7e28ea9af407a0557ad0224a5c48e8c7d8#bafbbb7e28ea9af407a0557ad0224a5c48e8c7d8" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },

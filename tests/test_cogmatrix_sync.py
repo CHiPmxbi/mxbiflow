@@ -15,6 +15,7 @@ from cogmatrix import (
     ExperimentSessionStatus,
     SessionDataMismatch,
     SessionFileOutcome,
+    UnregisteredDeviceError,
 )
 from pydantic import JsonValue
 from test_session import make_session
@@ -40,7 +41,9 @@ CONFIG: dict[str, JsonValue] = {
     "experiment": {
         "protocol": {"id": PROTOCOL, "name": "Habituation"},
         "repository": {"id": REPOSITORY, "name": "Lab S3"},
-        "animals": [{"id": str(uuid4()), "name": "animal-1", "stage": "s", "level": 0}],
+        "subjects": [
+            {"id": str(uuid4()), "name": "animal-1", "stage": "s", "level": 0}
+        ],
     },
     "operator": {"issuer": "https://id.example", "subject": "s-1", "name": "R"},
     "cogmatrix": {"url": "https://matrix.example/api/graphql"},
@@ -282,6 +285,32 @@ class CogMatrixRecorderTests(unittest.TestCase):
             self.names(), ["create", "upload_data", "end", "upload_data", "upload_data"]
         )
         self.assertEqual(len(self.fake.uploads), 2)
+        self.assertEqual(list(self.state.iterdir()), [])
+
+    def test_an_unregistered_rig_logs_its_code_and_retries_at_the_next_start(
+        self,
+    ) -> None:
+        def unregistered(config: Any, **kwargs: Any) -> Any:
+            raise UnregisteredDeviceError(
+                [{"message": "No device has the code mxbi-01."}], None, None
+            )
+
+        with (
+            patch.object(self.fake, "create_from_device", unregistered),
+            self.assertLogs("mxbiflow", "ERROR") as logs,
+        ):
+            self.run_session(self.recorder())
+
+        self.assertIn("No device has the code mxbi-01.", "\n".join(logs.output))
+        [run_dir] = list(self.state.iterdir())
+        pending = PendingRun.model_validate_json((run_dir / "run.json").read_text())
+        self.assertIsNone(pending.session_id)
+
+        self.recorder().retry_pending()
+
+        self.assertEqual(
+            self.names(), ["create", "upload_data", "end", "upload_data", "upload_data"]
+        )
         self.assertEqual(list(self.state.iterdir()), [])
 
     def test_failed_uploads_are_retried_without_repeating_done_steps(self) -> None:

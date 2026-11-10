@@ -1,14 +1,14 @@
 """Experiment configuration that operators edit in cogmote (cagelab/cogmote#344).
 
 cogmote generates its form from :func:`experiment_config_schema`, looks up the
-chosen animals in CogMatrix, and sends the result to the rig in the device
+chosen subjects in CogMatrix, and sends the result to the rig in the device
 configuration, where mxbiflow reads it with ``pymotego.Client().get_config()``.
 Fields marked ``readOnly`` are filled by cogmote, not by the operator,
 ``x-cogmatrix`` marks CogMatrix IDs that cogmote offers pickers for and checks,
 ``x-mxbi-stages`` marks the stage configurations that cogmote's stage editor
 writes (:mod:`mxbiflow.models.stage_config`), ``x-mxbi-stage`` marks fields
-that name one of the experiment's registered stages, and ``x-mxbi-animal`` marks
-fields that name one of the configuration's animals.
+that name one of the experiment's registered stages, and ``x-mxbi-subject`` marks
+fields that name one of the configuration's subjects.
 Every object lists its properties in declaration order in ``x-mxbi-order``, since
 stores such as PostgreSQL ``jsonb`` do not keep key order.
 """
@@ -21,7 +21,7 @@ from .reward import RewardEnum
 
 _SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 STAGE_MARKER = "x-mxbi-stage"
-ANIMAL_MARKER = "x-mxbi-animal"
+SUBJECT_MARKER = "x-mxbi-subject"
 ORDER_MARKER = "x-mxbi-order"
 
 
@@ -38,14 +38,14 @@ class CogMatrixRef(BaseModel):
     )
 
 
-class ExperimentAnimal(BaseModel):
-    model_config = ConfigDict(frozen=True, title="Animal")
+class ExperimentSubject(BaseModel):
+    model_config = ConfigDict(frozen=True, title="Subject")
 
     id: str = Field(
         min_length=1,
-        title="Animal",
-        description="CogMatrix animal ID",
-        json_schema_extra={"x-cogmatrix": "animal"},
+        title="Subject",
+        description="CogMatrix subject ID",
+        json_schema_extra={"x-cogmatrix": "subject"},
     )
     name: str = Field(
         default="",
@@ -61,7 +61,7 @@ class ExperimentAnimal(BaseModel):
     stage: str = Field(
         min_length=1,
         max_length=200,
-        description="Stage the animal trains in; must be registered by the experiment",
+        description="Stage the subject trains in; must be registered by the experiment",
         json_schema_extra={STAGE_MARKER: True},
     )
     level: int = Field(default=0, ge=0, description="Level within the stage")
@@ -77,7 +77,7 @@ class ExperimentParameters(BaseModel):
         default="",
         max_length=200,
         title="Default scene",
-        description="Scene shown when no animal is present; empty uses idle",
+        description="Scene shown when no subject is present; empty uses idle",
         json_schema_extra={STAGE_MARKER: True},
     )
     fault_fallback: str = Field(
@@ -92,10 +92,10 @@ class ExperimentParameters(BaseModel):
         max_length=200,
         title="Unknown animal as",
         description=(
-            "Animal that runs when the RFID read fails or the tag is not configured; "
-            "its trials are recorded under this animal"
+            "Subject that runs when the RFID read fails or the tag is not configured; "
+            "its trials are recorded under this subject"
         ),
-        json_schema_extra={ANIMAL_MARKER: True},
+        json_schema_extra={SUBJECT_MARKER: True},
     )
     fullscreen: bool = True
     hide_cursor: bool = Field(default=True, title="Hide cursor")
@@ -140,9 +140,9 @@ class ExperimentConfig(BaseModel):
         description="CogMatrix storage repository for the results",
         json_schema_extra={"x-cogmatrix": "repository"},
     )
-    animals: tuple[ExperimentAnimal, ...] = Field(
+    subjects: tuple[ExperimentSubject, ...] = Field(
         min_length=1,
-        description="The cage's animals, fixed for the run; animal IDs are unique",
+        description="The cage's subjects, fixed for the run; subject IDs are unique",
     )
     parameters: ExperimentParameters
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
@@ -150,17 +150,17 @@ class ExperimentConfig(BaseModel):
         default_factory=dict,
         title="Stage configurations",
         description=(
-            "Stage name to its config.json document: the default and per-animal "
-            "overrides by animal name; a stage without one uses its template"
+            "Stage name to its config.json document: the default and per-subject "
+            "overrides by subject name; a stage without one uses its template"
         ),
         json_schema_extra={"x-mxbi-stages": True},
     )
 
     @model_validator(mode="after")
-    def _validate_unique_animals(self) -> ExperimentConfig:
-        ids = [animal.id for animal in self.animals]
+    def _validate_unique_subjects(self) -> ExperimentConfig:
+        ids = [subject.id for subject in self.subjects]
         if len(ids) != len(set(ids)):
-            raise ValueError("animal IDs must be unique")
+            raise ValueError("subject IDs must be unique")
         return self
 
 
