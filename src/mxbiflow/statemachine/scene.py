@@ -1,23 +1,27 @@
-"""Runs a cogforge experiment's stages in the game loop, one scene per trial.
+"""Runs a stage's trial state machine in the game loop, one scene per trial.
+
+A stage is a class; the scheduler makes an instance of the animal's stage for each
+trial. What the trial does is the stage's machine, which is data. Which values the
+trial gets, and what its outcome does to the animal's level, is the stage's Python:
+:class:`MachineTrial` for a stage written in Python, :func:`machine_scenes` for the
+stages of a cogforge file, which run with their parameters' defaults.
 
 Without cagelab-2 the machine is evaluated once per frame: timeouts, timers, sounds and
 outputs have one-frame resolution. An input change carries the time its channel gives
-it, which for a GPIO pin is when the edge happened. Register the scenes of
-:func:`machine_scenes` with the scene manager; the scheduler then starts the scene of
-the animal's stage for each trial.
+it, which for a GPIO pin is when the edge happened.
 
-The experiment only names its channels; the rig wires each name to a device or a GPIO
-pin (``channels`` in the hardware configuration, :mod:`mxbiflow.driver.channels`). The
-touchscreen needs no wiring. The trial's life cycle is :class:`~mxbiflow.scene.TrialScene`'s: a
-stopped trial (the animal left, the run ended) is recorded but does not count towards
-the level rules.
+The machine only names its channels; the rig wires each name to a device or a GPIO pin
+(``channels`` in the hardware configuration, :mod:`mxbiflow.driver.channels`). The
+touchscreen needs no wiring. The trial's life cycle is
+:class:`~mxbiflow.scene.TrialScene`'s.
 """
 
 import io
+from abc import abstractmethod
 from collections.abc import Callable, Collection, Hashable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from time import monotonic
-from typing import ClassVar
+from typing import Any, ClassVar
 from urllib.request import urlopen
 
 import pygame
@@ -25,7 +29,6 @@ from pydantic import BaseModel, JsonValue
 from pygame import Surface
 from pygame.event import Event
 
-from ..context import get_mxbiflow
 from ..driver.audioplayer import (
     AudioPlayer,
     PureToneGenerator,
@@ -36,25 +39,16 @@ from ..driver.audioplayer import (
 )
 from ..driver.channels import InputChannel, OutputChannel
 from ..scene.scene import Scene
-from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
 from ..task import Task
-from .host import (
-    ACTIONS,
-    Outcome,
-    Progress,
-    draw_trial,
-    outcome_of,
-    record_of,
-    settle,
-)
+from .host import ACTIONS, Entered, Logged, Outcome, TrialRecord, outcome_of
+from .machine import Machine, TrialParams
 from .models import (
     BackgroundStimulus,
     CircleStimulus,
     CrossStimulus,
     Experiment,
     ImageStimulus,
-    Machine,
     Outcomes,
     RectStimulus,
     Stage,
@@ -66,26 +60,11 @@ from .runner import (
     Values,
     VisualStimulus,
     amount_in,
+    default_values,
     duration_of,
     place_of,
 )
-from .validate import check_experiment
-
-_CONTEXT = "machine"
-
-
-class Cursor(BaseModel):
-    """The next row of each factor that ``level`` of a stage takes in turn.
-
-    Kept in the stage's context; the level's counts are the session's.
-    """
-
-    level: int
-    cursors: dict[str, int] = {}
-
-
-type Hook = Callable[["MachineScene"], None]
-type Rule = Callable[["MachineScene", Outcomes | None], SettlementAction]
+from .validate import machine_problems, value_problems
 
 
 def check_channels(
@@ -109,73 +88,96 @@ def check_channels(
 
 
 @dataclass
-class Hooks:
-    """A stage's own Python code, run by the host around the machine.
+class Loaded:
+    """A stage's machine as the format's data, with what was decoded for it."""
 
-    The machine stays data: what it does is in its states and transitions. A hook is
-    for what the data cannot say, such as picking this trial's values from a sequence
-    or grading a reward. It gets the trial's :class:`MachineScene`.
+    stage: Stage
+    # Decoded pictures and sounds, kept across the stage's trials.
+    surfaces: dict[str, Surface | None] = field(
+        default_factory=dict[str, Surface | None]
+    )
+    sounds: dict[Hashable, Sound | None] = field(
+        default_factory=dict[Hashable, Sound | None]
+    )
+
+
+def on_enter[F: Callable[..., None]](*states: str) -> Callable[[F], F]:
+    """Mark a stage's method to be called each time one of ``states`` is entered.
+
+    It runs in the frame after the state was entered, so what it decides has one-frame
+    resolution; what must be exact belongs in the machine.
     """
 
-    #: Called before the trial starts; may change ``scene.values``.
-    on_trial: list[Hook] = field(default_factory=list["Hook"])
-    #: By state name: called once each time the state is entered.
-    on_enter: dict[str, list[Hook]] = field(default_factory=dict[str, list["Hook"]])
-    #: Decides whether the animal moves after a trial, in place of the stage's rule.
-    rule: Rule | None = None
+    def mark(method: F) -> F:
+        method.__dict__["on_enter_states"] = tuple(str(state) for state in states)
+        return method
+
+    return mark
 
 
-def machine_scenes(
-    experiment: Experiment, hooks: Mapping[str, Hooks] | None = None
-) -> dict[str, type[Scene]]:
-    """One scene class per stage of ``experiment``, by stage name.
+def machine_scenes(experiment: Experiment) -> dict[str, type[Scene]]:
+    """One scene class per stage of a cogforge file, by stage name.
 
-    ``hooks`` gives stages their Python code, by stage name. A stage that uses a
-    channel the rig does not wire raises ``ValueError`` when its first trial is made,
-    before the trial starts. An experiment whose levels cannot be drawn (a parameter
-    set twice, a factor without rows, a stimulus of the wrong kind) raises here.
+    Each trial runs with the parameters' defaults: a file has the trial's machine, not
+    which values a trial gets. A machine that cannot run as written raises here.
     """
-    check_experiment(experiment)
-    return {
-        stage.name: type(
+    scenes: dict[str, type[Scene]] = {}
+    for stage in experiment.stages:
+        problems = machine_problems(stage.machine)
+        if problems:
+            raise ValueError(f'stage "{stage.name}": ' + "; ".join(problems))
+        scenes[stage.name] = type(
             f"MachineScene[{stage.name}]",
-            (MachineScene,),
-            {
-                "experiment": experiment,
-                "stage_index": index,
-                "hooks": (hooks or {}).get(stage.name, Hooks()),
-                "level_table": {"default": list(range(1, len(stage.levels) + 1))},
-                "_surfaces": {},
-                "_sounds": {},
-            },
+            (_FileScene,),
+            {"loaded": Loaded(stage=stage)},
         )
-        for index, stage in enumerate(experiment.stages)
-    }
+    return scenes
 
 
 class MachineScene(TrialScene):
-    """One trial of one stage; :func:`machine_scenes` makes the class of each stage.
+    """One trial of a stage whose trial is a state machine.
 
-    The session's level ``n`` is the stage's ``n``-th level, counted from 1.
+    A subclass says which machine (``load``) and which values this trial gets
+    (``values``). The rest is :class:`~mxbiflow.scene.TrialScene`: ``settlement`` or
+    ``decide`` move the animal between levels, as in any stage; ``outcome`` and
+    ``trial`` say how the trial went.
     """
 
-    experiment: ClassVar[Experiment]
-    stage_index: ClassVar[int]
-    hooks: ClassVar[Hooks]
-    # Decoded pictures and sounds of the stage, kept across its trials.
-    _surfaces: ClassVar[dict[str, Surface | None]]
-    _sounds: ClassVar[dict[Hashable, Sound | None]]
+    # By state: the names of the methods marked with ``on_enter``.
+    _entry_methods: ClassVar[dict[str, list[str]]] = {}
 
-    @classmethod
-    def name(cls) -> str:
-        return cls.experiment.stages[cls.stage_index].name
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        methods: dict[str, list[str]] = {}
+        for name in dir(cls):
+            states = getattr(getattr(cls, name, None), "on_enter_states", ())
+            for state in states:
+                methods.setdefault(state, []).append(name)
+        cls._entry_methods = methods
+
+    # ---- the stage -----------------------------------------------------------
+
+    @abstractmethod
+    def load(self) -> Loaded:
+        """The stage's machine; the same object for trials of the same machine."""
+
+    def values(self) -> Mapping[str, float | str]:
+        """This trial's parameter values; one left out takes its default."""
+        return {}
+
+    # ---- the trial -----------------------------------------------------------
 
     def __init__(self) -> None:
-        # What cannot run fails here, before the trial is counted.
-        context = get_mxbiflow()
-        mxbi = context.mxbi
-        self._stage = self.experiment.stages[self.stage_index]
-        self._machine: Machine = self._stage.machine
+        super().__init__()
+        mxbi = self.mxbiflow.mxbi
+        self._loaded = self.load()
+        self._stage = self._loaded.stage
+        self._machine = self._stage.machine
+        unknown = set(self._entry_methods) - {s.name for s in self._machine.states}
+        if unknown:
+            raise ValueError(
+                f'stage "{self._stage.name}": on_enter of no state: {sorted(unknown)}'
+            )
         check_channels(self._stage, mxbi.inputs, mxbi.outputs)
         self._inputs: dict[str, InputChannel] = {
             name: mxbi.inputs[name] for name in self._machine.channels.inputs
@@ -183,30 +185,23 @@ class MachineScene(TrialScene):
         self._outputs: dict[str, OutputChannel] = {
             name: mxbi.outputs[name] for name in self._machine.channels.outputs
         }
-        # The animal's screen: the rig's, turned a quarter when the experiment is laid
+        # The animal's screen: the rig's, turned a quarter when the machine is laid
         # out upright and the rig's framebuffer lies on its side (or the reverse).
         rig = (mxbi.screen_size.width, mxbi.screen_size.height)
         reference = self._machine.screen
         self._rotated = (reference.width > reference.height) != (rig[0] > rig[1])
         self._screen: tuple[int, int] = (rig[1], rig[0]) if self._rotated else rig
-        # A level outside the stage's (a new animal's 0, one set by hand) is brought in.
-        state = context.session.require_current_animal().current_stage
-        level = min(max(state.level, 1), len(self._stage.levels))
-        if level != state.level:
-            state.reset_level(level)
-        super().__init__()
         self._aplayer: AudioPlayer = mxbi.aplayer
 
-        progress = self._load_progress()
-        own = next(
-            (a.values for a in self.experiment.animals if a.name == self.animal.name),
-            {},
-        )
-        self._draw = draw_trial(self.experiment, own, progress)
-        self._progress = replace(progress, cursors=self._draw.cursors)
-        self._settled: Progress = self._progress
+        given = dict(self.values())
+        problems = value_problems(self._machine, given)
+        if problems:
+            raise ValueError(
+                f'stage "{self._stage.name}": the values of the trial: '
+                + "; ".join(problems)
+            )
+        self._values: Values = {**default_values(self._machine), **given}
         self._outcome: Outcome = "none"
-        self._values: Values = self._draw.values
         self._extra: dict[str, JsonValue] = {}
         self._entered = 0
 
@@ -221,8 +216,6 @@ class MachineScene(TrialScene):
     # ---- TrialScene ----------------------------------------------------------
 
     def begin(self) -> None:
-        for hook in self.hooks.on_trial:
-            hook(self)
         self._check_places()
         self._started = monotonic()
         levels: dict[str, bool] = {}
@@ -238,7 +231,7 @@ class MachineScene(TrialScene):
             photodiode=False,
             screen=self._screen,
         )
-        self._run_hooks()
+        self._run_entries()
         self._apply(0)
         self._resolve_known()
 
@@ -250,42 +243,19 @@ class MachineScene(TrialScene):
         self._apply(now)
         self._outcome = outcome_of(self._stage, self._trial)
 
-    def decide(self) -> SettlementAction:
-        rule = self.hooks.rule
-        decided = None
-        if rule is not None:
-            outcome = None if self._outcome == "none" else Outcomes(self._outcome)
-            decided = ACTIONS[rule(self, outcome)]
-        self._settled, action = settle(
-            self.experiment, self._progress, self._outcome, decided
-        )
-        self.session.count_trial(self._outcome == "correct")
-        return next(a for a, name in ACTIONS.items() if name == action)
-
     def record(self) -> BaseModel:
-        assert self._trial is not None
-        return record_of(
-            self.experiment,
-            self.animal.name,
-            self.info.trial_id,
-            self._progress,
-            self._draw,
-            self._trial,
-            self._outcome,
-            ACTIONS[self.action],
-            self._extra,
-        )
-
-    def move(self, action: SettlementAction) -> None:
-        settled = self._settled
-        if action in (SettlementAction.NEXT_STAGE, SettlementAction.PREV_STAGE):
-            self.session.enter_stage(
-                self.experiment.stages[settled.stage].name, settled.level + 1
-            )
-        else:
-            super().move(action)
-        self.session.set_stage_context(
-            _CONTEXT, Cursor(level=settled.level + 1, cursors=dict(settled.cursors))
+        trial = self.trial
+        return TrialRecord(
+            animal=self.animal.name,
+            trial=self.info.trial_id,
+            stage=self._stage.name,
+            level=self.info.level,
+            values=self._values,
+            outcome=self._outcome,
+            action=ACTIONS[self.action],
+            states=[Entered(state=v.state, t=v.t) for v in trial.visited],
+            events=[Logged(t=entry.t, text=entry.text) for entry in trial.log],
+            extra=self._extra,
         )
 
     def handle_event(self, event: Event) -> None:
@@ -321,7 +291,7 @@ class MachineScene(TrialScene):
         for at, apply in sorted(events, key=lambda event: event[0]):
             apply(min(max(at, trial.now), now))
         trial.advance(now)
-        self._run_hooks()
+        self._run_entries()
         self._apply(now)
         self._resolve_known()
         if trial.state is None:
@@ -336,12 +306,7 @@ class MachineScene(TrialScene):
             self._frame = (list(shown), frame)
         screen.blit(self._frame[1], (0, 0))
 
-    # ---- for the stage's hooks -----------------------------------------------
-
-    @property
-    def values(self) -> Values:
-        """This trial's parameter values; an ``on_trial`` hook may change them."""
-        return self._values
+    # ---- for the stage's own code -------------------------------------------
 
     @property
     def trial(self) -> Trial:
@@ -351,6 +316,12 @@ class MachineScene(TrialScene):
         return self._trial
 
     @property
+    def outcome(self) -> Outcomes | None:
+        """The trial's outcome so far: that of the last state entered that has one."""
+        outcome = outcome_of(self._stage, self.trial)
+        return None if outcome == "none" else Outcomes(outcome)
+
+    @property
     def now_ms(self) -> float:
         """Milliseconds from the start of the trial."""
         return self._now()
@@ -358,17 +329,6 @@ class MachineScene(TrialScene):
     def fire(self, name: str) -> None:
         """Send the machine the event ``host.<name>``."""
         self.trial.host(name, max(self._now(), self.trial.now))
-
-    def params[P: BaseModel](self, model: type[P]) -> P:
-        """This trial's parameter values as the stage's ``TrialParams`` model."""
-        return model.model_validate(self._values)
-
-    def set(self, parameter: object, value: float | str) -> None:
-        """Set a parameter of this trial (``Params.refs().<field>``), in ``on_trial``."""
-        name = str(parameter)
-        if name not in self._values:
-            raise KeyError(f"no parameter {name}")
-        self._values[name] = value
 
     def note(self, extra: BaseModel) -> None:
         """Keep a model's fields in the trial's record, under ``extra``."""
@@ -380,18 +340,18 @@ class MachineScene(TrialScene):
         The trial may go on (a reward, the time between trials); once its outcome is
         known it is settled even when the animal leaves before it ends.
         """
-        outcome = outcome_of(self._stage, self.trial)
-        if outcome != "none":
-            self.resolve(outcome == "correct")
+        outcome = self.outcome
+        if outcome is not None:
+            self.resolve(outcome is Outcomes.correct)
 
-    def _run_hooks(self) -> None:
-        """Call the hooks of the states entered since the last call, in order."""
+    def _run_entries(self) -> None:
+        """Call the ``on_enter`` methods of the states entered since the last call."""
         trial = self.trial
         while self._entered < len(trial.visited):
             visit = trial.visited[self._entered]
             self._entered += 1
-            for hook in self.hooks.on_enter.get(visit.state, []):
-                hook(self)
+            for method in self._entry_methods.get(visit.state, []):
+                getattr(self, method)()
 
     # ---- the rig -------------------------------------------------------------
 
@@ -453,28 +413,28 @@ class MachineScene(TrialScene):
         assert isinstance(stimulus, (WavStimulus, TonesStimulus))
         aplayer = self._aplayer
         if isinstance(stimulus, WavStimulus):
-            if name not in self._sounds:
-                type(self)._sounds[name] = (
+            if name not in self._loaded.sounds:
+                self._loaded.sounds[name] = (
                     None
                     if stimulus.sound is None
                     else aplayer.prepare(
                         read_sound(io.BytesIO(_data(stimulus.sound)[1]))
                     )
                 )
-            return self._sounds[name]
+            return self._loaded.sounds[name]
         # Tones may be this trial's: frequencies and lengths can be parameters.
         tones = tuple(
             (amount_in(self._values, t.frequency), amount_in(self._values, t.duration))
             for t in stimulus.tones
         )
         key = (name, tones, duration_of(stimulus, self._values))
-        if key not in self._sounds:
+        if key not in self._loaded.sounds:
             sample_rate_hz = aplayer.format.sample_rate_hz
             units = _tone_units(tones, key[2], aplayer, sample_rate_hz)
-            type(self)._sounds[key] = aplayer.prepare(
+            self._loaded.sounds[key] = aplayer.prepare(
                 tone_train(units, sample_rate_hz=sample_rate_hz)
             )
-        return self._sounds[key]
+        return self._loaded.sounds[key]
 
     # ---- the screen ----------------------------------------------------------
 
@@ -516,7 +476,7 @@ class MachineScene(TrialScene):
             _draw_text(frame, stimulus.text, stimulus.color, h, box.center)
 
     def _image(self, stimulus: ImageStimulus, size: tuple[int, int]) -> Surface | None:
-        if stimulus.name not in self._surfaces:
+        if stimulus.name not in self._loaded.surfaces:
             surface = None
             if stimulus.image is not None:
                 kind, data = _data(stimulus.image)
@@ -525,25 +485,66 @@ class MachineScene(TrialScene):
                 else:
                     loaded = pygame.image.load(io.BytesIO(data))
                     surface = pygame.transform.smoothscale(loaded.convert_alpha(), size)
-            type(self)._surfaces[stimulus.name] = surface
-        return self._surfaces[stimulus.name]
+            self._loaded.surfaces[stimulus.name] = surface
+        return self._loaded.surfaces[stimulus.name]
 
-    # ---- the host's side -----------------------------------------------------
 
-    def _load_progress(self) -> Progress:
-        """Where the animal is: the session's stage, level and counts at the level."""
-        state = self.animal.current_stage
-        cursor = state.get_context(_CONTEXT, Cursor)
-        return Progress(
-            self.stage_index,
-            state.level - 1,
-            state.level_counted,
-            state.level_correct,
-            # A new level, or one set by hand, takes its rows from the first again.
-            cursor.cursors
-            if cursor is not None and cursor.level == state.level
-            else {},
-        )
+class _FileScene(MachineScene):
+    """A stage of a cogforge file: its machine with the parameters' defaults."""
+
+    loaded: ClassVar[Loaded]
+
+    @classmethod
+    def name(cls) -> str:
+        return cls.loaded.stage.name
+
+    def load(self) -> Loaded:
+        return self.loaded
+
+
+class MachineTrial[P: TrialParams](MachineScene):
+    """A stage written in Python: one trial of a :class:`~.machine.Machine`.
+
+    The stage gives the machine (``machine``) and this trial's values (``params``, an
+    instance of the machine's parameters); ``given`` is that instance afterwards. Moving
+    the animal between levels is ``settlement`` or ``decide``, as in any
+    :class:`~mxbiflow.scene.TrialScene`.
+
+        class Touch(MachineTrial[Params]):
+            def machine(self) -> Machine:
+                return MACHINE
+
+            def params(self) -> Params:
+                return Params(reward_ms=choice((300, 500)))
+
+            @on_enter(S.GIVE)
+            def note_reward(self) -> None:
+                self.note(Reward(length_ms=self.given.reward_ms))
+    """
+
+    # The machines built so far, by stage, with the model each was built from: the
+    # same model is built once, another (a changed configuration) again.
+    _built: ClassVar[dict[str, tuple[Machine, Loaded]]] = {}
+
+    @abstractmethod
+    def machine(self) -> Machine:
+        """The trial's machine; return the same object while it does not change."""
+
+    @abstractmethod
+    def params(self) -> P:
+        """This trial's parameter values."""
+
+    def load(self) -> Loaded:
+        machine = self.machine()
+        built = self._built.get(self.name())
+        if built is None or built[0] is not machine:
+            built = (machine, Loaded(stage=machine.build(self.name())))
+            MachineTrial._built[self.name()] = built
+        return built[1]
+
+    def values(self) -> Mapping[str, float | str]:
+        self.given: P = self.params()
+        return self.given.model_dump(mode="json", by_alias=True)
 
 
 def _data(url: str) -> tuple[str, bytes]:

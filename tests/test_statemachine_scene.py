@@ -15,7 +15,7 @@ from mxbiflow.driver.channels import DetectorInput, RewarderOutput
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 from mxbiflow.statemachine.models import Experiment
-from mxbiflow.statemachine.scene import Cursor, machine_scenes
+from mxbiflow.statemachine.scene import machine_scenes
 
 
 def state(name: str, **parts: Any) -> dict[str, Any]:
@@ -37,7 +37,6 @@ def stage(
     size: float = 20,
 ) -> dict[str, Any]:
     """Touch the target for a reward; leaving the beam ends the trial."""
-    level = {"values": {}, "factors": []}
     return {
         "name": name,
         "machine": {
@@ -96,13 +95,11 @@ def stage(
             ],
         },
         "outcomes": {"reward": "correct", "error": "incorrect"},
-        "levels": [{"name": "easy", **level}, {"name": "hard", **level}],
-        "progression": {"rule": "count", "correct": 2},
     }
 
 
 def experiment(*stages: dict[str, Any]) -> Experiment:
-    return Experiment.model_validate({"stages": list(stages), "animals": []})
+    return Experiment.model_validate({"stages": list(stages)})
 
 
 class MachineSceneTests(unittest.TestCase):
@@ -205,7 +202,7 @@ class MachineSceneTests(unittest.TestCase):
         (record,) = self.records("touch")
         self.assertEqual(
             {key: record[key] for key in ("animal", "trial", "stage", "level")},
-            {"animal": "a", "trial": 1, "stage": "touch", "level": "easy"},
+            {"animal": "a", "trial": 1, "stage": "touch", "level": 0},
         )
         self.assertEqual(record["outcome"], "correct")
         self.assertEqual(record["values"], {"reward_ms": 50})
@@ -217,25 +214,22 @@ class MachineSceneTests(unittest.TestCase):
         self.publish.assert_called_once()
         self.assertIs(self.publish.call_args.kwargs["correct"], True)
 
-    def test_correct_trials_move_the_animal_through_levels_and_stages(self) -> None:
-        scenes = experiment(stage("first"), stage("second"))
+    def test_a_files_stage_counts_its_trials_and_keeps_the_animal_where_it_is(
+        self,
+    ) -> None:
+        scenes = experiment(stage("touch"))
         context = self.context(scenes)
-        actions: list[str] = []
-        for _ in range(4):
+        for _ in range(3):
             start = self.now
             scene = self.trial(scenes, context)
             self.touch(scene, (150, 20), at=start + 10)
             self.now = start + 100
             scene.update(0)
-            actions.append(self.records("first")[-1]["action"])
 
-        self.assertEqual(actions, ["none", "level up", "none", "next stage"])
-        animal = self.session.require_current_animal()
-        self.assertEqual(animal.current_stage_name, "second")
-        second = animal.current_stage
-        self.assertEqual((second.level, second.level_counted), (1, 0))
-        self.assertEqual(animal.stages["first"].level, 2)
-        self.assertEqual(second.get_context("machine", Cursor), Cursor(level=1))
+        # A file has the trial, not how an animal moves between levels.
+        self.assertEqual([r["action"] for r in self.records("touch")], ["none"] * 3)
+        state = self.session.require_current_animal().current_stage
+        self.assertEqual((state.level_counted, state.level_correct), (3, 3))
 
     def test_a_trial_the_animal_leaves_is_recorded_but_not_counted(self) -> None:
         scenes = experiment(stage("touch"))
@@ -345,14 +339,12 @@ class MachineSceneTests(unittest.TestCase):
         scene.update(0)
         return self.records("touch")[0]
 
-    def test_an_unwired_channel_fails_before_the_trial_is_counted(self) -> None:
+    def test_an_unwired_channel_stops_the_run_with_its_name(self) -> None:
         scenes = experiment(stage("touch"))
         context = self.context(scenes, inputs={}, outputs={})
 
         with self.assertRaisesRegex(ValueError, 'input "beam", output "reward"'):
             self.trial(scenes, context)
-
-        self.assertEqual(self.session.require_current_animal().trial_id, 0)
 
     def test_the_rig_screen_counts_not_the_experiment_reference(self) -> None:
         # Laid out on a 400×200 reference; this rig's screen is 200×100.

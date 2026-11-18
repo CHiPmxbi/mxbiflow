@@ -182,74 +182,6 @@ class Duration(RootModel[float]):
     root: Annotated[float, Field(gt=0.0)]
 
 
-class Value1(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    uniform: tuple[float, float]
-
-
-class Order(StrEnum):
-    random = "random"
-    cycle = "cycle"
-
-
-class Row(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    name: Annotated[str, Field(min_length=1)]
-    weight: Annotated[float, Field(ge=0.0)]
-    values: dict[
-        Annotated[str, StringConstraints(min_length=1)],
-        float | Annotated[str, StringConstraints(min_length=1)],
-    ]
-
-
-class ManualProgression(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    rule: Literal["manual"]
-
-
-class RateProgression(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    rule: Literal["rate"]
-    min_trials: Annotated[int, Field(alias="minTrials", gt=0, le=9007199254740991)]
-    up: Annotated[float, Field(ge=0.0, le=1.0)]
-    down: Annotated[float, Field(ge=0.0, le=1.0)]
-
-
-class CountProgression(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    rule: Literal["count"]
-    correct: Annotated[int, Field(gt=0, le=9007199254740991)]
-
-
-class Animal(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    name: Annotated[str, Field(min_length=1)]
-    stage: Annotated[str, Field(min_length=1)]
-    level: Annotated[str, Field(min_length=1)]
-    values: dict[
-        Annotated[str, StringConstraints(min_length=1)],
-        float | Annotated[str, StringConstraints(min_length=1)],
-    ]
-
-
 class Generator(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -386,27 +318,6 @@ class TonesStimulus(BaseModel):
     duration: Duration | ParamRef
 
 
-class Value2(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    choice: Annotated[
-        list[float | Annotated[str, StringConstraints(min_length=1)]],
-        Field(min_length=1),
-    ]
-
-
-class Factor(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    name: Annotated[str, Field(min_length=1)]
-    order: Order
-    rows: list[Row]
-
-
 class Timer(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -425,19 +336,6 @@ class Group(BaseModel):
     group: Annotated[str, StringConstraints(min_length=1)] | None
     hold: list[Annotated[str, StringConstraints(min_length=1)]]
     transitions: list[Transition]
-
-
-class Level(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    name: Annotated[str, Field(min_length=1)]
-    values: dict[
-        Annotated[str, StringConstraints(min_length=1)],
-        Value1 | Value2 | float | Annotated[str, StringConstraints(min_length=1)],
-    ]
-    factors: list[Factor]
 
 
 class State(BaseModel):
@@ -511,11 +409,6 @@ class Stage(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     machine: Machine
     outcomes: dict[Annotated[str, StringConstraints(min_length=1)], Outcomes]
-    levels: Annotated[list[Level], Field(min_length=1)]
-    progression: Annotated[
-        ManualProgression | RateProgression | CountProgression,
-        Field(discriminator="rule"),
-    ]
 
 
 class Experiment(BaseModel):
@@ -524,4 +417,3 @@ class Experiment(BaseModel):
         populate_by_name=True,
     )
     stages: Annotated[list[Stage], Field(min_length=1)]
-    animals: list[Animal]

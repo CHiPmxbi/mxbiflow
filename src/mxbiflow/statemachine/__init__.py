@@ -4,16 +4,19 @@
 (`schema/experiment.schema.json`). Never edit it by hand: copy the new schema over and
 run `uv run datamodel-codegen`.
 
-An experiment runs by registering its stages' scenes::
+The format has the trial only: a stage is a machine and the outcomes of its states.
+Which values a trial gets and how an animal moves between levels is the host's Python.
+
+A stage written in Python is a class with its machine (`machine`) and each trial's
+values (`scene.MachineTrial`)::
+
+    scene_manager.register([Touch])
+
+The stages of a cogforge file run with their parameters' defaults::
 
     scene_manager.register(machine_scenes(load_experiment(path)))
 
-A stage can also be written in Python, with states and transitions added by name and
-Python hooks for what the data cannot say (`stage`)::
-
-    scene_manager.register(stage_scenes(stage))
-
-`mxbiflow eject experiment.json` writes an experiment file as that Python (`eject`).
+`mxbiflow eject experiment.json` writes a file as Python stages (`eject`).
 
 `runner` and `host` are ports of cogforge's `simulate.ts` and `host.ts` and pass its
 conformance cases (`tests/fixtures/conformance`).
@@ -21,17 +24,19 @@ conformance cases (`tests/fixtures/conformance`).
 
 from pathlib import Path
 
+from .machine import Machine, TrialParams
 from .models import Experiment
-from .scene import MachineScene, machine_scenes
-from .stage import Stage, stage_scenes
+from .scene import MachineScene, MachineTrial, machine_scenes, on_enter
 
 __all__ = [
     "Experiment",
+    "Machine",
     "MachineScene",
-    "Stage",
+    "MachineTrial",
+    "TrialParams",
     "load_experiment",
     "machine_scenes",
-    "stage_scenes",
+    "on_enter",
 ]
 
 

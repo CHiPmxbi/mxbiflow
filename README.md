@@ -295,23 +295,20 @@ A delay of `mxbiflow.timer` is the same `Task` (`mxbiflow.task`):
 cancelled and tells when it is done. Callbacks of both run on the game loop's thread.
 A trial's delays and sounds are cancelled when it ends.
 
-## cogforge experiments
+## Trial state machines
 
-An experiment designed in cogforge (stages, each a trial state machine with levels,
-factors, outcomes and level rules) runs without stage code:
+A stage's trial can be a state machine: states that hold outputs and show or play
+stimuli when entered, and transitions on events (a touch, an input's edge, a timeout).
+The machine is data in cogforge's experiment format, which has the trial only: a stage
+is a machine and the outcomes of its states. Which values a trial gets and how an
+animal moves between levels is the stage's Python, as in any stage.
 
-```python
-from mxbiflow.statemachine import load_experiment, machine_scenes
-
-scene_manager.register(machine_scenes(load_experiment(Path("experiment.json"))))
-```
-
-Each stage becomes a scene of its name, and one scene instance is one trial
-(`mxbiflow.statemachine`). The machine is evaluated once per frame: timeouts, timers,
-sounds and outputs have one-frame resolution, GPIO input edges keep their own time. The format is cogforge's: `models.py` is generated from its JSON
-Schema (`uv run datamodel-codegen` after copying a new `experiment.schema.json`), and the
-runner and the host logic pass cogforge's conformance cases
-(`tests/fixtures/conformance/cases.json`, copied from cogforge).
+One scene instance is one trial (`mxbiflow.statemachine`). The machine is evaluated
+once per frame: timeouts, timers, sounds and outputs have one-frame resolution, GPIO
+input edges keep their own time. `models.py` is generated from cogforge's JSON Schema
+(`uv run datamodel-codegen` after copying a new `experiment.schema.json`), and the
+runner passes cogforge's conformance cases (`tests/fixtures/conformance/cases.json`,
+copied from cogforge).
 
 - **Channels**: the experiment only names them; the wiring is the rig's, under
   `channels` in the hardware configuration (`mxbiflow.driver.channels`):
@@ -342,63 +339,36 @@ runner and the host logic pass cogforge's conformance cases
   the layout is upright: when it is and the rig's framebuffer lies on its side, the
   frame is drawn turned, as the idle scene's picture is. A stimulus that does not fit
   the rig's screen, or a centre outside it, stops the run with the stimulus's name.
-- **Animals**: stage and level come from the session configuration; level `n` is the
-  stage's `n`-th level, from 1. The experiment file's animals only give their own
-  parameter values. Counts at the level are the session's; the cursors of factors taken in turn are in
-  the stage's context `machine`.
-- **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl` with
-  cogforge's fields (`animal`, `trial`, `stage`, `level`, `factors`, `values`, `outcome`,
-  `action`, `states`, `events`). A trial stopped because the animal left or the run
-  ended is recorded; it counts towards the level rules once a state has decided its
-  outcome (the animal leaving during the time between trials), and not before.
-
-- **Levels**: a trial's parameters are the defaults, then the level's values (a range
-  or a choice drawn anew), then one row of each of the level's factors, then the
-  animal's own. A factor is what varies on its own from trial to trial (the side, the
-  sound); its rows are drawn by weight or taken in turn. A `stimulus` parameter names
-  the stimulus to show or play, and a tone's frequency and length may be parameters.
-  A level that cannot be drawn as written is refused when the scenes are made: a
-  parameter set by the level and a factor or by two factors, a factor without rows or
-  with only zero weights, a stimulus parameter naming no stimulus of its use
-  (`mxbiflow.statemachine.validate`).
+- **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl`: cogforge's
+  `trial`, `stage`, `values`, `outcome`, `states` and `events`, and mxbiflow's
+  `animal`, `level`, `action` and `extra`. A trial stopped because the animal left or
+  the run ended is recorded; it is settled once a state has decided its outcome (the
+  animal leaving during the time between trials), and not before.
+- **Values**: each value a trial is given must name a parameter and be of its kind (a
+  number, a state, a stimulus of the right kind); anything else stops the run before
+  the trial starts (`mxbiflow.statemachine.validate`).
 
 ### A stage written in Python
 
-`mxbiflow.statemachine.stage` writes a stage as the same data cogforge exports, so the
-runner, the records and the level rules are the same and nothing needs the graphical
-editor. Names are enum members, a trial's parameters are the fields of a `TrialParams`
-model, and states, transitions, stimuli and levels are models that refer to them, so
-the editor completes every reference and the type checker finds a misspelt one. A name
-is any string: a plain `str` works wherever an enum member does.
-A model with more than one field takes keyword arguments only, so each argument says
-what it is; an action or an event of one field (`Show(Stim.TARGET)`) may go without.
+A stage is a class, `MachineTrial`: it gives the trial's machine and each trial's
+values, and moves the animal between levels with `settlement` or `decide`, as any
+`TrialScene` does. The machine (`mxbiflow.statemachine.machine`) is written so that the
+editor and the type checker see every reference: a name is an enum member, the trial's
+parameters are the fields of a `TrialParams` model, and states, transitions and stimuli
+are models that refer to them. A name is any string: a plain `str` works wherever an
+enum member does. A model with more than one field takes keyword arguments only; an
+action or an event of one field (`Show(Stim.TARGET)`) may go without.
 
 ```python
 from enum import StrEnum, auto
+from random import choice
 
-from mxbiflow.scene.settlement import SettlementAction
-from mxbiflow.statemachine.scene import MachineScene
-from mxbiflow.statemachine.stage import (
-    EXIT,
-    Choice,
-    Circle,
-    Clear,
-    Factor,
-    Host,
-    Level,
-    On,
-    Outcome,
-    Row,
-    ScreenTouch,
-    Show,
-    Stage,
-    State,
-    Time,
-    Timeout,
-    Touch,
-    TrialParams,
-    stage_scenes,
+from mxbiflow.scene.settlement import CountSettlementConfig
+from mxbiflow.statemachine.machine import (
+    EXIT, Circle, Clear, Host, Machine, On, Outcome, ScreenTouch, Show, State, Time,
+    Timeout, Touch, TrialParams,
 )
+from mxbiflow.statemachine.scene import MachineTrial, on_enter
 from pydantic import BaseModel
 
 
@@ -423,11 +393,6 @@ class Verdict(StrEnum):
     SLOW = auto()
 
 
-class Place(StrEnum):
-    LEFT = auto()
-    RIGHT = auto()
-
-
 class Params(TrialParams):
     reward_ms: Time = 500
     target_x: float = 0.5
@@ -439,38 +404,27 @@ class Extra(BaseModel):
 
 p = Params.refs()  # the parameters themselves, where a value could stand
 
-
-def judge(scene: MachineScene) -> None:  # Python where the data cannot say it
-    scene.note(Extra(latency_ms=scene.now_ms))
-    scene.fire(Verdict.FAST if scene.now_ms < 1500 else Verdict.SLOW)
-
-
-def rule(scene: MachineScene, outcome: Outcome | None) -> SettlementAction:
-    return SettlementAction.NONE
-
-
-touch = Stage(
-    name="touch",
+MACHINE = Machine(
     params=Params,
     outputs=Out,
     stimuli=[
         Circle(
-            name=Stim.TARGET,
-            x=p.target_x,
-            y=0.3,
-            width=0.3,
-            height=0.3,
-            color="#ffffff",
+            name=Stim.TARGET, x=p.target_x, y=0.3, width=0.3, height=0.3, color="#ffffff"
         )
     ],
     states=[
         State(name=S.WAIT, timeout_ms=5000, on_entry=[Show(Stim.TARGET)]),
         State(name=S.JUDGE, on_entry=[Clear()]),
         State(
-            name=S.FAST, timeout_ms=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct
+            name=S.FAST,
+            timeout_ms=p.reward_ms,
+            hold=[Out.REWARD],
+            outcome=Outcome.correct,
         ),
         State(name=S.SLOW, timeout_ms=200, hold=[Out.REWARD], outcome=Outcome.correct),
-        State(name=S.MISS, timeout_ms=2000, on_entry=[Clear()], outcome=Outcome.incorrect),
+        State(
+            name=S.MISS, timeout_ms=2000, on_entry=[Clear()], outcome=Outcome.incorrect
+        ),
     ],
     transitions=[
         On(source=S.WAIT, event=Touch(Stim.TARGET), target=S.JUDGE),
@@ -483,63 +437,77 @@ touch = Stage(
             for state in (S.FAST, S.SLOW, S.MISS)
         ),
     ],
-    levels=[
-        Level(name=1, values={p.reward_ms: 500}),
-        Level(
-            name=2,
-            values={p.reward_ms: Choice(200, 300)},  # one is drawn per trial
-            factors=[
-                Factor(
-                    name="place",
-                    rows=[
-                        Row(name=Place.LEFT, values={p.target_x: 0.3}),
-                        Row(name=Place.RIGHT, values={p.target_x: 0.7}),
-                    ],
-                )
-            ],
-        ),
-    ],
-    rule=rule,
-    on_enter={S.JUDGE: judge},
 )
 
-scene_manager.register(stage_scenes(touch))
+
+class Touching(MachineTrial[Params]):
+    level_table = {"default": [1, 2]}
+
+    def machine(self) -> Machine:
+        return MACHINE
+
+    def params(self) -> Params:  # this trial's values
+        if self.info.level == 1:
+            return Params(reward_ms=500)
+        return Params(reward_ms=choice((200, 300)), target_x=choice((0.3, 0.7)))
+
+    def settlement(self) -> CountSettlementConfig:  # up after 20 correct trials
+        return CountSettlementConfig(total_levels=2, settlement_cycle=20)
+
+    @on_enter(S.JUDGE)  # Python where the data cannot say it
+    def judge(self) -> None:
+        self.note(Extra(latency_ms=self.now_ms))
+        self.fire(Verdict.FAST if self.now_ms < 1500 else Verdict.SLOW)
+
+
+scene_manager.register([Touching])
 ```
 
 - The machine is data: a state holds outputs, does its entry actions and has
   transitions tried in the order given; a group's hold and transitions apply in its
-  states. `build()` refuses a name that leads nowhere (a missing state, output,
-  stimulus, timer) and says where.
+  states. `Machine.build` refuses a name that leads nowhere (a missing state, output,
+  stimulus, timer) and an event with two transitions in one state, and says where.
 - A parameter's type is its field's: `Time`, `Count`, `float` for any other number,
   `StateParam[S]` for where a transition leads and `StimulusParam[Stim]` for which
   stimulus to show or play; a field of another type is refused. Times carry their unit
-  in the name (`timeout_ms`, `time_ms`, `width_ms`). Defaults known only when the stage is made are an instance of the model
-  (`defaults=Params(...)`). `Params.refs().reward_ms` is the parameter itself: put it where a state or a
-  stimulus takes a value, and use it as the key of a level's or a row's values. The
-  event of a stimulus parameter (`Touch(p.target)`) is that of each stimulus it can name.
-- Python is the host's: `on_trial` hooks run before a trial and may set its parameters
-  (`scene.set(p.target_x, 0.3)`); `on_enter` hooks run when their state is entered. A
-  hook has `scene.mxbiflow`, `scene.trial`, `scene.now_ms`, `scene.params(Params)` for the
-  trial's values as the model, `scene.fire(name)` to send the machine `Host(name)`, and
-  `scene.note(model)` to keep a model's fields under `extra` in the trial's record.
-- `rule` moves the animal between levels: `RateRule`, `CountRule`, or Python for a rule
-  they cannot say, which gets the trial's `Outcome` and returns a `SettlementAction`. A
-  move that does not exist (up from the last level) stops the run.
-- A hook runs in the frame after its state was entered, so what it decides has
-  one-frame resolution; what must be exact belongs in the machine.
+  in the name (`timeout_ms`, `time_ms`, `width_ms`). `Params.refs().reward_ms` is the
+  parameter itself: put it where a state or a stimulus takes a value. An event is a
+  stimulus's, not a parameter's: for the touch of a stimulus a parameter names, give
+  each stimulus it can name its own transition.
+- `params()` gives each trial its values as an instance of the parameters, so each is
+  checked where it is written; `self.given` is that instance afterwards. `machine()`
+  returns the same object while the machine does not change; it is built once, and
+  again when a stage returns another (one made from a changed configuration).
+- A method marked `@on_enter(state)` runs when the state is entered, in the frame
+  after: what it decides has one-frame resolution, and what must be exact belongs in
+  the machine. It has `self.trial`, `self.now_ms`, `self.outcome`, `self.fire(name)` to
+  send the machine `Host(name)`, and `self.note(model)` to keep a model's fields under
+  `extra` in the trial's record.
+- `settlement()` or `decide()` moves the animal between levels as in any `TrialScene`;
+  `self.outcome` is the trial's outcome and `self.trial.visited` the states it went
+  through.
 
-### From an experiment file to Python
+### An experiment file
 
-When a stage designed in cogforge needs Python hooks, write the file as Python once
-and go on from there:
+The stages of a cogforge file run as they are, each trial with its parameters'
+defaults:
+
+```python
+from mxbiflow.statemachine import load_experiment, machine_scenes
+
+scene_manager.register(machine_scenes(load_experiment(Path("experiment.json"))))
+```
+
+To give trials their values and move animals between levels, write the file as Python
+once and go on from there:
 
 ```
 mxbiflow eject experiment.json my-experiment
 ```
 
-writes `my-experiment/stages.py`, with each stage as one would write it by hand (every
-name an enum member, the parameters a model), and the pictures and sounds as files in
-`my-experiment/assets`. Register its `scenes`:
+writes `my-experiment/stages.py`, with each stage as one would write it by hand (its
+enums, its parameters, its machine and its class), and the pictures and sounds as files
+in `my-experiment/assets`. Register its `scenes`:
 
 ```python
 from stages import scenes
@@ -547,11 +515,10 @@ from stages import scenes
 scene_manager.register(scenes)
 ```
 
-The stages built are the ones in the file (a test builds every example and compares),
-except cogforge's node positions, which are left out. This goes one way: hooks cannot
-go back into the file, so from then on `stages.py` is the experiment, and `eject`
-never writes over an existing one. The source is printed from a syntax tree
-(`ast.unparse`) and formatted with ruff when ruff is installed.
+The machines built are the ones in the file (a test builds every example and
+compares), except cogforge's node positions, which are left out. This goes one way:
+`eject` never writes over an existing `stages.py`. The source is printed from a syntax
+tree (`ast.unparse`) and formatted with ruff when ruff is installed.
 
 ## Experiment manifest and stage configurations
 
