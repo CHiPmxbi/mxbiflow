@@ -35,6 +35,9 @@ def everything() -> StageBuilder:
     licks = stage.add_count("2 licks", 2)
     x = stage.add_number("stage", 0.25)
     after = stage.add_target("after", "give")
+    hz = stage.add_number("hz", 4000)
+    which = stage.add_stimulus_parameter("which", "show")
+    sound = stage.add_stimulus_parameter("sound", "tone")
     stage.add_background("grey", "#808080")
     cue = stage.add_cross(
         "show", x=x, y=0.5, width=40, height=40, size="px", color="#ffffff"
@@ -43,7 +46,8 @@ def everything() -> StageBuilder:
         'say "go"', 'it\'s "go"\n', x=0.5, y=0.1, width=0.5, height=0.1, color="#000000"
     )
     stage.add_image("frame", None, x=0.5, y=0.5, width=0.2, height=0.2)
-    tone = stage.add_tones("tone", [(4000, 100), (0, 50.5)], 600)
+    tone = stage.add_tones("tone", [(hz, 100), (0, wait_ms)], 600)
+    stage.add_tones("long", [(500, 50.5)], wait_ms)
     stage.add_wav("silence", None, duration_ms=250)
     stage.add_timer("limit", wait_ms)
     stage.add_generator("pulses", "laser", width=5, period=20, count=0)
@@ -57,6 +61,10 @@ def everything() -> StageBuilder:
         on_entry=[
             show(cue),
             hide(cue),
+            show(which),
+            hide(which),
+            play(sound),
+            stop(sound),
             clear(),
             play(tone),
             start("limit"),
@@ -76,12 +84,19 @@ def everything() -> StageBuilder:
     stage.add_transition("all", "limit.done", EXIT)
     stage.set_outcome("give", "correct")
     stage.add_level("easy")
-    stage.add_level(
+    hard = stage.add_level(
         "hard",
-        {"wait ms": (500, 900.5), "2 licks": 3},
-        types={"left": {"stage": 0.25, "after": "give"}, "right": {"stage": 0.75}},
+        {"wait ms": (500, 900.5), "2 licks": 3, "hz": [4000, 8000], "sound": ["tone"]},
+    )
+    stage.add_factor(
+        hard,
+        "side",
+        {"left": {"stage": 0.25, "after": "give"}, "right": {"stage": 0.75}},
         weights={"right": 2.5},
         order="cycle",
+    )
+    stage.add_factor(
+        hard, "which", {"cue": {"which": "show"}, "frame": {"which": "frame"}}
     )
     stage.set_count_rule(5)
     return stage

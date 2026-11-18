@@ -30,6 +30,7 @@ from ..scene.scene import Scene
 from .models import Experiment, ParamRef, Stage
 from .runner import EXIT
 from .scene import Hook, Hooks, machine_scenes
+from .validate import stage_problems
 
 __all__ = [
     "EXIT",
@@ -53,13 +54,16 @@ type Fixed = float | str
 # ---- what a state does when it is entered ------------------------------------
 
 
-def show(stimulus: str) -> Action:
-    """Show a visual stimulus, on top of what is shown."""
-    return {"show": stimulus}
+def show(stimulus: str | ParamRef) -> Action:
+    """Show a visual stimulus, on top of what is shown.
+
+    The stimulus is a name, or an ``add_stimulus_parameter`` that names one per trial.
+    """
+    return {"show": _amount(stimulus)}
 
 
-def hide(stimulus: str) -> Action:
-    return {"hide": stimulus}
+def hide(stimulus: str | ParamRef) -> Action:
+    return {"hide": _amount(stimulus)}
 
 
 def clear() -> Action:
@@ -67,9 +71,9 @@ def clear() -> Action:
     return {"clear": True}
 
 
-def play(sound: str) -> Action:
+def play(sound: str | ParamRef) -> Action:
     """Play a sound; when it has played to its end the event is ``<sound>.done``."""
-    return {"play": sound}
+    return {"play": _amount(sound)}
 
 
 def start(name: str) -> Action:
@@ -77,9 +81,9 @@ def start(name: str) -> Action:
     return {"start": name}
 
 
-def stop(name: str) -> Action:
+def stop(name: str | ParamRef) -> Action:
     """Stop a timer, a pulse generator or a sound."""
-    return {"stop": name}
+    return {"stop": _amount(name)}
 
 
 def reset(counter: str) -> Action:
@@ -102,7 +106,7 @@ class StageBuilder:
 
     Everything is referred to by name. Times are milliseconds. A time, a count or a
     transition's target may be a parameter (``add_time``, ``add_count``,
-    ``add_target``, ``add_number``), which a level, a trial type or an ``on_trial``
+    ``add_target``, ``add_number``), which a level, a factor's row or an ``on_trial``
     hook sets per trial. ``screen`` is the layout's reference and says whether it is
     upright; stimuli are placed by fractions of the rig's screen.
     """
@@ -152,6 +156,10 @@ class StageBuilder:
     def add_target(self, name: str, default_state: str) -> ParamRef:
         """A state to go to that a trial may set, such as where the left choice leads."""
         return self._parameter(name, "state", default_state)
+
+    def add_stimulus_parameter(self, name: str, default_stimulus: str) -> ParamRef:
+        """A stimulus that a trial may set, to show or play whichever one it draws."""
+        return self._parameter(name, "stimulus", default_stimulus)
 
     # ---- stimuli -------------------------------------------------------------
 
@@ -257,17 +265,18 @@ class StageBuilder:
         return self._stimulus(name, "background", color=color)
 
     def add_tones(
-        self, name: str, tones: Sequence[tuple[float, float]], duration_ms: float
+        self, name: str, tones: Sequence[tuple[Amount, Amount]], duration_ms: Amount
     ) -> str:
         """Tones as ``(frequency in Hz, duration in ms)``, repeated for ``duration_ms``.
 
-        Frequency 0 is silence.
+        Frequency 0 is silence. Each may be a parameter (``add_number`` for a
+        frequency, ``add_time`` for a length), drawn per trial.
         """
         return self._stimulus(
             name,
             "tones",
-            tones=[{"frequency": f, "duration": d} for f, d in tones],
-            duration=duration_ms,
+            tones=[{"frequency": _amount(f), "duration": _amount(d)} for f, d in tones],
+            duration=_amount(duration_ms),
         )
 
     def add_wav(
@@ -391,37 +400,64 @@ class StageBuilder:
     def add_level(
         self,
         name: str,
-        values: Mapping[str, Fixed | tuple[float, float]] | None = None,
-        *,
-        types: Mapping[str, Mapping[str, Fixed]] | None = None,
-        weights: Mapping[str, float] | None = None,
-        order: Literal["random", "cycle"] = "random",
-    ) -> None:
-        """A level's parameter values; a ``(low, high)`` pair is drawn per trial.
+        values: Mapping[str, Fixed | tuple[float, float] | Sequence[Fixed]]
+        | None = None,
+    ) -> str:
+        """A level's parameter values.
 
-        ``types`` are kinds of trial, by name: values that go together, one kind drawn
-        per trial (or taken in turn with ``order="cycle"``). A kind is drawn as often
-        as its weight in ``weights`` says, 1 unless given.
+        A ``(low, high)`` tuple is a range and a list is a choice; each is drawn anew
+        per trial.
         """
-        unknown = set(weights or {}) - set(types or {})
-        if unknown:
-            raise ValueError(f'level "{name}": weights for no type: {sorted(unknown)}')
         self._levels.append(
             {
                 "name": name,
                 "values": {
-                    key: {"uniform": list(value)} if isinstance(value, tuple) else value
+                    key: {"uniform": list(value)}
+                    if isinstance(value, tuple)
+                    else value
+                    if isinstance(value, (int, float, str))
+                    else {"choice": list(value)}
                     for key, value in (values or {}).items()
                 },
-                "types": [
-                    {
-                        "name": kind,
-                        "weight": (weights or {}).get(kind, 1),
-                        "values": dict(kind_values),
-                    }
-                    for kind, kind_values in (types or {}).items()
-                ],
+                "factors": [],
+            }
+        )
+        return name
+
+    def add_factor(
+        self,
+        level: str,
+        name: str,
+        rows: Mapping[str, Mapping[str, Fixed]],
+        *,
+        weights: Mapping[str, float] | None = None,
+        order: Literal["random", "cycle"] = "random",
+    ) -> None:
+        """Something that varies from trial to trial at a level, by its own draw.
+
+        ``rows`` are values that go together, by name; one row is drawn per trial as
+        often as its weight in ``weights`` says (1 unless given), or the rows are taken
+        in turn with ``order="cycle"``. A level's factors are drawn independently, so
+        two factors of two rows give four kinds of trial.
+        """
+        found = next((item for item in self._levels if item["name"] == level), None)
+        if found is None:
+            raise ValueError(f'no level "{level}"')
+        unknown = set(weights or {}) - set(rows)
+        if unknown:
+            raise ValueError(f'factor "{name}": weights for no row: {sorted(unknown)}')
+        found["factors"].append(
+            {
+                "name": name,
                 "order": order,
+                "rows": [
+                    {
+                        "name": row,
+                        "weight": (weights or {}).get(row, 1),
+                        "values": dict(row_values),
+                    }
+                    for row, row_values in rows.items()
+                ],
             }
         )
 
@@ -477,11 +513,13 @@ class StageBuilder:
                     "stimuli": list(self._stimuli.values()),
                 },
                 "outcomes": self._outcomes,
-                "levels": self._levels
-                or [{"name": "1", "values": {}, "types": [], "order": "random"}],
+                "levels": self._levels or [{"name": "1", "values": {}, "factors": []}],
                 "progression": self._progression,
             }
         )
+        problems = stage_problems(stage)
+        if problems:
+            raise ValueError("; ".join(problems))
         return stage, self._hooks
 
     def _check(self) -> None:
@@ -512,6 +550,8 @@ class StageBuilder:
                     problems.append(f'{where}: no state "{target}"')
             for action in holder.get("onEntry", []):
                 (kind, name), *_ = action.items()
+                if isinstance(name, dict):
+                    continue  # a stimulus parameter: checked with the levels
                 known = {
                     "show": visuals,
                     "hide": visuals,
@@ -537,7 +577,7 @@ def stage_scenes(
 
     Past a stage's last level an animal moves to the next stage given, and below its
     first to the previous one. ``animal_values`` are parameter values of single
-    animals, by animal name; they replace a level's and a trial type's.
+    animals, by animal name; they replace a level's and its factors'.
     """
     built = [stage.build() for stage in stages]
     first = built[0][0]

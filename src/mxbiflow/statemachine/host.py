@@ -8,7 +8,7 @@ is passed in so tests can fix it.
 import math
 import random as random_module
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from pydantic import BaseModel, Field, JsonValue
@@ -24,10 +24,13 @@ from .models import (
     Animal,
     CountProgression,
     Experiment,
+    Factor,
     Order,
     RateProgression,
+    Row,
     Stage,
     Value1,
+    Value2,
 )
 from .runner import Trial, Values, default_values
 
@@ -51,15 +54,17 @@ class Progress:
     level: int
     trials: int = 0
     correct: int = 0
-    # The next trial type when a level takes them in turn.
-    cursor: int = 0
+    # For each factor that takes its rows in turn, the next row.
+    cursors: Mapping[str, int] = field(default_factory=dict[str, int])
 
 
 @dataclass(frozen=True)
 class Draw:
-    type: str | None
+    """A trial's parameters, and the row each factor drew."""
+
+    factors: dict[str, str]
     values: Values
-    cursor: int
+    cursors: dict[str, int]
 
 
 class Entered(BaseModel):
@@ -79,7 +84,7 @@ class TrialRecord(BaseModel):
     trial: int
     stage: str
     level: str
-    type: str | None
+    factors: dict[str, str]
     values: dict[str, float | str]
     outcome: Outcome
     action: Action
@@ -110,42 +115,62 @@ def draw_trial(
 ) -> Draw:
     """The parameters of the animal's next trial.
 
-    Defaults, then the level's values (ranges drawn), then the drawn trial type's, then
-    the animal's own ``values``.
+    Defaults, then the level's values in order (one random number per range or
+    choice), then one row of each factor in order, then the animal's own ``values``.
+    The order and the use of random numbers are cogforge's, number for number.
     """
+    if not 0 <= progress.stage < len(experiment.stages):
+        raise ValueError(f"no stage {progress.stage}")
     stage = experiment.stages[progress.stage]
+    if not 0 <= progress.level < len(stage.levels):
+        raise ValueError(f'stage "{stage.name}": no level {progress.level}')
     level = stage.levels[progress.level]
     # Times are whole milliseconds and counts whole numbers.
     whole = {p.name for p in stage.machine.parameters if p.type in ("count", "time")}
     drawn: Values = default_values(stage.machine)
     for name, value in level.values.items():
-        if isinstance(value, Value1):
+        if isinstance(value, Value2):
+            choice = value.choice
+            drawn[name] = choice[
+                min(len(choice) - 1, math.floor(random() * len(choice)))
+            ]
+        elif isinstance(value, Value1):
             low, high = value.uniform
             number = low + random() * (high - low)
             drawn[name] = _round(number) if name in whole else number
         else:
             drawn[name] = value
-    chosen = None
-    cursor = progress.cursor
-    if level.types:
-        if level.order is Order.cycle:
-            chosen = level.types[cursor % len(level.types)]
-            cursor += 1
-        else:
-            pick = random() * sum(t.weight for t in level.types)
-            total = 0.0
-            chosen = level.types[-1]
-            for trial_type in level.types:
-                total += trial_type.weight
-                if pick < total:
-                    chosen = trial_type
-                    break
-    if chosen is not None:
-        drawn.update(chosen.values)
+    factors: dict[str, str] = {}
+    cursors = dict(progress.cursors)
+    for factor in level.factors:
+        if not factor.rows:
+            continue
+        cursor = cursors.get(factor.name, 0)
+        row = _draw_row(factor, cursor, random)
+        if factor.order is Order.cycle:
+            cursors[factor.name] = cursor + 1
+        factors[factor.name] = row.name
+        drawn.update(row.values)
     for name, value in values.items():
         if name in drawn:
             drawn[name] = value
-    return Draw(type=chosen.name if chosen else None, values=drawn, cursor=cursor)
+    return Draw(factors=factors, values=drawn, cursors=cursors)
+
+
+def _draw_row(factor: Factor, cursor: int, random: Callable[[], float]) -> Row:
+    if factor.order is Order.cycle:
+        return factor.rows[cursor % len(factor.rows)]
+    pick = random() * sum(row.weight for row in factor.rows)
+    total = 0.0
+    for row in factor.rows:
+        total += row.weight
+        if pick < total:
+            return row
+    # A random number of nearly 1 can round past the last sum.
+    for row in reversed(factor.rows):
+        if row.weight > 0:
+            return row
+    raise ValueError(f'factor "{factor.name}" has no row to draw')
 
 
 def outcome_of(stage: Stage, trial: Trial) -> Outcome:
@@ -222,7 +247,7 @@ def record_of(
         trial=trial_number,
         stage=stage.name,
         level=stage.levels[progress.level].name,
-        type=draw.type,
+        factors=draw.factors,
         values=draw.values,
         outcome=outcome,
         action=action,

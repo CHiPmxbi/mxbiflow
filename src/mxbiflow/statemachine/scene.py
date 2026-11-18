@@ -14,7 +14,7 @@ the level rules.
 """
 
 import io
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import ClassVar
@@ -54,7 +54,15 @@ from .models import (
     TonesStimulus,
     WavStimulus,
 )
-from .runner import Trial, Values, VisualStimulus, place_of
+from .runner import (
+    Trial,
+    Values,
+    VisualStimulus,
+    amount_in,
+    duration_of,
+    place_of,
+)
+from .validate import check_experiment
 
 _CONTEXT = "machine"
 
@@ -62,13 +70,13 @@ type Sound = WavStimulus | TonesStimulus
 
 
 class Cursor(BaseModel):
-    """The next trial type at ``level`` of a stage that takes them in turn.
+    """The next row of each factor that ``level`` of a stage takes in turn.
 
     Kept in the stage's context; the level's counts are the session's.
     """
 
     level: int
-    cursor: int = 0
+    cursors: dict[str, int] = {}
 
 
 type Hook = Callable[["MachineScene"], None]
@@ -116,8 +124,10 @@ def machine_scenes(
 
     ``hooks`` gives stages their Python code, by stage name. A stage that uses a
     channel the rig does not wire raises ``ValueError`` when its first trial is made,
-    before the trial starts.
+    before the trial starts. An experiment whose levels cannot be drawn (a parameter
+    set twice, a factor without rows, a stimulus of the wrong kind) raises here.
     """
+    check_experiment(experiment)
     return {
         stage.name: type(
             f"MachineScene[{stage.name}]",
@@ -146,7 +156,7 @@ class MachineScene(TrialScene):
     hooks: ClassVar[Hooks]
     # Decoded pictures and sounds of the stage, kept across its trials.
     _surfaces: ClassVar[dict[str, Surface | None]]
-    _sounds: ClassVar[dict[str, LoadedWav | list[PureToneUnit] | None]]
+    _sounds: ClassVar[dict[Hashable, LoadedWav | list[PureToneUnit] | None]]
 
     @classmethod
     def name(cls) -> str:
@@ -185,7 +195,7 @@ class MachineScene(TrialScene):
             {},
         )
         self._draw = draw_trial(self.experiment, own, progress)
-        self._progress = replace(progress, cursor=self._draw.cursor)
+        self._progress = replace(progress, cursors=self._draw.cursors)
         self._settled: Progress = self._progress
         self._outcome: Outcome = "none"
         self._values: Values = self._draw.values
@@ -259,7 +269,7 @@ class MachineScene(TrialScene):
         else:
             super().move(action)
         self.session.set_stage_context(
-            _CONTEXT, Cursor(level=settled.level + 1, cursor=settled.cursor)
+            _CONTEXT, Cursor(level=settled.level + 1, cursors=dict(settled.cursors))
         )
 
     def handle_event(self, event: Event) -> None:
@@ -406,15 +416,21 @@ class MachineScene(TrialScene):
         return self._aplayer.play_puretone_sequence(sound)
 
     def _sound(self, name: str) -> LoadedWav | list[PureToneUnit] | None:
-        if name not in self._sounds:
-            stimulus = next(s for s in self._machine.stimuli if s.name == name)
-            assert isinstance(stimulus, (WavStimulus, TonesStimulus))
-            type(self)._sounds[name] = (
-                _load_wav(stimulus)
-                if isinstance(stimulus, WavStimulus)
-                else _tone_train(stimulus, self._aplayer)
-            )
-        return self._sounds[name]
+        stimulus = next(s for s in self._machine.stimuli if s.name == name)
+        assert isinstance(stimulus, (WavStimulus, TonesStimulus))
+        if isinstance(stimulus, WavStimulus):
+            if name not in self._sounds:
+                type(self)._sounds[name] = _load_wav(stimulus)
+            return self._sounds[name]
+        # Tones may be this trial's: frequencies and lengths can be parameters.
+        tones = tuple(
+            (amount_in(self._values, t.frequency), amount_in(self._values, t.duration))
+            for t in stimulus.tones
+        )
+        key = (name, tones, duration_of(stimulus, self._values))
+        if key not in self._sounds:
+            type(self)._sounds[key] = _tone_train(tones, key[2], self._aplayer)
+        return self._sounds[key]
 
     # ---- the screen ----------------------------------------------------------
 
@@ -479,8 +495,10 @@ class MachineScene(TrialScene):
             state.level - 1,
             state.level_counted,
             state.level_correct,
-            # A new level, or one set by hand, takes its types from the first again.
-            cursor.cursor if cursor is not None and cursor.level == state.level else 0,
+            # A new level, or one set by hand, takes its rows from the first again.
+            cursor.cursors
+            if cursor is not None and cursor.level == state.level
+            else {},
         )
 
 
@@ -514,18 +532,20 @@ def _load_wav(stimulus: WavStimulus) -> LoadedWav | None:
     )
 
 
-def _tone_train(stimulus: TonesStimulus, aplayer: AudioPlayer) -> list[PureToneUnit]:
-    """The tones repeated until the stimulus's duration has passed; the last is cut."""
+def _tone_train(
+    tones: Sequence[tuple[float, float]], duration: float, aplayer: AudioPlayer
+) -> list[PureToneUnit]:
+    """Tones of ``(Hz, ms)`` repeated until ``duration`` has passed; the last is cut."""
     generator = PureToneGenerator()
     table = aplayer.frequency_response_table
     units: list[PureToneUnit] = []
-    left = stimulus.duration
-    while left > 0 and stimulus.tones:
-        for tone in stimulus.tones:
+    left = duration
+    while left > 0 and tones:
+        for hz, ms in tones:
             if left <= 0:
                 break
-            length = min(tone.duration, left)
-            frequency = round(tone.frequency)
+            length = min(ms, left)
+            frequency = round(hz)
             units.append(
                 generator.gen_stimulus_unit(
                     PureToneUnit(

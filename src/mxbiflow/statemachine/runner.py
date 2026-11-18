@@ -17,6 +17,7 @@ from .models import (
     CircleStimulus,
     ClearAction,
     CrossStimulus,
+    Duration,
     HideAction,
     ImageStimulus,
     Machine,
@@ -40,7 +41,8 @@ FRAME_MS = 17
 _MAX_STEPS = 1000
 
 type Values = dict[str, float | str]
-type Amount = Amount1 | ParamRef
+type Amount = Amount1 | Duration | ParamRef
+type Sound = WavStimulus | TonesStimulus
 type VisualStimulus = (
     ImageStimulus | CircleStimulus | RectStimulus | CrossStimulus | TextStimulus
 )
@@ -63,7 +65,7 @@ def default_values(machine: Machine) -> Values:
 
 
 def amount_in(values: Values, amount: Amount) -> float:
-    if isinstance(amount, Amount1):
+    if not isinstance(amount, ParamRef):
         return amount.root
     found = values.get(amount.param)
     return found if isinstance(found, (int, float)) else 0
@@ -74,6 +76,21 @@ def target_in(values: Values, target: ParamRef | str) -> str:
         return target
     found = values.get(target.param)
     return found if isinstance(found, str) else EXIT
+
+
+def stimulus_in(values: Values, stimulus: ParamRef | str) -> str:
+    """The stimulus an action names with this trial's values."""
+    if isinstance(stimulus, str):
+        return stimulus
+    found = values.get(stimulus.param)
+    return found if isinstance(found, str) else ""
+
+
+def duration_of(sound: Sound, values: Values) -> float:
+    """A sound's length with this trial's values."""
+    if isinstance(sound, WavStimulus):
+        return sound.duration
+    return amount_in(values, sound.duration)
 
 
 @dataclass(frozen=True)
@@ -294,26 +311,36 @@ class Trial:
         shown = self.shown
         for action in state.on_entry:
             if isinstance(action, ShowAction):
-                stimulus = self._stimuli.get(action.show)
-                if stimulus is not None and not isinstance(
-                    stimulus, (WavStimulus, TonesStimulus)
-                ):
-                    shown = [*(n for n in shown if n != action.show), action.show]
+                found = self._find(action.show, visual=True, t=t)
+                if found is not None:
+                    shown = [*(n for n in shown if n != found), found]
             elif isinstance(action, HideAction):
-                shown = [n for n in shown if n != action.hide]
+                found = self._find(action.hide, visual=True, t=t)
+                if found is not None:
+                    shown = [n for n in shown if n != found]
             elif isinstance(action, ClearAction):
                 shown = []
             elif isinstance(action, ResetAction):
                 self.counters[action.reset] = 0
             elif isinstance(action, StopAction):
-                self._timers.pop(action.stop, None)
-                self._generators.pop(action.stop, None)
-                self._generator_starts.pop(action.stop, None)
-                self.sounds.pop(action.stop, None)
+                found = stimulus_in(self.values, action.stop)
+                self._timers.pop(found, None)
+                self._generators.pop(found, None)
+                self._generator_starts.pop(found, None)
+                self.sounds.pop(found, None)
             elif isinstance(action, PlayAction):
-                sound = self._stimuli.get(action.play)
-                if isinstance(sound, (WavStimulus, TonesStimulus)):
-                    self.sounds[sound.name] = t + sound.duration
+                found = self._find(action.play, visual=False, t=t)
+                if found is None:
+                    continue
+                sound = self._stimuli[found]
+                assert isinstance(sound, (WavStimulus, TonesStimulus))
+                # A tone drawn with no length would never end.
+                if isinstance(sound, TonesStimulus) and any(
+                    amount_in(self.values, tone.duration) <= 0 for tone in sound.tones
+                ):
+                    self._say(t, f"{found}: a tone's duration is not positive")
+                else:
+                    self.sounds[found] = t + duration_of(sound, self.values)
             else:
                 self._start(action.start, t)
         self._set_screen(shown, t)
@@ -322,6 +349,20 @@ class Trial:
             f"{name}.{'high' if high else 'low'}" for name, high in self.inputs.items()
         ]
         self._fire(levels, t, depth + 1, quiet=True)
+
+    def _find(self, ref: ParamRef | str, *, visual: bool, t: float) -> str | None:
+        """The stimulus of the right kind an action names, or ``None`` and a log line.
+
+        A stimulus named by a parameter that names none is said, not skipped silently.
+        """
+        name = stimulus_in(self.values, ref)
+        stimulus = self._stimuli.get(name)
+        is_sound = isinstance(stimulus, (WavStimulus, TonesStimulus))
+        if stimulus is not None and is_sound != visual:
+            return name
+        param = f" (${ref.param})" if isinstance(ref, ParamRef) else ""
+        self._say(t, f'no stimulus "{name}"{param}')
+        return None
 
     def _start(self, name: str, t: float) -> None:
         for timer in self._machine.timers:
