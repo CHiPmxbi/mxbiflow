@@ -13,6 +13,8 @@ Python hooks for what the data cannot say (`builder`)::
 
     scene_manager.register(stage_scenes(stage))
 
+`mxbiflow eject experiment.json` writes an experiment file as that Python (`eject`).
+
 `runner` and `host` are ports of cogforge's `simulate.ts` and `host.ts` and pass its
 conformance cases (`tests/fixtures/conformance`).
 """

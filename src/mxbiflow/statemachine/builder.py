@@ -270,15 +270,20 @@ class StageBuilder:
             duration=duration_ms,
         )
 
-    def add_wav(self, name: str, path: Path) -> str:
-        """A sound file; its length is read from the file."""
-        info = soundfile.info(str(path))
-        return self._stimulus(
-            name,
-            "wav",
-            sound=_data_url(path, "audio"),
-            duration=round(info.frames / info.samplerate * 1000),
-        )
+    def add_wav(
+        self, name: str, path: Path | None, *, duration_ms: float | None = None
+    ) -> str:
+        """A sound file; its length is read from the file unless ``duration_ms`` is given.
+
+        ``None`` is silence that lasts ``duration_ms``.
+        """
+        if duration_ms is None:
+            if path is None:
+                raise ValueError(f'sound "{name}" has no file: give its duration_ms')
+            info = soundfile.info(str(path))
+            duration_ms = round(info.frames / info.samplerate * 1000)
+        sound = _data_url(path, "audio") if path is not None else None
+        return self._stimulus(name, "wav", sound=sound, duration=duration_ms)
 
     # ---- the machine ---------------------------------------------------------
 
@@ -389,13 +394,18 @@ class StageBuilder:
         values: Mapping[str, Fixed | tuple[float, float]] | None = None,
         *,
         types: Mapping[str, Mapping[str, Fixed]] | None = None,
+        weights: Mapping[str, float] | None = None,
         order: Literal["random", "cycle"] = "random",
     ) -> None:
         """A level's parameter values; a ``(low, high)`` pair is drawn per trial.
 
         ``types`` are kinds of trial, by name: values that go together, one kind drawn
-        per trial (or taken in turn with ``order="cycle"``).
+        per trial (or taken in turn with ``order="cycle"``). A kind is drawn as often
+        as its weight in ``weights`` says, 1 unless given.
         """
+        unknown = set(weights or {}) - set(types or {})
+        if unknown:
+            raise ValueError(f'level "{name}": weights for no type: {sorted(unknown)}')
         self._levels.append(
             {
                 "name": name,
@@ -404,7 +414,11 @@ class StageBuilder:
                     for key, value in (values or {}).items()
                 },
                 "types": [
-                    {"name": kind, "weight": 1, "values": dict(kind_values)}
+                    {
+                        "name": kind,
+                        "weight": (weights or {}).get(kind, 1),
+                        "values": dict(kind_values),
+                    }
                     for kind, kind_values in (types or {}).items()
                 ],
                 "order": order,
@@ -515,12 +529,31 @@ class StageBuilder:
             raise ValueError(f'stage "{self.name}": ' + "; ".join(problems))
 
 
-def stage_scenes(*stages: StageBuilder) -> dict[str, type[Scene]]:
+def stage_scenes(
+    *stages: StageBuilder,
+    animal_values: Mapping[str, Mapping[str, Fixed]] | None = None,
+) -> dict[str, type[Scene]]:
     """The scenes of stages written in Python, to register with the scene manager.
 
     Past a stage's last level an animal moves to the next stage given, and below its
-    first to the previous one.
+    first to the previous one. ``animal_values`` are parameter values of single
+    animals, by animal name; they replace a level's and a trial type's.
     """
     built = [stage.build() for stage in stages]
-    experiment = Experiment(stages=[stage for stage, _ in built], animals=[])
+    first = built[0][0]
+    experiment = Experiment.model_validate(
+        {
+            "stages": [stage for stage, _ in built],
+            # Stage and level come from the session; the format wants them filled.
+            "animals": [
+                {
+                    "name": animal,
+                    "stage": first.name,
+                    "level": first.levels[0].name,
+                    "values": dict(values),
+                }
+                for animal, values in (animal_values or {}).items()
+            ],
+        }
+    )
     return machine_scenes(experiment, {stage.name: hooks for stage, hooks in built})

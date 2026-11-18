@@ -384,6 +384,31 @@ scene_manager.register(stage_scenes(stage))
 - A hook runs in the frame after its state was entered, so what it decides has
   one-frame resolution; what must be exact belongs in the machine.
 
+### From an experiment file to Python
+
+When a stage designed in cogforge needs Python hooks, write the file as Python once
+and go on from there:
+
+```
+mxbiflow eject experiment.json my-experiment
+```
+
+writes `my-experiment/stages.py`, with one function per stage that builds it with
+`StageBuilder` as one would by hand, and the pictures and sounds as files in
+`my-experiment/assets`. Register its `scenes`:
+
+```python
+from stages import scenes
+
+scene_manager.register(scenes)
+```
+
+The stages built are the ones in the file (a test builds every example and compares),
+except cogforge's node positions, which are left out. This goes one way: hooks cannot
+go back into the file, so from then on `stages.py` is the experiment, and `eject`
+never writes over an existing one. The source is printed from a syntax tree
+(`ast.unparse`) and formatted with ruff when ruff is installed.
+
 ## Experiment manifest and stage configurations
 
 `--describe` (`uv run main.py --describe`) prints the experiment's manifest as

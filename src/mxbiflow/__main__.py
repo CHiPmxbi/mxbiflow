@@ -9,6 +9,8 @@ from .models.experiment import experiment_config_schema
 from .run import RunFlags, run_experiment
 from .scene import SceneManager
 from .scene.idle.idle import IDLE
+from .statemachine import load_experiment
+from .statemachine.eject import eject as write_python
 from .utils.logger import setup_logging
 
 app = App(
@@ -24,6 +26,20 @@ app = App(
 def schema() -> None:
     """Print the JSON Schema of the cogmote experiment configuration."""
     print(json.dumps(experiment_config_schema(), indent=2))
+
+
+@app.command
+def eject(experiment: Path, directory: Path = Path(".")) -> None:
+    """Write a cogforge experiment file as Python (stages.py and its assets).
+
+    Parameters
+    ----------
+    experiment
+        The experiment JSON file written by cogforge.
+    directory
+        Where to write; an existing stages.py is never written over.
+    """
+    print(write_python(load_experiment(experiment), directory, experiment.name))
 
 
 @app.default
