@@ -151,7 +151,7 @@ class MachineSceneTests(unittest.TestCase):
     def trial(self, scenes: Experiment, context: SimpleNamespace):
         """Start the next trial of the animal's stage at the current time."""
         animal = self.session.require_current_animal()
-        with patch("mxbiflow.core.context._current_mxbiflow", context):
+        with patch("mxbiflow.context._current_mxbiflow", context):
             scene = machine_scenes(scenes, WIRING)[animal.current_stage_name]()
         scene.start()
         return scene
@@ -298,7 +298,7 @@ class MachineSceneTests(unittest.TestCase):
     def test_the_rig_configuration_wires_the_channels(self) -> None:
         scenes = experiment(stage("touch"))
         context = self.context(scenes)
-        with patch("mxbiflow.core.context._current_mxbiflow", context):
+        with patch("mxbiflow.context._current_mxbiflow", context):
             with self.assertRaisesRegex(ValueError, 'input "beam", output "reward"'):
                 machine_scenes(scenes)["touch"]()
             self.assertEqual(self.session.require_current_animal().trial_id, 0)

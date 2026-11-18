@@ -13,7 +13,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from ..gameloop.settlement import (
+from ..scene.settlement import (
     CountSettlementConfig,
     RateSettlementConfig,
     SettlementAction,

@@ -5,16 +5,16 @@ from typing import final
 
 from pydantic import BaseModel
 
-from ..core.context import get_mxbiflow
-from ..gameloop.settlement import (
+from ..context import get_mxbiflow
+from ..infra.data_logger import DataLogger
+from .scene import Scene
+from .settlement import (
     CountSettlementConfig,
     RateSettlementConfig,
     SettlementAction,
     settle_by_count,
     settle_by_rate,
 )
-from ..infra.data_logger import DataLogger
-from .scene import Scene
 
 
 class TrialScene(Scene):
@@ -28,7 +28,7 @@ class TrialScene(Scene):
     left, the run ended) before its outcome is known is :attr:`aborted`: recorded and
     published, but not settled.
 
-    Levels count from 1, as :mod:`mxbiflow.gameloop.settlement` does.
+    Levels count from 1, as :mod:`mxbiflow.scene.settlement` does.
     """
 
     def __init__(self) -> None:

@@ -23,13 +23,13 @@ from pydantic import BaseModel
 from pygame import Surface
 from pygame.event import Event
 
-from ..core.context import get_mxbiflow
+from ..context import get_mxbiflow
 from ..driver.audioplayer.audioplayer import AudioPlayer, LoadedWav, PlayTask
 from ..driver.audioplayer.puretone_generator import PureToneGenerator, PureToneUnit
 from ..driver.detector.detector import Detector
 from ..driver.rewarder.rewarder import Rewarder
-from ..gameloop.settlement import SettlementAction
 from ..scene.scene import Scene
+from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
 from .host import (
     ACTIONS,

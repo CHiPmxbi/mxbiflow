@@ -10,14 +10,14 @@ from pydantic import BaseModel
 from pygame import Event, Surface
 
 from mxbiflow.driver import MXBIModel
-from mxbiflow.gameloop.settlement import (
+from mxbiflow.models.animal import Animal, AnimalBaseInfo, AnimalConfig, StageState
+from mxbiflow.models.session import Session, SessionConfig, SessionState
+from mxbiflow.scene import TrialScene
+from mxbiflow.scene.settlement import (
     CountSettlementConfig,
     RateSettlementConfig,
     SettlementAction,
 )
-from mxbiflow.models.animal import Animal, AnimalBaseInfo, AnimalConfig, StageState
-from mxbiflow.models.session import Session, SessionConfig, SessionState
-from mxbiflow.scene import TrialScene
 
 
 class Record(BaseModel):
@@ -91,7 +91,7 @@ class TrialSceneTests(unittest.TestCase):
         Touch.ended = 0
 
     def trial(self) -> Touch:
-        with patch("mxbiflow.core.context._current_mxbiflow", self.context):
+        with patch("mxbiflow.context._current_mxbiflow", self.context):
             scene = Touch()
         scene.start()
         return scene

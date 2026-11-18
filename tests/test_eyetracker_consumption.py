@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch
 
 from pygame import Event, Surface
 
-from mxbiflow.core import context as context_module
-from mxbiflow.core.context import MXBIFlow
+from mxbiflow import context as context_module
+from mxbiflow.context import MXBIFlow
 from mxbiflow.driver.eyetracker import EyeSample, MockEyetracker
 from mxbiflow.driver.eyetracker.eyetracker import Eyetracker
 from mxbiflow.driver.mxbi.mxbi import MXBI

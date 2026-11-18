@@ -6,7 +6,7 @@ from pygame import Event
 from mxbiflow.driver import MXBI
 
 from ..commands import CommandRegistry
-from ..core.context import MXBIFlow, set_mxbiflow
+from ..context import MXBIFlow, set_mxbiflow
 from ..core.offline import is_offline
 from ..core.path import get_data_dir_path
 from ..models.session import Session

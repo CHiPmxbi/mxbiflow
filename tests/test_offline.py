@@ -15,9 +15,9 @@ import pygame
 from pygame import Event, Surface
 from PySide6.QtWidgets import QApplication
 
-from mxbiflow import core, run
+from mxbiflow import context, run
+from mxbiflow.context import get_mxbiflow
 from mxbiflow.core.config_store import ConfigStore
-from mxbiflow.core.context import get_mxbiflow
 from mxbiflow.core.offline import set_offline
 from mxbiflow.core.path import (
     get_config_session_path,
@@ -151,7 +151,7 @@ class OfflineRunTests(TemporaryHome):
             patch.object(run, "show_run_end", show),
             patch.object(socket.socket, "connect", refuse),
             patch.object(socket.socket, "connect_ex", refuse),
-            patch.object(core.context, "_current_mxbiflow", None),
+            patch.object(context, "_current_mxbiflow", None),
         ):
             run.run_experiment(manager, argv=[], recorder=recorder)
 

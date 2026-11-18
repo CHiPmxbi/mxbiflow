@@ -5,7 +5,7 @@ import unittest
 import mxbiflow
 from mxbiflow.bootstrap import init_gameloop
 from mxbiflow.commands import CommandRegistry, NoParams, RemoteCommand, Reply
-from mxbiflow.core.context import MXBIFlow, get_mxbiflow
+from mxbiflow.context import MXBIFlow, get_mxbiflow
 from mxbiflow.core.path import get_base_path, set_base_path
 from mxbiflow.scene import Scene, SceneManager, TrialScene
 

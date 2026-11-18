@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from pydantic import BaseModel
 from test_session import make_session
 
-from mxbiflow.core.context import MXBIFlow
+from mxbiflow.context import MXBIFlow
 from mxbiflow.infra.camera_recording import segment_start, write_subtitles
 from mxbiflow.infra.run_end import run_summary
 from mxbiflow.models import AnimalBaseInfo
@@ -23,7 +23,7 @@ class Plain(BaseModel):
 
 class PublishTrialMarkTests(unittest.TestCase):
     def setUp(self) -> None:
-        patcher = patch("mxbiflow.core.context.is_offline", return_value=True)
+        patcher = patch("mxbiflow.context.is_offline", return_value=True)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.session = make_session()
