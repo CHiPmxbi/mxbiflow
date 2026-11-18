@@ -125,15 +125,17 @@ class Touch(TrialScene):
     def end(self) -> None: ...            # stop what it started; called once
     def record(self) -> BaseModel: ...    # asked once, after settling
     def settlement(self) -> RateSettlementConfig | CountSettlementConfig | None: ...
-    # handle_event, update and draw run the trial and call self.finish(correct)
+    # handle_event, update and draw run the trial: self.resolve(correct), self.finish()
 ```
 
 - `self.info` is the animal's stage, level and trial numbers when the trial started;
   `self.correct`, `self.aborted` and `self.action` are set before `record()` is asked.
-- `finish(correct)` ends the trial; `correct=None` leaves it out of accuracy and of the
-  level's counts.
-- A trial the framework ends first (the animal left, the run ended) is aborted: it is
-  recorded and published with `aborted` set, and not settled.
+- `resolve(correct)` gives the outcome as soon as it is known; `correct=None` leaves the
+  trial out of accuracy and of the level's counts. `finish()` ends the trial, after the
+  reward and the inter-trial interval if the trial has them.
+- A trial the framework ends (the animal left, the run ended) before it is resolved is
+  aborted: recorded and published with `aborted` set, and not settled. A resolved one is
+  settled as if it had finished.
 - Levels count from 1. The counts a rule settles on are the session's
   (`StageState.level_counted` and `level_correct`), and start again at every level
   change, a manual one included. Without `settlement()` the level stays.

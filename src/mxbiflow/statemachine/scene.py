@@ -267,7 +267,8 @@ class MachineScene(TrialScene):
         self._apply(now)
         if self._trial.state is None:
             outcome = outcome_of(self._stage, self._trial)
-            self.finish(None if outcome == "none" else outcome == "correct")
+            self.resolve(None if outcome == "none" else outcome == "correct")
+            self.finish()
 
     def draw(self, screen: Surface) -> None:
         shown = self._trial.shown if self._trial is not None else []

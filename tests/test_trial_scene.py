@@ -57,6 +57,11 @@ class Next(Touch):
     pass
 
 
+def finish(scene: Touch, correct: bool | None) -> None:
+    scene.resolve(correct)
+    scene.finish()
+
+
 class TrialSceneTests(unittest.TestCase):
     def setUp(self) -> None:
         directory = tempfile.TemporaryDirectory()
@@ -100,7 +105,7 @@ class TrialSceneTests(unittest.TestCase):
         self.assertTrue(scene.running)
         self.assertEqual(scene.info.trial_id, 1)
 
-        scene.finish(True)
+        finish(scene, True)
 
         self.assertFalse(scene.running)
         (record,) = self.records()
@@ -120,8 +125,8 @@ class TrialSceneTests(unittest.TestCase):
     def test_a_trial_ends_once(self) -> None:
         scene = self.trial()
 
-        scene.finish(False)
-        scene.finish(True)
+        finish(scene, False)
+        scene.finish()
         scene.quit()
 
         self.assertEqual(len(self.records()), 1)
@@ -141,9 +146,24 @@ class TrialSceneTests(unittest.TestCase):
         stage = self.session.require_current_animal().current_stage
         self.assertEqual((stage.level, stage.level_counted), (1, 0))
 
+    def test_a_resolved_trial_the_framework_ends_is_settled(self) -> None:
+        Touch.rule = CountSettlementConfig(total_levels=2, settlement_cycle=1)
+        scene = self.trial()
+        scene.resolve(True)
+
+        # The animal leaves in the inter-trial interval.
+        scene.quit()
+
+        (record,) = self.records()
+        self.assertEqual(
+            (record["correct"], record["aborted"], record["action"]),
+            (True, False, "LEVEL_UP"),
+        )
+        self.assertEqual(self.session.require_current_animal().current_stage.level, 2)
+
     def test_a_trial_left_out_of_accuracy_does_not_count(self) -> None:
         Touch.rule = RateSettlementConfig(total_levels=2, min_trials=1)
-        self.trial().finish(None)
+        finish(self.trial(), None)
 
         stage = self.session.require_current_animal().current_stage
         self.assertEqual((stage.level, stage.level_counted), (1, 0))
@@ -156,7 +176,7 @@ class TrialSceneTests(unittest.TestCase):
         actions: list[str] = []
         levels: list[int] = []
         for correct in (True, True, False, False):
-            self.trial().finish(correct)
+            finish(self.trial(), correct)
             actions.append(self.records()[-1]["action"])
             levels.append(stage.level)
 
@@ -168,11 +188,11 @@ class TrialSceneTests(unittest.TestCase):
 
     def test_the_count_rule_moves_to_the_next_stage_past_the_last_level(self) -> None:
         Touch.rule = CountSettlementConfig(total_levels=1, settlement_cycle=2)
-        self.trial().finish(True)
-        self.trial().finish(False)
+        finish(self.trial(), True)
+        finish(self.trial(), False)
         scene = self.trial()
 
-        scene.finish(True)
+        finish(scene, True)
 
         self.assertIs(scene.action, SettlementAction.NEXT_STAGE)
         animal = self.session.require_current_animal()

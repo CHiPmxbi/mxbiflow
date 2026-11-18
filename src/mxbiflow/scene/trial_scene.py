@@ -23,9 +23,10 @@ class TrialScene(Scene):
     The framework counts the trial, and when it ends records it in ``result.jsonl``,
     publishes it, settles the animal's level and stops the trial's timers and sounds.
     The stage describes the trial: :meth:`begin` starts it, the scene's ``handle_event``,
-    ``update`` and ``draw`` run it, :meth:`finish` ends it and :meth:`record` describes
-    it. A trial the framework ends first (the animal left, the run ended) is
-    :attr:`aborted`: recorded and published, but not settled.
+    ``update`` and ``draw`` run it, :meth:`resolve` gives its outcome, :meth:`finish`
+    ends it and :meth:`record` describes it. A trial the framework ends (the animal
+    left, the run ended) before its outcome is known is :attr:`aborted`: recorded and
+    published, but not settled.
 
     Levels count from 1, as :mod:`mxbiflow.gameloop.settlement` does.
     """
@@ -40,8 +41,9 @@ class TrialScene(Scene):
         self.info = self.animal.base_info
         #: Whether the trial was correct; ``None`` leaves it out of accuracy.
         self.correct: bool | None = None
-        #: The framework ended the trial before the stage finished it.
+        #: The framework ended the trial before the stage resolved it.
         self.aborted = False
+        self._resolved = False
         #: What settling the trial decided; set before :meth:`record` is called.
         self.action = SettlementAction.NONE
         self._closed = False
@@ -105,15 +107,24 @@ class TrialScene(Scene):
         self.begin()
 
     @final
-    def finish(self, correct: bool | None) -> None:
-        """End the trial; the stage calls this once."""
+    def resolve(self, correct: bool | None) -> None:
+        """Give the trial's outcome; ``None`` leaves it out of accuracy.
+
+        The trial may go on (a reward, the inter-trial interval): once resolved it is
+        settled even when the framework ends it.
+        """
         self.correct = correct
+        self._resolved = True
+
+    @final
+    def finish(self) -> None:
+        """End the trial; a trial never resolved ends with no outcome."""
         self._close(aborted=False)
 
     @final
     def quit(self) -> None:
         if self._running:
-            self._close(aborted=True)
+            self._close(aborted=not self._resolved)
 
     def _close(self, *, aborted: bool) -> None:
         if self._closed:
