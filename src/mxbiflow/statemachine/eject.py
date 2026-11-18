@@ -1,8 +1,8 @@
 """Turn an experiment file into Python that builds the same stages.
 
 The code written is what one would write by hand with :mod:`~.stage`: every name an
-enum member, a trial's parameters a model, and states, transitions, stimuli and levels
-models that refer to them; pictures and sounds become files beside it. It is for the
+enum member, a trial's parameters a model, and states, transitions and stimuli models
+that refer to them; pictures and sounds become files beside it. It is for the
 day a stage needs Python hooks; from then on the Python file is the experiment, since
 hooks cannot go back into the file. cogforge's node positions (``layout``) are left out.
 
@@ -22,27 +22,20 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
-from . import stage as stage_module
+from . import machine as machine_module
 from .models import (
     Amount1,
     BackgroundStimulus,
     ClearAction,
-    CountProgression,
     Duration,
     Experiment,
-    Factor,
     ImageStimulus,
-    Level,
-    Order,
     ParamRef,
-    RateProgression,
     Size,
     Stage,
     State,
     TextStimulus,
     TonesStimulus,
-    Value1,
-    Value2,
     WavStimulus,
 )
 from .runner import EXIT
@@ -51,7 +44,6 @@ ASSETS = "assets"
 ANNOTATIONS = {"time": "Time", "count": "Count", "number": "float"}
 # The models with more than one field take keywords only: their first fields' names.
 FIELDS = {
-    "Uniform": ["low", "high"],
     "State": ["name"],
     "Group": ["name"],
     "On": ["source", "event", "target"],
@@ -66,9 +58,6 @@ FIELDS = {
     "Text": ["name", "text"],
     "Tones": ["name", "tones", "duration_ms"],
     "Wav": ["name", "path"],
-    "Row": ["name", "values"],
-    "Factor": ["name", "rows"],
-    "Level": ["name", "values"],
 }
 SUFFIXES = {
     "rise": "Rise",
@@ -172,15 +161,20 @@ class _StageSource:
     """The enums, the parameters and the model of one stage."""
 
     def __init__(
-        self, stage: Stage, prefix: str, variable: str, files: dict[str, bytes]
+        self,
+        stage: Stage,
+        prefix: str,
+        variable: str,
+        class_name: str,
+        files: dict[str, bytes],
     ) -> None:
         self.stage = stage
         self.variable = variable
         self.files = files
-        self.used: set[str] = {"Stage", "State"}
+        self.used: set[str] = {"Machine", "State", "TrialParams"}
+        self.class_name = class_name
+        self.machine = f"{variable.upper()}_MACHINE" if prefix else "MACHINE"
         machine = stage.machine
-        levels = stage.levels
-        factors = [factor for level in levels for factor in level.factors]
         hosts = [
             t.event.removeprefix("host.")
             for holder in (*machine.states, *machine.groups)
@@ -196,9 +190,6 @@ class _StageSource:
             "Timers": [t.name for t in machine.timers],
             "Generators": [g.name for g in machine.generators],
             "Counters": [c.name for c in machine.counters],
-            "Levels": [level.name for level in levels if not level.name.isdecimal()],
-            "Factors": [factor.name for factor in factors],
-            "Rows": [row.name for factor in factors for row in factor.rows],
             "HostEvents": hosts,
         }
         self.enums = {
@@ -208,7 +199,7 @@ class _StageSource:
         self.params_class = f"{prefix}Params"
         self.refs = f"{variable}_p" if prefix else "p"
         # A model's field cannot start with an underscore or be one of its methods.
-        fields = _Names(dir(stage_module.TrialParams), lead="p")
+        fields = _Names(dir(machine_module.TrialParams), lead="p")
         self.parameters = {p.name: fields.new(p.name) for p in machine.parameters}
 
     # ---- references ------------------------------------------------------------
@@ -417,76 +408,9 @@ class _StageSource:
             else ast.Attribute(ast.Name("Outcome"), outcome.name),
         )
 
-    def _values(self, values: dict[str, Any], where: str) -> ast.Dict:
-        """Values by parameter; a state or a stimulus as its enum member."""
-        types = {p.name: p.type for p in self.stage.machine.parameters}
-
-        def fixed(parameter: str, value: Any) -> Any:
-            if not isinstance(value, str):
-                return value
-            if types.get(parameter) == "state":
-                return self._target(value, where)
-            return self._of(["Stimuli", "States"], value, where)
-
-        items: dict[str, Any] = {}
-        for parameter, value in values.items():
-            if isinstance(value, Value1):
-                items[parameter] = self._model("Uniform", *value.uniform)
-            elif isinstance(value, Value2):
-                items[parameter] = self._model(
-                    "Choice", *(fixed(parameter, item) for item in value.choice)
-                )
-            else:
-                items[parameter] = fixed(parameter, value)
-        return ast.Dict(
-            [self._param(parameter) for parameter in items],
-            [_expr(value) for value in items.values()],
-        )
-
-    def _factor(self, factor: Factor, where: str) -> ast.Call:
-        order = None
-        if factor.order is not Order.random:
-            self.used.add("Order")
-            order = ast.Attribute(ast.Name("Order"), factor.order.name)
-        rows = [
-            self._model(
-                "Row",
-                self._name("Rows", row.name),
-                *([self._values(row.values, where)] if row.values else []),
-                weight=None if row.weight == 1 else row.weight,
-            )
-            for row in factor.rows
-        ]
-        return self._model(
-            "Factor", self._name("Factors", factor.name), rows, order=order
-        )
-
-    def _level(self, level: Level) -> ast.Call:
-        name = (
-            int(level.name)
-            if level.name.isdecimal() and str(int(level.name)) == level.name
-            else self._name("Levels", level.name)
-        )
-        return self._model(
-            "Level",
-            name,
-            *([self._values(level.values, level.name)] if level.values else []),
-            factors=[self._factor(f, level.name) for f in level.factors] or None,
-        )
-
-    def _rule(self) -> ast.expr | None:
-        rule = self.stage.progression
-        if isinstance(rule, RateProgression):
-            return self._model(
-                "RateRule", min_trials=rule.min_trials, up=rule.up, down=rule.down
-            )
-        if isinstance(rule, CountProgression):
-            return self._model("CountRule", rule.correct)
-        return None
-
     def definitions(self, stage_name: ast.expr) -> list[ast.stmt]:
-        """The stage's enums, its parameters and the stage itself."""
-        stage, machine = self.stage, self.stage.machine
+        """The stage's enums, its parameters, its machine and the stage's class."""
+        machine = self.stage.machine
         body: list[ast.stmt] = [
             enum.definition() for enum in self.enums.values() if enum.members
         ]
@@ -509,8 +433,7 @@ class _StageSource:
         if machine.states and machine.start != machine.states[0].name:
             start = self._name("States", machine.start)
         model = _call(
-            "Stage",
-            name=stage_name,
+            "Machine",
             params=ast.Name(self.params_class) if machine.parameters else None,
             inputs=channels["Inputs"],
             outputs=channels["Outputs"],
@@ -557,11 +480,38 @@ class _StageSource:
             states=[self._state(state) for state in machine.states],
             start=start,
             transitions=transitions or None,
-            levels=[self._level(level) for level in stage.levels],
-            rule=self._rule(),
         )
-        body.append(ast.Assign([ast.Name(self.variable, ast.Store())], model, lineno=0))
+        body.append(ast.Assign([ast.Name(self.machine, ast.Store())], model, lineno=0))
+        body.append(self._stage_class(stage_name))
         return body
+
+    def _stage_class(self, stage_name: ast.expr) -> ast.ClassDef:
+        """The stage: its machine, and each trial with the parameters' defaults."""
+        params = self.params_class if self.stage.machine.parameters else "TrialParams"
+
+        def method(
+            name: str, returns: str, value: ast.expr, *, of_class: bool = False
+        ) -> ast.FunctionDef:
+            return ast.FunctionDef(
+                name,
+                ast.arguments(args=[ast.arg("cls" if of_class else "self")]),
+                [ast.Return(value)],
+                [ast.Name("classmethod")] if of_class else [],
+                ast.Name(returns),
+            )
+
+        return ast.ClassDef(
+            self.class_name,
+            [ast.Subscript(ast.Name("MachineTrial"), ast.Name(params))],
+            [],
+            [
+                # The stage keeps the name it has in the file.
+                method("name", "str", stage_name, of_class=True),
+                method("machine", "Machine", ast.Name(self.machine)),
+                method("params", params, _call(params)),
+            ],
+            [],
+        )
 
 
 def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, bytes]]:
@@ -572,30 +522,41 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
     """
     files: dict[str, bytes] = {}
     several = len(experiment.stages) > 1
-    variables = _Names(["scenes", "ASSETS", "Path", "p", *stage_module.__all__])
+    taken = ["scenes", "ASSETS", "Path", "p", "MachineTrial", *machine_module.__all__]
+    variables = _Names(taken)
+    classes = _Names(taken)
     stage_names = _Enum("Stages", [stage.name for stage in experiment.stages])
     stages: list[_StageSource] = []
     for stage in experiment.stages:
         variable = variables.new(stage.name)
         prefix = "".join(part.capitalize() for part in variable.split("_"))
-        stages.append(_StageSource(stage, prefix if several else "", variable, files))
+        stages.append(
+            _StageSource(
+                stage,
+                prefix if several else "",
+                variable,
+                classes.new(prefix or "Stage"),
+                files,
+            )
+        )
     definitions: list[ast.stmt] = [stage_names.definition()]
     for stage in stages:
         definitions += stage.definitions(stage_names.ref(stage.stage.name))
-    used = sorted({"stage_scenes"}.union(*(stage.used for stage in stages)))
-    animal_values = {a.name: a.values for a in experiment.animals if a.values}
+    used = sorted(set[str]().union(*(stage.used for stage in stages)))
     body: list[ast.stmt] = [
         ast.Expr(
             ast.Constant(
                 f"Written by `mxbiflow eject` from {origin}.\n\n"
-                "Register `scenes` with the scene manager. Give a stage its Python "
-                "with\n`on_trial`, `on_enter` and `rule`.\n"
+                "Register `scenes` with the scene manager. A stage's `params` gives "
+                "each trial\nits values; `settlement` or `decide` moves the animal "
+                "between levels.\n"
             )
         ),
         ast.ImportFrom("enum", [ast.alias("StrEnum"), ast.alias("auto")], 0),
         ast.ImportFrom(
-            "mxbiflow.statemachine.stage", [ast.alias(name) for name in used], 0
+            "mxbiflow.statemachine.machine", [ast.alias(name) for name in used], 0
         ),
+        ast.ImportFrom("mxbiflow.statemachine.scene", [ast.alias("MachineTrial")], 0),
     ]
     if any(stage.needs_field for stage in stages):
         body.append(ast.ImportFrom("pydantic", [ast.alias("Field")], 0))
@@ -613,11 +574,7 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
     body.append(
         ast.Assign(
             [ast.Name("scenes", ast.Store())],
-            _call(
-                "stage_scenes",
-                *(ast.Name(stage.variable) for stage in stages),
-                animal_values=animal_values or None,
-            ),
+            ast.List([ast.Name(stage.class_name) for stage in stages]),
             lineno=0,
         )
     )

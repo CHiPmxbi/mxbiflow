@@ -1,28 +1,24 @@
-"""What is wrong with an experiment's levels: cogforge's ``validateExperiment``.
+"""What is wrong with a machine's stimulus parameters, and with a trial's values.
 
-cogforge refuses these while an experiment is edited; a file written by hand or by
-``Stage`` has not been through it, and each of them would otherwise go wrong
-silently in a trial (one value overriding another, a stimulus never shown).
+cogforge refuses these while a machine is edited (``validate`` and ``valueProblems`` in
+its ``src/model/validate.ts``); a machine written in Python and the values a stage
+gives a trial have not been through it, and each would otherwise go wrong silently in
+a trial (a stimulus never shown, a value that is ignored).
 """
 
+from collections.abc import Mapping
+
 from .models import (
-    Experiment,
     HideAction,
     Machine,
-    Order,
     ParamRef,
     PlayAction,
     ShowAction,
-    Stage,
     StopAction,
     TonesStimulus,
-    Value1,
-    Value2,
     WavStimulus,
 )
 from .runner import EXIT
-
-type Fixed = float | str
 
 
 def stimulus_uses(machine: Machine) -> dict[str, set[str]]:
@@ -30,11 +26,10 @@ def stimulus_uses(machine: Machine) -> dict[str, set[str]]:
     uses: dict[str, set[str]] = {}
     for state in machine.states:
         for action in state.on_entry:
-            if isinstance(action, (ShowAction, HideAction)):
-                ref, use = (
-                    action.show if isinstance(action, ShowAction) else action.hide,
-                    "screen",
-                )
+            if isinstance(action, ShowAction):
+                ref, use = action.show, "screen"
+            elif isinstance(action, HideAction):
+                ref, use = action.hide, "screen"
             elif isinstance(action, PlayAction):
                 ref, use = action.play, "sound"
             elif isinstance(action, StopAction):
@@ -60,115 +55,54 @@ def _stimulus_problem(machine: Machine, param: str, value: str) -> str | None:
     return None
 
 
-def stage_problems(stage: Stage) -> list[str]:
-    """What is wrong with the stage's stimulus parameters, levels and factors."""
-    machine = stage.machine
+def machine_problems(machine: Machine) -> list[str]:
+    """What is wrong with the machine's stimulus parameters."""
     problems: list[str] = []
     types = {p.name: p.type for p in machine.parameters}
-    states = {s.name for s in machine.states}
     uses = stimulus_uses(machine)
-
     for param in machine.parameters:
         if param.type != "stimulus":
             continue
         if len(uses.get(param.name, ())) == 2:
             problems.append(
-                f"{stage.name}: the stimulus parameter {param.name} is both shown "
-                "and played"
+                f"the stimulus parameter {param.name} is both shown and played"
             )
         found = _stimulus_problem(machine, param.name, param.default)
         if found:
-            problems.append(f"{stage.name}: {found}")
-    for name in uses:
-        if types.get(name) != "stimulus":
-            problems.append(f"{stage.name}: {name} is not a stimulus parameter")
-
-    def check_fixed(where: str, name: str, value: Fixed) -> None:
-        kind = types.get(name)
-        if kind is None:
-            problems.append(f"{where}: no parameter {name}")
-        elif kind == "state":
-            if not isinstance(value, str):
-                problems.append(f"{where}: {name} needs a state")
-            elif value != EXIT and value not in states:
-                problems.append(f'{where}: {name}: no state "{value}"')
-        elif kind == "stimulus":
-            if not isinstance(value, str):
-                problems.append(f"{where}: {name} needs a stimulus")
-            else:
-                found = _stimulus_problem(machine, name, value)
-                if found:
-                    problems.append(f"{where}: {found}")
-        elif isinstance(value, str):
-            problems.append(f"{where}: {name} needs a number")
-
-    level_names: set[str] = set()
-    for level in stage.levels:
-        where = f"{stage.name} / {level.name}"
-        if level.name in level_names:
-            problems.append(f"{where}: the level's name is used twice")
-        level_names.add(level.name)
-        for name, value in level.values.items():
-            if isinstance(value, Value2):
-                for item in value.choice:
-                    check_fixed(where, name, item)
-            elif isinstance(value, Value1):
-                kind = types.get(name)
-                if kind is None:
-                    problems.append(f"{where}: no parameter {name}")
-                elif kind in ("state", "stimulus"):
-                    problems.append(f"{where}: {name} needs a {kind}, not a range")
-                elif value.uniform[0] > value.uniform[1]:
-                    problems.append(f"{where}: the range of {name} is backwards")
-            else:
-                check_fixed(where, name, value)
-        # Who sets each parameter: the level itself or a factor. Two setters would
-        # silently override each other.
-        set_by = dict.fromkeys(level.values, level.name)
-        factor_names: set[str] = set()
-        for factor in level.factors:
-            at = f"{where} / {factor.name}"
-            if factor.name in factor_names:
-                problems.append(f"{at}: the factor's name is used twice")
-            factor_names.add(factor.name)
-            if not factor.rows:
-                problems.append(f"{at}: the factor has no rows")
-            elif factor.order is Order.random and all(
-                row.weight == 0 for row in factor.rows
-            ):
-                problems.append(f"{at}: every row's weight is 0")
-            row_names: set[str] = set()
-            set_here: dict[str, None] = {}
-            for row in factor.rows:
-                if row.name in row_names:
-                    problems.append(f'{at}: the row name "{row.name}" is used twice')
-                row_names.add(row.name)
-                for name, value in row.values.items():
-                    check_fixed(f"{at} / {row.name}", name, value)
-                    set_here[name] = None
-            for name in set_here:
-                if name in set_by:
-                    problems.append(
-                        f"{at}: {name} is set twice, by {set_by[name]} and by "
-                        f"{factor.name}"
-                    )
-                else:
-                    set_by[name] = factor.name
+            problems.append(found)
+    problems += [
+        f"{name} is not a stimulus parameter"
+        for name in uses
+        if types.get(name) != "stimulus"
+    ]
     return problems
 
 
-def check_experiment(experiment: Experiment) -> None:
-    """Raise ``ValueError`` naming everything wrong with the experiment's levels."""
-    problems = [p for stage in experiment.stages for p in stage_problems(stage)]
-    for animal in experiment.animals:
-        for stage in experiment.stages:
-            types = {p.name: p.type for p in stage.machine.parameters}
-            for name, value in animal.values.items():
-                if name in types and (
-                    types[name] in ("state", "stimulus")
-                ) != isinstance(value, str):
-                    problems.append(
-                        f"{animal.name}: {name} is of the wrong kind for {stage.name}"
-                    )
-    if problems:
-        raise ValueError("the experiment cannot run: " + "; ".join(problems))
+def value_problems(machine: Machine, values: Mapping[str, float | str]) -> list[str]:
+    """What is wrong with the values a trial is given.
+
+    Each must name a parameter and be of its kind: a number, a state's name or the exit
+    for a ``state`` parameter, a stimulus of the right kind for a ``stimulus`` one.
+    """
+    problems: list[str] = []
+    types = {p.name: p.type for p in machine.parameters}
+    states = {state.name for state in machine.states}
+    for name, value in values.items():
+        kind = types.get(name)
+        if kind is None:
+            problems.append(f"no parameter {name}")
+        elif kind == "state":
+            if not isinstance(value, str):
+                problems.append(f"{name} needs a state")
+            elif value != EXIT and value not in states:
+                problems.append(f'{name}: no state "{value}"')
+        elif kind == "stimulus":
+            if not isinstance(value, str):
+                problems.append(f"{name} needs a stimulus")
+            else:
+                found = _stimulus_problem(machine, name, value)
+                if found:
+                    problems.append(found)
+        elif isinstance(value, (str, bool)):
+            problems.append(f"{name} needs a number")
+    return problems

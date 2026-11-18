@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import tempfile
@@ -7,7 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from mxbiflow.statemachine import load_experiment
-from mxbiflow.statemachine.models import RateProgression, Value1
+from mxbiflow.statemachine.models import Outcomes
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "tests" / "fixtures" / "two_pictures.experiment.json"
@@ -38,21 +39,29 @@ class LoadExperimentTests(unittest.TestCase):
 
         stage = experiment.stages[0]
         self.assertEqual(stage.name, "discriminate")
-        self.assertEqual([level.name for level in stage.levels], ["1", "2"])
-        self.assertEqual(stage.levels[0].values["choice_ms"], 10000)
         self.assertEqual(
-            stage.levels[1].values["choice_ms"], Value1(uniform=(3000, 5000))
+            stage.outcomes,
+            {"reward": Outcomes.correct, "error": Outcomes.incorrect},
         )
         self.assertEqual(
-            stage.progression,
-            RateProgression(rule="rate", min_trials=10, up=0.8, down=0.3),
+            [parameter.name for parameter in stage.machine.parameters][:2],
+            ["on_left", "on_right"],
         )
-        self.assertEqual([animal.name for animal in experiment.animals], ["mock_001"])
+
+    def test_rejects_a_file_of_the_format_with_levels(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "experiment.json"
+            old = load_experiment(EXAMPLE).model_dump(mode="json", by_alias=True)
+            old["stages"][0]["levels"] = []
+            path.write_text(json.dumps(old))
+
+            with self.assertRaises(ValidationError):
+                load_experiment(path)
 
     def test_rejects_an_unknown_field(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "experiment.json"
-            path.write_text('{"stages": [], "animals": [], "extra": 1}')
+            path.write_text('{"stages": [], "extra": 1}')
 
             with self.assertRaises(ValidationError):
                 load_experiment(path)

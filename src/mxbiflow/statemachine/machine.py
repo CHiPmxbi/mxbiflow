@@ -1,10 +1,10 @@
-"""Write a stage in Python: names as enums, everything else as pydantic models.
+"""Write a trial's state machine in Python: names as enums, the rest as models.
 
-A stage is the same data cogforge exports (:class:`~.models.Stage`), written so that the
-editor and the type checker see every reference: a name is an enum member, a trial's
-parameters are the fields of a :class:`TrialParams` model, and states, transitions,
-stimuli and levels are models that refer to each other by those. A name is any string,
-so a plain ``str`` works wherever an enum member does.
+A :class:`Machine` is the same data cogforge exports for a stage, written so that the
+editor and the type checker see every reference: a name is an enum member, the trial's
+parameters are the fields of a :class:`TrialParams` model, and states, transitions and
+stimuli are models that refer to each other by those. A name is any string, so a plain
+``str`` works wherever an enum member does.
 
     class S(StrEnum):
         WAIT = auto()
@@ -21,8 +21,7 @@ so a plain ``str`` works wherever an enum member does.
 
     p = Params.refs()
 
-    touch = Stage(
-        name="touch",
+    MACHINE = Machine(
         params=Params,
         outputs=Out,
         stimuli=[
@@ -45,53 +44,44 @@ so a plain ``str`` works wherever an enum member does.
         ],
     )
 
-    scene_manager.register(stage_scenes(touch))
-
 A model with more than one field takes keyword arguments only, so each argument says
 what it is; an action or an event of one field (``Show(Stim.TARGET)``) may go without.
 
-What data cannot say is Python the host calls: ``on_trial`` before a trial, ``on_enter``
-when a state is entered, and a ``rule`` that moves the animal between levels.
+The machine is only the trial. Which values a trial gets, and what its outcome does to
+the animal's level, is the stage's own Python: :class:`~.scene.MachineTrial`.
 """
 
 import base64
 import mimetypes
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Self, TypeVar, cast
+from typing import Annotated, Any, Self, TypeVar, cast
 
 import soundfile
 from pydantic import (
     BaseModel,
     ConfigDict,
-    Field,
     GetCoreSchemaHandler,
-    field_validator,
 )
 from pydantic.dataclasses import dataclass
 from pydantic_core import core_schema
 
-from ..scene.scene import Scene
-from .models import Experiment, Order, Size
 from .models import Outcomes as Outcome
+from .models import Size
 from .models import Stage as StageData
 from .runner import EXIT
-from .scene import Hook, Hooks, Rule, machine_scenes
-from .validate import stage_problems
+from .validate import machine_problems
 
 __all__ = [
     "EXIT",
     "Background",
-    "Choice",
     "Circle",
     "Clear",
     "Count",
-    "CountRule",
     "Counter",
     "Cross",
     "Done",
-    "Factor",
     "Fall",
     "Generator",
     "Group",
@@ -99,23 +89,19 @@ __all__ = [
     "High",
     "Host",
     "Image",
-    "Level",
     "Low",
+    "Machine",
     "On",
-    "Order",
     "Outcome",
     "Play",
-    "RateRule",
     "Reached",
     "Rect",
     "Ref",
     "Reset",
     "Rise",
-    "Row",
     "ScreenTouch",
     "Show",
     "Size",
-    "Stage",
     "Start",
     "State",
     "StateParam",
@@ -128,9 +114,7 @@ __all__ = [
     "Tones",
     "Touch",
     "TrialParams",
-    "Uniform",
     "Wav",
-    "stage_scenes",
 ]
 
 _CONFIG = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -171,7 +155,6 @@ StateParam = Annotated[_N, _Kind("state")]
 #: A parameter that names the stimulus to show or play: ``StimulusParam[Stim]``.
 StimulusParam = Annotated[_N, _Kind("stimulus")]
 
-type Fixed = float | str
 type Amount = float | Ref
 type Name = str
 type StimulusName = Name | Ref
@@ -184,9 +167,8 @@ class TrialParams(BaseModel):
     for any other number, :data:`StateParam` for where a transition leads and
     :data:`StimulusParam` for which stimulus to show or play. A field of any other
     type is refused. Its default is the parameter's.
-    A field's alias is the parameter's name when that is not a Python name. Defaults
-    known only when the stage is made (from a configuration) are an instance of the
-    model, given to the stage as ``defaults``.
+    A field's alias is the parameter's name when that is not a Python name. An instance
+    is the values of one trial, which a stage gives its machine.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
@@ -210,26 +192,6 @@ class _Refs:
         if field is None:
             raise AttributeError(f"{self._params.__name__} has no parameter {name}")
         return Ref(field.alias or name)
-
-
-@dataclass(frozen=True, config=_CONFIG, kw_only=True)
-class Uniform:
-    """A level's value drawn anew per trial from ``low`` to ``high``."""
-
-    low: float
-    high: float
-
-
-class Choice:
-    """A level's value drawn anew per trial from these, each as likely."""
-
-    def __init__(self, *items: Fixed) -> None:
-        if not items:
-            raise ValueError("a choice needs something to choose from")
-        self.items = items
-
-
-type Value = Fixed | Uniform | Choice
 
 
 # ---- what a state does when it is entered ------------------------------------
@@ -280,6 +242,15 @@ class Reset:
 
 type Action = Show | Hide | Clear | Play | Start | Stop | Reset
 
+_ACTIONS: dict[type, str] = {
+    Show: "show",
+    Hide: "hide",
+    Play: "play",
+    Stop: "stop",
+    Start: "start",
+    Reset: "reset",
+}
+
 
 # ---- events -------------------------------------------------------------------
 
@@ -293,12 +264,11 @@ class Timeout:
 class Touch:
     """The animal touched this stimulus.
 
-    With a parameter it is a touch of whichever stimulus the trial drew for it. That
-    is written as the touch of each stimulus the parameter can name, so no other
-    parameter with events may name one of them.
+    An event is a stimulus's, not a parameter's: for a stimulus a parameter names, give
+    each stimulus it can name its own transition.
     """
 
-    stimulus: StimulusName
+    stimulus: Name
 
 
 @dataclass(frozen=True, config=_CONFIG)
@@ -310,7 +280,7 @@ class ScreenTouch:
 class Done:
     """A timer or a pulse generator is done, or a sound has played to its end."""
 
-    name: StimulusName
+    name: Name
 
 
 @dataclass(frozen=True, config=_CONFIG)
@@ -507,59 +477,7 @@ class Wav:
 
 type Stimulus = Background | Image | Rect | Circle | Cross | Text | Tones | Wav
 
-
-# ---- levels and level rules ---------------------------------------------------
-
-
-@dataclass(frozen=True, config=_CONFIG, kw_only=True)
-class Row:
-    """Values that go together, drawn as often as ``weight`` says."""
-
-    name: Name
-    # By parameter: a key is ``Params.refs().<field>``, read by the checker as the field.
-    values: Mapping[Any, Fixed] = Field(default_factory=dict[Any, Fixed])
-    weight: float = 1
-
-
-@dataclass(frozen=True, config=_CONFIG, kw_only=True)
-class Factor:
-    """Something that varies from trial to trial at a level, by its own draw.
-
-    One row is drawn per trial by weight, or the rows are taken in turn with
-    ``Order.cycle``. A level's factors are drawn independently.
-    """
-
-    name: Name
-    rows: Sequence[Row]
-    order: Order = Order.random
-
-
-@dataclass(frozen=True, config=_CONFIG, kw_only=True)
-class Level:
-    """A level's parameter values, by parameter (``Params.refs()``), and its factors."""
-
-    name: Name | int
-    values: Mapping[Any, Value] = Field(default_factory=dict[Any, Value])
-    factors: Sequence[Factor] = ()
-
-
-@dataclass(frozen=True, config=_CONFIG, kw_only=True)
-class RateRule:
-    """Move a level up or down by the correct rate of the trials at the level."""
-
-    min_trials: int
-    up: float
-    down: float
-
-
-@dataclass(frozen=True, config=_CONFIG)
-class CountRule:
-    """Move a level up after this many correct trials at the level."""
-
-    correct: int
-
-
-# ---- the stage ----------------------------------------------------------------
+# ---- the machine as a whole ---------------------------------------------------
 
 
 def _names(names: Iterable[str]) -> list[str]:
@@ -578,18 +496,19 @@ def _data_url(path: Path, kind: str) -> str:
     return f"data:{media};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 
-class Stage(BaseModel):
-    """One stage: a trial state machine, its levels, outcomes and Python.
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
+class Machine:
+    """A trial as a state machine: what a stage's trial does, as data.
 
-    Times are milliseconds. ``inputs`` and ``outputs`` are the channels the stage uses,
-    wired by the rig. ``screen`` is the layout's reference and says whether it is
-    upright; stimuli are placed by fractions of the rig's screen. Without ``levels``
-    the stage has one, with the parameters' defaults.
+    Times are milliseconds. ``inputs`` and ``outputs`` are the channels the machine
+    uses, wired by the rig. ``screen`` is the layout's reference and says whether it is
+    upright; stimuli are placed by fractions of the rig's screen. The trial's values
+    are the stage's to give (:class:`~.scene.MachineTrial`); ``defaults`` are what the
+    format keeps for a parameter a trial leaves out.
     """
 
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True, frozen=True)
-
-    name: Name
+    states: Sequence[State]
+    transitions: Sequence[On] = ()
     params: type[TrialParams] = TrialParams
     #: The parameters' defaults, when they are not the fields' own.
     defaults: TrialParams | None = None
@@ -602,35 +521,7 @@ class Stage(BaseModel):
     generators: Sequence[Generator] = ()
     counters: Sequence[Counter] = ()
     groups: Sequence[Group] = ()
-    states: Sequence[State]
     start: Name | None = None
-    transitions: Sequence[On] = ()
-    levels: Sequence[Level] = ()
-    #: Moves the animal between levels: a rule of the format, or Python for a rule the
-    #: format cannot say (``rule(scene, outcome)`` returns the move).
-    rule: RateRule | CountRule | Rule | None = None
-    #: Called before each trial; may change ``scene.values``.
-    on_trial: Sequence[Hook] = ()
-    #: By state: called each time the state is entered.
-    on_enter: Mapping[str, Hook | Sequence[Hook]] = Field(
-        default_factory=dict[str, Hook | Sequence[Hook]]
-    )
-
-    _ACTIONS: ClassVar[dict[type, str]] = {
-        Show: "show",
-        Hide: "hide",
-        Play: "play",
-        Stop: "stop",
-        Start: "start",
-        Reset: "reset",
-    }
-
-    @field_validator("inputs", "outputs", mode="before")
-    @classmethod
-    def _members(cls, names: Iterable[Name]) -> list[Name]:
-        return list(names)
-
-    # ---- to the format ---------------------------------------------------------
 
     def _parameters(self) -> list[dict[str, Any]]:
         parameters: list[dict[str, Any]] = []
@@ -659,91 +550,11 @@ class Stage(BaseModel):
             parameters.append({"name": name, "type": kind, "default": default})
         return parameters
 
-    def _values_of(self, parameter: str) -> list[str]:
-        """Every name a parameter can take: its default, the levels', the rows'."""
-        found = [
-            item["default"]
-            for item in self._parameters()
-            if item["name"] == parameter and isinstance(item["default"], str)
-        ]
-        for level in self.levels:
-            value = level.values.get(parameter)
-            items = value.items if isinstance(value, Choice) else (value,)
-            found += [str(item) for item in items if isinstance(item, str)]
-            for factor in level.factors:
-                for row in factor.rows:
-                    item = row.values.get(parameter)
-                    if isinstance(item, str):
-                        found.append(str(item))
-        return list(dict.fromkeys(found))
-
-    def _shared_stimuli(self) -> list[str]:
-        """Stimuli that two parameters with events can both name.
-
-        The format's events are those of stimuli, so the event of a parameter is
-        written as the event of each stimulus it can name. A stimulus two parameters
-        can name would then be taken for both: a touch of the target in one trial and
-        of the distractor in another could not be told apart.
-        """
-        events = [on.event for on in self.transitions]
-        events += [counter.event for counter in self.counters]
-        parameters: dict[str, None] = {}
-        for event in events:
-            name = (
-                event.stimulus
-                if isinstance(event, Touch)
-                else event.name
-                if isinstance(event, Done)
-                else None
-            )
-            if isinstance(name, Ref):
-                parameters[name] = None
-        problems: list[str] = []
-        names = list(parameters)
-        for index, first in enumerate(names):
-            for second in names[index + 1 :]:
-                both = set(self._values_of(first)) & set(self._values_of(second))
-                problems += [
-                    f'"{stimulus}" can be both {first} and {second}, so its events '
-                    "cannot tell which it is: give each its own stimulus"
-                    for stimulus in sorted(both)
-                ]
-        return problems
-
-    def _events(self, event: Event) -> list[str]:
-        """The format's events of an event; several for a stimulus parameter's."""
-
-        def each(name: StimulusName, suffix: str) -> list[str]:
-            names = self._values_of(name) if isinstance(name, Ref) else [str(name)]
-            return [f"{item}.{suffix}" for item in names]
-
-        match event:
-            case Timeout():
-                return ["timeout"]
-            case ScreenTouch():
-                return ["screen.touch"]
-            case Touch(stimulus=stimulus):
-                return each(stimulus, "touch")
-            case Done(name=name):
-                return each(name, "done")
-            case Reached(counter=counter):
-                return [f"{counter}.reached"]
-            case Rise(input=name):
-                return [f"{name}.rise"]
-            case Fall(input=name):
-                return [f"{name}.fall"]
-            case High(input=name):
-                return [f"{name}.high"]
-            case Low(input=name):
-                return [f"{name}.low"]
-            case Host(name=name):
-                return [f"host.{name}"]
-
     def _action(self, action: Action) -> dict[str, Any]:
         if isinstance(action, Clear):
             return {"clear": True}
         (value,) = (getattr(action, f) for f in action.__dataclass_fields__)
-        return {self._ACTIONS[type(action)]: _amount(value)}
+        return {_ACTIONS[type(action)]: _amount(value)}
 
     def _stimulus(self, stimulus: Stimulus) -> dict[str, Any]:
         name = str(stimulus.name)
@@ -797,68 +608,24 @@ class Stage(BaseModel):
                     placed["text"] = stimulus.text
                 return placed
 
-    def _level(self, level: Level) -> dict[str, Any]:
-        def value(item: Value) -> Any:
-            if isinstance(item, Uniform):
-                return {"uniform": [item.low, item.high]}
-            if isinstance(item, Choice):
-                return {"choice": [_fixed(i) for i in item.items]}
-            return _fixed(item)
-
-        return {
-            "name": str(level.name),
-            "values": {str(k): value(v) for k, v in level.values.items()},
-            "factors": [
-                {
-                    "name": str(factor.name),
-                    "order": factor.order,
-                    "rows": [
-                        {
-                            "name": str(row.name),
-                            "weight": row.weight,
-                            "values": {
-                                str(k): _fixed(v) for k, v in row.values.items()
-                            },
-                        }
-                        for row in factor.rows
-                    ],
-                }
-                for factor in level.factors
-            ],
-        }
-
-    def _progression(self) -> dict[str, Any]:
-        rule = self.rule
-        if isinstance(rule, RateRule):
-            return {
-                "rule": "rate",
-                "minTrials": rule.min_trials,
-                "up": rule.up,
-                "down": rule.down,
-            }
-        if isinstance(rule, CountRule):
-            return {"rule": "count", "correct": rule.correct}
-        return {"rule": "manual"}
-
-    def build(self) -> tuple[StageData, Hooks]:
-        """The stage as the format's data, and its Python; raises for a wrong name."""
+    def build(self, name: str) -> StageData:
+        """The machine as the format's stage called ``name``; raises for a wrong name."""
         transitions: dict[str, list[dict[str, Any]]] = {}
         for on in self.transitions:
             target = (
                 _amount(on.target) if isinstance(on.target, Ref) else str(on.target)
             )
-            for event in self._events(on.event):
-                transitions.setdefault(str(on.source), []).append(
-                    {"event": event, "target": target}
-                )
+            transitions.setdefault(str(on.source), []).append(
+                {"event": _event(on.event), "target": target}
+            )
         holders = _names(s.name for s in (*self.states, *self.groups))
-        problems = self._shared_stimuli() + [
+        problems = [
             f'a transition from "{source}", which is no state or group'
             for source in transitions
             if source not in holders
         ]
         data: dict[str, Any] = {
-            "name": str(self.name),
+            "name": name,
             "machine": {
                 "channels": {
                     "inputs": _names(self.inputs),
@@ -883,7 +650,7 @@ class Stage(BaseModel):
                 "counters": [
                     {
                         "name": str(c.name),
-                        "event": self._events(c.event)[0],
+                        "event": _event(c.event),
                         "limit": _amount(c.limit),
                     }
                     for c in self.counters
@@ -920,33 +687,43 @@ class Stage(BaseModel):
             "outcomes": {
                 str(s.name): s.outcome for s in self.states if s.outcome is not None
             },
-            "levels": [self._level(level) for level in self.levels]
-            or [{"name": "1", "values": {}, "factors": []}],
-            "progression": self._progression(),
         }
-        hooks = Hooks(
-            on_trial=list(self.on_trial),
-            on_enter={
-                str(state): [hook] if callable(hook) else list(hook)
-                for state, hook in self.on_enter.items()
-            },
-            rule=self.rule if callable(self.rule) else None,
-        )
-        problems += _dangling(data, hooks)
+        problems += _dangling(data)
         if problems:
-            raise ValueError(f'stage "{self.name}": ' + "; ".join(problems))
+            raise ValueError(f'stage "{name}": ' + "; ".join(problems))
         stage = StageData.model_validate(data)
-        problems = stage_problems(stage)
+        problems = machine_problems(stage.machine)
         if problems:
-            raise ValueError("; ".join(problems))
-        return stage, hooks
+            raise ValueError(f'stage "{name}": ' + "; ".join(problems))
+        return stage
 
 
-def _fixed(value: Fixed) -> Fixed:
-    return str(value) if isinstance(value, str) else value
+def _event(event: Event) -> str:
+    """The format's name of an event."""
+    match event:
+        case Timeout():
+            return "timeout"
+        case ScreenTouch():
+            return "screen.touch"
+        case Touch(stimulus=stimulus):
+            return f"{stimulus}.touch"
+        case Done(name=name):
+            return f"{name}.done"
+        case Reached(counter=counter):
+            return f"{counter}.reached"
+        case Rise(input=name):
+            return f"{name}.rise"
+        case Fall(input=name):
+            return f"{name}.fall"
+        case High(input=name):
+            return f"{name}.high"
+        case Low(input=name):
+            return f"{name}.low"
+        case Host(name=name):
+            return f"host.{name}"
 
 
-def _dangling(data: dict[str, Any], hooks: Hooks) -> list[str]:
+def _dangling(data: dict[str, Any]) -> list[str]:
     """Names that lead nowhere would fail silently in a trial: say where they are."""
     machine = data["machine"]
     problems: list[str] = []
@@ -979,6 +756,11 @@ def _dangling(data: dict[str, Any], hooks: Hooks) -> list[str]:
         for output in holder["hold"]:
             if output not in machine["channels"]["outputs"]:
                 problems.append(f'{where}: no output "{output}"')
+        events = [transition["event"] for transition in holder["transitions"]]
+        for event in dict.fromkeys(events):
+            if events.count(event) > 1:
+                # The first would always win, whatever the second was meant for.
+                problems.append(f'{where}: "{event}" has more than one transition')
         for transition in holder["transitions"]:
             target = transition["target"]
             if isinstance(target, dict):
@@ -988,43 +770,10 @@ def _dangling(data: dict[str, Any], hooks: Hooks) -> list[str]:
                 problems.append(f'{where}: no state "{target}"')
         for action in holder.get("onEntry", []):
             ((kind, name),) = action.items()
-            # A stimulus parameter is checked with the levels.
+            # What a stimulus parameter names is checked with the trial's values.
             if kind in known and not isinstance(name, dict) and name not in known[kind]:
                 problems.append(f'{where}: {kind} "{name}" does not exist')
     for generator in machine["generators"]:
         if generator["output"] not in machine["channels"]["outputs"]:
             problems.append(f'{generator["name"]}: no output "{generator["output"]}"')
-    for state in hooks.on_enter:
-        if state not in states:
-            problems.append(f'no state "{state}" for a hook')
     return problems
-
-
-def stage_scenes(
-    *stages: Stage,
-    animal_values: Mapping[str, Mapping[str, Fixed]] | None = None,
-) -> dict[str, type[Scene]]:
-    """The scenes of stages written in Python, to register with the scene manager.
-
-    Past a stage's last level an animal moves to the next stage given, and below its
-    first to the previous one. ``animal_values`` are parameter values of single
-    animals, by animal name; they replace a level's and its factors'.
-    """
-    built = [stage.build() for stage in stages]
-    first = built[0][0]
-    experiment = Experiment.model_validate(
-        {
-            "stages": [stage for stage, _ in built],
-            # Stage and level come from the session; the format wants them filled.
-            "animals": [
-                {
-                    "name": animal,
-                    "stage": first.name,
-                    "level": first.levels[0].name,
-                    "values": dict(values),
-                }
-                for animal, values in (animal_values or {}).items()
-            ],
-        }
-    )
-    return machine_scenes(experiment, {stage.name: hooks for stage, hooks in built})

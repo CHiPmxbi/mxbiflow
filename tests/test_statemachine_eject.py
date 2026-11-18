@@ -12,36 +12,28 @@ from pydantic import Field
 from mxbiflow.__main__ import main
 from mxbiflow.statemachine import load_experiment
 from mxbiflow.statemachine.eject import eject, python_source
-from mxbiflow.statemachine.models import Experiment
-from mxbiflow.statemachine.models import Stage as StageData
-from mxbiflow.statemachine.stage import (
+from mxbiflow.statemachine.machine import (
     EXIT,
     Background,
-    Choice,
     Clear,
     Count,
     Counter,
-    CountRule,
     Cross,
     Done,
-    Factor,
     Generator,
     Group,
     Hide,
     Host,
     Image,
-    Level,
+    Machine,
     On,
-    Order,
     Outcome,
     Play,
     Reached,
     Reset,
     Rise,
-    Row,
     Show,
     Size,
-    Stage,
     Start,
     State,
     StateParam,
@@ -54,9 +46,11 @@ from mxbiflow.statemachine.stage import (
     Tones,
     Touch,
     TrialParams,
-    Uniform,
     Wav,
 )
+from mxbiflow.statemachine.models import Experiment
+from mxbiflow.statemachine.models import Stage as StageData
+from mxbiflow.statemachine.scene import MachineTrial
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXAMPLE = FIXTURES / "two_pictures.experiment.json"
@@ -74,11 +68,10 @@ class Odd(TrialParams):
     sound: StimulusParam[str] = "tone"
 
 
-def everything() -> Stage:
+def everything() -> Machine:
     """A stage that uses each thing the format has, with names that are not Python's."""
     p = Odd.refs()
-    return Stage(
-        name="class",
+    return Machine(
         params=Odd,
         inputs=["lick left"],
         outputs=["reward", "laser"],
@@ -152,36 +145,6 @@ def everything() -> Stage:
             On(source="trial", event=Reached("licked"), target="give"),
             On(source="all", event=Done("limit"), target=EXIT),
         ],
-        levels=[
-            Level(name="easy"),
-            Level(
-                name="hard",
-                values={
-                    p.wait_ms: Uniform(low=500, high=900.5),
-                    p.licks: 3,
-                    p.hz: Choice(4000, 8000),
-                    p.sound: Choice("tone"),
-                },
-                factors=[
-                    Factor(
-                        name="side",
-                        rows=[
-                            Row(name="left", values={p.stage: 0.25, p.after: "give"}),
-                            Row(name="right", values={p.stage: 0.75}, weight=2.5),
-                        ],
-                        order=Order.cycle,
-                    ),
-                    Factor(
-                        name="which",
-                        rows=[
-                            Row(name="cue", values={p.which: "show"}),
-                            Row(name="frame", values={p.which: "frame"}),
-                        ],
-                    ),
-                ],
-            ),
-        ],
-        rule=CountRule(5),
     )
 
 
@@ -206,8 +169,13 @@ def rebuilt(experiment: Experiment, directory: Path) -> tuple[list[StageData], s
     """The stages built by the Python written for ``experiment``, and that Python."""
     target = eject(experiment, directory, "a test")
     module = runpy.run_path(str(target))
-    stages = [value for value in module.values() if isinstance(value, Stage)]
-    return [stage.build()[0] for stage in stages], target.read_text()
+    stages: list[type[MachineTrial[Any]]] = module["scenes"]
+    machines = [value for value in module.values() if isinstance(value, Machine)]
+    built = [
+        machine.build(stage.name())
+        for stage, machine in zip(stages, machines, strict=True)
+    ]
+    return built, target.read_text()
 
 
 class EjectTests(unittest.TestCase):
@@ -224,8 +192,8 @@ class EjectTests(unittest.TestCase):
         self.assert_round_trip(load_experiment(EXAMPLE))
 
     def test_everything_the_format_has_comes_back_the_same(self) -> None:
-        stage, _ = everything().build()
-        self.assert_round_trip(Experiment(stages=[stage], animals=[]))
+        stage = everything().build("class")
+        self.assert_round_trip(Experiment(stages=[stage]))
 
     def test_the_machines_of_the_conformance_cases_come_back_the_same(self) -> None:
         cases = json.loads((FIXTURES / "conformance" / "cases.json").read_text())
@@ -239,15 +207,14 @@ class EjectTests(unittest.TestCase):
         self.assertIn("class States(StrEnum):", source)
         self.assertIn("    WAIT = auto()", source)
         # A name that is not what auto() gives keeps its spelling.
-        self.assertIn('    A_LEFT = "A left"', source)
+        self.assertIn('    A = "A"', source)
         self.assertIn("    on_left: StateParam[States] = States.REWARD", source)
         self.assertIn(
             "On(source=States.CHOICE, event=Rise(Inputs.LICK_LEFT), target=p.on_left)",
             source,
         )
-        self.assertIn("Choice(6000, 9500, 12000)", source)
         # No name is looked up by a string: the only ones left are colours.
-        body = source[source.index("discriminate = Stage(") :]
+        body = source[source.index("MACHINE = Machine(") :]
         strings = [
             node.value
             for node in ast.walk(ast.parse(body))
@@ -255,22 +222,28 @@ class EjectTests(unittest.TestCase):
         ]
         self.assertTrue(all(s.startswith("#") or s.endswith(".svg") for s in strings))
 
-    def test_stages_get_their_own_enums(self) -> None:
-        stage, _ = everything().build()
+    def test_stages_get_their_own_enums_and_classes(self) -> None:
+        stage = everything().build("class")
         other = stage.model_copy(update={"name": "class_"})
-        source = self.assert_round_trip(Experiment(stages=[stage, other], animals=[]))
+        source = self.assert_round_trip(Experiment(stages=[stage, other]))
 
         self.assertIn("class ClassStates(StrEnum):", source)
         self.assertIn("class Class2States(StrEnum):", source)
         self.assertIn('wait_ms: Time = Field(1500, alias="wait ms")', source)
+        self.assertIn("class Class(MachineTrial[ClassParams]):", source)
+        self.assertIn("scenes = [Class, Class2]", source)
 
-    def test_pictures_become_files_and_animal_values_are_kept(self) -> None:
-        experiment = load_experiment(EXAMPLE)
-        experiment.animals[0].values["choice_ms"] = 4000
-        source, files = python_source(experiment, "x")
+    def test_a_written_stage_runs_its_trials_with_the_defaults(self) -> None:
+        source = self.assert_round_trip(load_experiment(EXAMPLE))
+
+        self.assertIn("class Discriminate(MachineTrial[Params]):", source)
+        self.assertIn("        return Stages.DISCRIMINATE", source)
+        self.assertIn("        return Params()", source)
+
+    def test_pictures_become_files(self) -> None:
+        source, files = python_source(load_experiment(EXAMPLE), "x")
         self.assertEqual(len(files), 2)
         self.assertTrue(all(name.endswith(".svg") for name in files))
-        self.assertIn("animal_values={'mock_001': {'choice_ms': 4000}}", source)
         self.assertNotIn("data:image", source)
 
     def test_an_existing_file_is_not_written_over(self) -> None:
@@ -286,7 +259,7 @@ class EjectTests(unittest.TestCase):
             main(["eject", str(EXAMPLE), directory])
             written = (Path(directory) / "stages.py").read_text()
         self.assertIn("two_pictures.experiment.json", written)
-        self.assertIn("scenes = stage_scenes(discriminate)", written)
+        self.assertIn("scenes = [Discriminate]", written)
 
 
 if __name__ == "__main__":
