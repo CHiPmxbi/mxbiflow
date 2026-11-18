@@ -27,6 +27,7 @@ from .models import (
     BackgroundStimulus,
     ClearAction,
     CountProgression,
+    Duration,
     Experiment,
     Generator,
     ImageStimulus,
@@ -41,6 +42,7 @@ from .models import (
     TonesStimulus,
     Transition,
     Value1,
+    Value2,
     WavStimulus,
 )
 from .runner import EXIT
@@ -51,6 +53,7 @@ PARAMETERS = {
     "count": "add_count",
     "number": "add_number",
     "state": "add_target",
+    "stimulus": "add_stimulus_parameter",
 }
 
 
@@ -123,7 +126,7 @@ class _StageSource:
         self.parameters = {p.name: names.new(p.name) for p in machine.parameters}
         self.stimuli = {s.name: names.new(s.name) for s in machine.stimuli}
 
-    def _amount(self, value: Amount1 | ParamRef) -> ast.expr:
+    def _amount(self, value: Amount1 | Duration | ParamRef) -> ast.expr:
         if isinstance(value, ParamRef):
             return ast.Name(self.parameters[value.param])
         return _expr(value.root)
@@ -133,7 +136,9 @@ class _StageSource:
             return None
         return self._amount(value)
 
-    def _stimulus(self, name: str) -> ast.expr:
+    def _stimulus(self, name: str | ParamRef) -> ast.expr:
+        if isinstance(name, ParamRef):
+            return ast.Name(self.parameters[name.param])
         return ast.Name(self.stimuli[name]) if name in self.stimuli else _expr(name)
 
     def _event(self, event: str) -> ast.expr:
@@ -179,8 +184,11 @@ class _StageSource:
             if isinstance(s, BackgroundStimulus):
                 call = _call("stage.add_background", s.name, s.color)
             elif isinstance(s, TonesStimulus):
-                tones = [(t.frequency, t.duration) for t in s.tones]
-                call = _call("stage.add_tones", s.name, tones, s.duration)
+                tones = [
+                    (self._amount(t.frequency), self._amount(t.duration))
+                    for t in s.tones
+                ]
+                call = _call("stage.add_tones", s.name, tones, self._amount(s.duration))
             elif isinstance(s, WavStimulus):
                 path = None if s.sound is None else self._file(s.name, s.sound)
                 call = _call(
@@ -210,7 +218,7 @@ class _StageSource:
         if isinstance(action, ClearAction):
             self.used.add("clear")
             return _call("clear")
-        ((kind, name),) = action.model_dump().items()
+        ((kind, name),) = dict(action).items()
         self.used.add(kind)
         return _call(kind, self._stimulus(name))
 
@@ -251,21 +259,37 @@ class _StageSource:
             )
         )
 
-    def _level(self, level: Level) -> ast.stmt:
+    def _level(self, level: Level) -> list[ast.stmt]:
         values = {
-            name: value.uniform if isinstance(value, Value1) else value
+            name: value.uniform
+            if isinstance(value, Value1)
+            else value.choice
+            if isinstance(value, Value2)
+            else value
             for name, value in level.values.items()
         }
-        weights = {t.name: t.weight for t in level.types if t.weight != 1}
-        call = _call(
-            "stage.add_level",
-            level.name,
-            *([values] if values else []),
-            types={t.name: t.values for t in level.types} or None,
-            weights=weights or None,
-            order=None if level.order is Order.random else level.order.value,
-        )
-        return ast.Expr(call)
+        body: list[ast.stmt] = [
+            ast.Expr(
+                _call("stage.add_level", level.name, *([values] if values else []))
+            )
+        ]
+        for factor in level.factors:
+            weights = {row.name: row.weight for row in factor.rows if row.weight != 1}
+            body.append(
+                ast.Expr(
+                    _call(
+                        "stage.add_factor",
+                        level.name,
+                        factor.name,
+                        {row.name: row.values for row in factor.rows},
+                        weights=weights or None,
+                        order=None
+                        if factor.order is Order.random
+                        else factor.order.value,
+                    )
+                )
+            )
+        return body
 
     def _rule(self) -> list[ast.stmt]:
         rule = self.stage.progression
@@ -323,7 +347,8 @@ class _StageSource:
             ast.Expr(_call("stage.set_outcome", state, outcome.value))
             for state, outcome in stage.outcomes.items()
         ]
-        body += [self._level(level) for level in stage.levels]
+        for level in stage.levels:
+            body += self._level(level)
         body += self._rule()
         body.append(ast.Return(ast.Name("stage")))
         return ast.FunctionDef(

@@ -36,7 +36,7 @@ def stage(
     size: float = 20,
 ) -> dict[str, Any]:
     """Touch the target for a reward; leaving the beam ends the trial."""
-    level = {"values": {}, "types": [], "order": "random"}
+    level = {"values": {}, "factors": []}
     return {
         "name": name,
         "machine": {

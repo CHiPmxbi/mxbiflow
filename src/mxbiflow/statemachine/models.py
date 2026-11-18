@@ -62,6 +62,16 @@ class NumberParameter(BaseModel):
     default: float
 
 
+class StimulusParameter(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    name: Annotated[str, Field(min_length=1)]
+    type: Literal["stimulus"]
+    default: Annotated[str, Field(min_length=1)]
+
+
 class Amount1(RootModel[float]):
     root: Annotated[float, Field(ge=0.0)]
 
@@ -82,14 +92,6 @@ class StartAction(BaseModel):
     start: Annotated[str, Field(min_length=1)]
 
 
-class StopAction(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    stop: Annotated[str, Field(min_length=1)]
-
-
 class ResetAction(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -103,7 +105,7 @@ class ShowAction(BaseModel):
         extra="forbid",
         populate_by_name=True,
     )
-    show: Annotated[str, Field(min_length=1)]
+    show: ParamRef | Annotated[str, StringConstraints(min_length=1)]
 
 
 class HideAction(BaseModel):
@@ -111,7 +113,7 @@ class HideAction(BaseModel):
         extra="forbid",
         populate_by_name=True,
     )
-    hide: Annotated[str, Field(min_length=1)]
+    hide: ParamRef | Annotated[str, StringConstraints(min_length=1)]
 
 
 class ClearAction(BaseModel):
@@ -127,7 +129,7 @@ class PlayAction(BaseModel):
         extra="forbid",
         populate_by_name=True,
     )
-    play: Annotated[str, Field(min_length=1)]
+    play: ParamRef | Annotated[str, StringConstraints(min_length=1)]
 
 
 class Place(BaseModel):
@@ -176,29 +178,8 @@ class WavStimulus(BaseModel):
     duration: Annotated[float, Field(ge=0.0)]
 
 
-class Tone(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    frequency: Annotated[float, Field(ge=0.0)]
-    duration: Annotated[float, Field(gt=0.0)]
-
-
-class TonesStimulus(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    kind: Literal["tones"]
-    name: Annotated[str, Field(min_length=1)]
-    tones: list[Tone]
-    duration: Annotated[float, Field(gt=0.0)]
-
-
-class Order(StrEnum):
-    random = "random"
-    cycle = "cycle"
+class Duration(RootModel[float]):
+    root: Annotated[float, Field(gt=0.0)]
 
 
 class Value1(BaseModel):
@@ -209,7 +190,12 @@ class Value1(BaseModel):
     uniform: tuple[float, float]
 
 
-class TrialType(BaseModel):
+class Order(StrEnum):
+    random = "random"
+    cycle = "cycle"
+
+
+class Row(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         populate_by_name=True,
@@ -296,6 +282,14 @@ class Transition(BaseModel):
     target: ParamRef | Annotated[str, StringConstraints(min_length=1)]
 
 
+class StopAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    stop: ParamRef | Annotated[str, StringConstraints(min_length=1)]
+
+
 class ImageStimulus(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -372,6 +366,47 @@ class TextStimulus(BaseModel):
     text: str
 
 
+class Tone(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    frequency: Amount1 | ParamRef
+    duration: Duration | ParamRef
+
+
+class TonesStimulus(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    kind: Literal["tones"]
+    name: Annotated[str, Field(min_length=1)]
+    tones: list[Tone]
+    duration: Duration | ParamRef
+
+
+class Value2(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    choice: Annotated[
+        list[float | Annotated[str, StringConstraints(min_length=1)]],
+        Field(min_length=1),
+    ]
+
+
+class Factor(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    name: Annotated[str, Field(min_length=1)]
+    order: Order
+    rows: list[Row]
+
+
 class Timer(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -390,6 +425,19 @@ class Group(BaseModel):
     group: Annotated[str, StringConstraints(min_length=1)] | None
     hold: list[Annotated[str, StringConstraints(min_length=1)]]
     transitions: list[Transition]
+
+
+class Level(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    name: Annotated[str, Field(min_length=1)]
+    values: dict[
+        Annotated[str, StringConstraints(min_length=1)],
+        Value1 | Value2 | float | Annotated[str, StringConstraints(min_length=1)],
+    ]
+    factors: list[Factor]
 
 
 class State(BaseModel):
@@ -416,20 +464,6 @@ class State(BaseModel):
     transitions: list[Transition]
 
 
-class Level(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    name: Annotated[str, Field(min_length=1)]
-    values: dict[
-        Annotated[str, StringConstraints(min_length=1)],
-        Value1 | float | Annotated[str, StringConstraints(min_length=1)],
-    ]
-    types: list[TrialType]
-    order: Order
-
-
 class Machine(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -438,7 +472,11 @@ class Machine(BaseModel):
     channels: Channels
     parameters: list[
         Annotated[
-            TimeParameter | CountParameter | StateParameter | NumberParameter,
+            TimeParameter
+            | CountParameter
+            | StateParameter
+            | NumberParameter
+            | StimulusParameter,
             Field(discriminator="type"),
         ]
     ]

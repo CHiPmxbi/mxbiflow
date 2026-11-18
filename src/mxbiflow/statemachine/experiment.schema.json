@@ -185,6 +185,9 @@
         },
         {
           "$ref": "#/$defs/NumberParameter"
+        },
+        {
+          "$ref": "#/$defs/StimulusParameter"
         }
       ]
     },
@@ -271,6 +274,29 @@
         },
         "default": {
           "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "default"
+      ],
+      "additionalProperties": false
+    },
+    "StimulusParameter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "const": "stimulus"
+        },
+        "default": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -545,14 +571,24 @@
       "type": "object",
       "properties": {
         "stop": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/StimulusRef"
         }
       },
       "required": [
         "stop"
       ],
       "additionalProperties": false
+    },
+    "StimulusRef": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "$ref": "#/$defs/ParamRef"
+        }
+      ]
     },
     "ResetAction": {
       "type": "object",
@@ -571,8 +607,7 @@
       "type": "object",
       "properties": {
         "show": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/StimulusRef"
         }
       },
       "required": [
@@ -584,8 +619,7 @@
       "type": "object",
       "properties": {
         "hide": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/StimulusRef"
         }
       },
       "required": [
@@ -610,8 +644,7 @@
       "type": "object",
       "properties": {
         "play": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/StimulusRef"
         }
       },
       "required": [
@@ -1022,12 +1055,18 @@
             "type": "object",
             "properties": {
               "frequency": {
-                "type": "number",
-                "minimum": 0
+                "$ref": "#/$defs/Amount"
               },
               "duration": {
-                "type": "number",
-                "exclusiveMinimum": 0
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  {
+                    "$ref": "#/$defs/ParamRef"
+                  }
+                ]
               }
             },
             "required": [
@@ -1038,8 +1077,15 @@
           }
         },
         "duration": {
-          "type": "number",
-          "exclusiveMinimum": 0
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "$ref": "#/$defs/ParamRef"
+            }
+          ]
         }
       },
       "required": [
@@ -1067,25 +1113,17 @@
             "$ref": "#/$defs/Value"
           }
         },
-        "types": {
+        "factors": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/TrialType"
+            "$ref": "#/$defs/Factor"
           }
-        },
-        "order": {
-          "type": "string",
-          "enum": [
-            "random",
-            "cycle"
-          ]
         }
       },
       "required": [
         "name",
         "values",
-        "types",
-        "order"
+        "factors"
       ],
       "additionalProperties": false
     },
@@ -1116,6 +1154,22 @@
             "uniform"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "choice": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Fixed"
+              }
+            }
+          },
+          "required": [
+            "choice"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1130,7 +1184,35 @@
         }
       ]
     },
-    "TrialType": {
+    "Factor": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "order": {
+          "type": "string",
+          "enum": [
+            "random",
+            "cycle"
+          ]
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Row"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "order",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "Row": {
       "type": "object",
       "properties": {
         "name": {

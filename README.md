@@ -273,7 +273,7 @@ from `~/.config/mxbi/frequency_response_table.json` instead.
 ## cogforge experiments
 
 An experiment designed in cogforge (stages, each a trial state machine with levels,
-trial types, outcomes and level rules) runs without stage code:
+factors, outcomes and level rules) runs without stage code:
 
 ```python
 from mxbiflow.statemachine import load_experiment, machine_scenes
@@ -319,12 +319,22 @@ runner and the host logic pass cogforge's conformance cases
   the rig's screen, or a centre outside it, stops the run with the stimulus's name.
 - **Animals**: stage and level come from the session configuration; level `n` is the
   stage's `n`-th level, from 1. The experiment file's animals only give their own
-  parameter values. Counts at the level are the session's; the trial-type cursor is in
+  parameter values. Counts at the level are the session's; the cursors of factors taken in turn are in
   the stage's context `machine`.
 - **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl` with
-  cogforge's fields (`animal`, `trial`, `stage`, `level`, `type`, `values`, `outcome`,
+  cogforge's fields (`animal`, `trial`, `stage`, `level`, `factors`, `values`, `outcome`,
   `action`, `states`, `events`). A trial stopped because the animal left or the run
   ended is recorded but does not count towards the level rules.
+
+- **Levels**: a trial's parameters are the defaults, then the level's values (a range
+  or a choice drawn anew), then one row of each of the level's factors, then the
+  animal's own. A factor is what varies on its own from trial to trial (the side, the
+  sound); its rows are drawn by weight or taken in turn. A `stimulus` parameter names
+  the stimulus to show or play, and a tone's frequency and length may be parameters.
+  A level that cannot be drawn as written is refused when the scenes are made: a
+  parameter set by the level and a factor or by two factors, a factor without rows or
+  with only zero weights, a stimulus parameter naming no stimulus of its use
+  (`mxbiflow.statemachine.validate`).
 
 ### A state machine written in Python
 
@@ -338,7 +348,8 @@ from mxbiflow.statemachine.builder import EXIT, StageBuilder, clear, show, stage
 
 stage = StageBuilder("touch", outputs=["reward"])
 reward_ms = stage.add_time("reward_ms", 500)
-target = stage.add_circle("target", x=0.5, y=0.3, width=0.3, height=0.3, color="#ffffff")
+target_x = stage.add_number("target_x", 0.5)
+target = stage.add_circle("target", x=target_x, y=0.3, width=0.3, height=0.3, color="#ffffff")
 
 stage.add_state("wait", on_entry=[show(target)], timeout=5000)
 stage.add_state("judge", on_entry=[clear()])
@@ -358,7 +369,8 @@ stage.set_outcome("fast", "correct")
 stage.set_outcome("slow", "correct")
 stage.set_outcome("miss", "incorrect")
 stage.add_level("1", {"reward_ms": 500})
-stage.add_level("2", {"reward_ms": 300})
+late = stage.add_level("2", {"reward_ms": [200, 300]})  # a list: one is drawn per trial
+stage.add_factor(late, "place", {"left": {"target_x": 0.3}, "right": {"target_x": 0.7}})
 stage.set_rate_rule(min_trials=20, up=0.8, down=0.2)
 
 

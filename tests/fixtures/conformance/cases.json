@@ -213,8 +213,7 @@
             {
               "name": "1",
               "values": {},
-              "types": [],
-              "order": "random"
+              "factors": []
             }
           ],
           "progression": {
@@ -486,8 +485,7 @@
             {
               "name": "1",
               "values": {},
-              "types": [],
-              "order": "random"
+              "factors": []
             }
           ],
           "progression": {
@@ -760,8 +758,7 @@
             {
               "name": "1",
               "values": {},
-              "types": [],
-              "order": "random"
+              "factors": []
             }
           ],
           "progression": {
@@ -1037,8 +1034,7 @@
             {
               "name": "1",
               "values": {},
-              "types": [],
-              "order": "random"
+              "factors": []
             }
           ],
           "progression": {
@@ -1294,8 +1290,7 @@
             {
               "name": "1",
               "values": {},
-              "types": [],
-              "order": "random"
+              "factors": []
             }
           ],
           "progression": {
@@ -1554,8 +1549,7 @@
             {
               "name": "1",
               "values": {},
-              "types": [],
-              "order": "random"
+              "factors": []
             }
           ],
           "progression": {
@@ -1653,6 +1647,11 @@
                 "name": "b_x",
                 "type": "number",
                 "default": 0.75
+              },
+              {
+                "name": "cue_hz",
+                "type": "number",
+                "default": 9500
               }
             ],
             "timers": [],
@@ -1844,7 +1843,9 @@
                 "name": "cue",
                 "tones": [
                   {
-                    "frequency": 9500,
+                    "frequency": {
+                      "param": "cue_hz"
+                    },
                     "duration": 100
                   },
                   {
@@ -1866,29 +1867,34 @@
               "values": {
                 "choice_ms": 10000
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             },
             {
               "name": "2",
@@ -1898,31 +1904,43 @@
                     3000,
                     5000
                   ]
+                },
+                "cue_hz": {
+                  "choice": [
+                    6000,
+                    9500,
+                    12000
+                  ]
                 }
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             }
           ],
           "progression": {
@@ -1949,7 +1967,8 @@
       "reward_ms": 50,
       "choice_ms": 10000,
       "a_x": 0.25,
-      "b_x": 0.75
+      "b_x": 0.75,
+      "cue_hz": 9500
     },
     "initial": {},
     "steps": [
@@ -2032,6 +2051,11 @@
                 "name": "b_x",
                 "type": "number",
                 "default": 0.75
+              },
+              {
+                "name": "cue_hz",
+                "type": "number",
+                "default": 9500
               }
             ],
             "timers": [],
@@ -2219,7 +2243,9 @@
                 "name": "cue",
                 "tones": [
                   {
-                    "frequency": 9500,
+                    "frequency": {
+                      "param": "cue_hz"
+                    },
                     "duration": 100
                   },
                   {
@@ -2241,29 +2267,34 @@
               "values": {
                 "choice_ms": 10000
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             },
             {
               "name": "2",
@@ -2273,31 +2304,43 @@
                     3000,
                     5000
                   ]
+                },
+                "cue_hz": {
+                  "choice": [
+                    6000,
+                    9500,
+                    12000
+                  ]
                 }
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             }
           ],
           "progression": {
@@ -2324,7 +2367,8 @@
       "reward_ms": 50,
       "choice_ms": 10000,
       "a_x": 0.75,
-      "b_x": 0.25
+      "b_x": 0.25,
+      "cue_hz": 9500
     },
     "initial": {},
     "steps": [
@@ -2409,6 +2453,11 @@
                 "name": "b_x",
                 "type": "number",
                 "default": 0.75
+              },
+              {
+                "name": "cue_hz",
+                "type": "number",
+                "default": 9500
               }
             ],
             "timers": [],
@@ -2596,7 +2645,9 @@
                 "name": "cue",
                 "tones": [
                   {
-                    "frequency": 9500,
+                    "frequency": {
+                      "param": "cue_hz"
+                    },
                     "duration": 100
                   },
                   {
@@ -2618,29 +2669,34 @@
               "values": {
                 "choice_ms": 10000
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             },
             {
               "name": "2",
@@ -2650,31 +2706,43 @@
                     3000,
                     5000
                   ]
+                },
+                "cue_hz": {
+                  "choice": [
+                    6000,
+                    9500,
+                    12000
+                  ]
                 }
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             }
           ],
           "progression": {
@@ -2701,7 +2769,8 @@
       "reward_ms": 50,
       "choice_ms": 10000,
       "a_x": 0.25,
-      "b_x": 0.75
+      "b_x": 0.75,
+      "cue_hz": 9500
     },
     "initial": {},
     "steps": [
@@ -2747,7 +2816,7 @@
   },
   {
     "kind": "draw",
-    "name": "two pictures, level 1: a low random number draws the first trial type",
+    "name": "two pictures, level 1: a low random number draws the first side",
     "experiment": {
       "stages": [
         {
@@ -2793,6 +2862,11 @@
                 "name": "b_x",
                 "type": "number",
                 "default": 0.75
+              },
+              {
+                "name": "cue_hz",
+                "type": "number",
+                "default": 9500
               }
             ],
             "timers": [],
@@ -2984,7 +3058,9 @@
                 "name": "cue",
                 "tones": [
                   {
-                    "frequency": 9500,
+                    "frequency": {
+                      "param": "cue_hz"
+                    },
                     "duration": 100
                   },
                   {
@@ -3006,29 +3082,34 @@
               "values": {
                 "choice_ms": 10000
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             },
             {
               "name": "2",
@@ -3038,31 +3119,43 @@
                     3000,
                     5000
                   ]
+                },
+                "cue_hz": {
+                  "choice": [
+                    6000,
+                    9500,
+                    12000
+                  ]
                 }
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             }
           ],
           "progression": {
@@ -3088,27 +3181,30 @@
       "level": 0,
       "trials": 0,
       "correct": 0,
-      "cursor": 0
+      "cursors": {}
     },
     "random": [
       0.2
     ],
     "expected": {
-      "type": "A left",
+      "factors": {
+        "side": "A left"
+      },
       "values": {
         "on_left": "reward",
         "on_right": "error",
         "reward_ms": 50,
         "choice_ms": 10000,
         "a_x": 0.25,
-        "b_x": 0.75
+        "b_x": 0.75,
+        "cue_hz": 9500
       },
-      "cursor": 0
+      "cursors": {}
     }
   },
   {
     "kind": "draw",
-    "name": "two pictures, level 2: a range is drawn and rounded, then the trial type",
+    "name": "two pictures, level 2: a range drawn and rounded, a choice, then the side",
     "experiment": {
       "stages": [
         {
@@ -3154,6 +3250,11 @@
                 "name": "b_x",
                 "type": "number",
                 "default": 0.75
+              },
+              {
+                "name": "cue_hz",
+                "type": "number",
+                "default": 9500
               }
             ],
             "timers": [],
@@ -3345,7 +3446,9 @@
                 "name": "cue",
                 "tones": [
                   {
-                    "frequency": 9500,
+                    "frequency": {
+                      "param": "cue_hz"
+                    },
                     "duration": 100
                   },
                   {
@@ -3367,29 +3470,34 @@
               "values": {
                 "choice_ms": 10000
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             },
             {
               "name": "2",
@@ -3399,31 +3507,43 @@
                     3000,
                     5000
                   ]
+                },
+                "cue_hz": {
+                  "choice": [
+                    6000,
+                    9500,
+                    12000
+                  ]
                 }
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             }
           ],
           "progression": {
@@ -3449,23 +3569,27 @@
       "level": 1,
       "trials": 0,
       "correct": 0,
-      "cursor": 0
+      "cursors": {}
     },
     "random": [
       0.3337,
+      0.7,
       0.9
     ],
     "expected": {
-      "type": "A right",
+      "factors": {
+        "side": "A right"
+      },
       "values": {
         "on_left": "error",
         "on_right": "reward",
         "reward_ms": 50,
         "choice_ms": 3667,
         "a_x": 0.75,
-        "b_x": 0.25
+        "b_x": 0.25,
+        "cue_hz": 12000
       },
-      "cursor": 0
+      "cursors": {}
     }
   },
   {
@@ -3516,6 +3640,11 @@
                 "name": "b_x",
                 "type": "number",
                 "default": 0.75
+              },
+              {
+                "name": "cue_hz",
+                "type": "number",
+                "default": 9500
               }
             ],
             "timers": [],
@@ -3707,7 +3836,9 @@
                 "name": "cue",
                 "tones": [
                   {
-                    "frequency": 9500,
+                    "frequency": {
+                      "param": "cue_hz"
+                    },
                     "duration": 100
                   },
                   {
@@ -3729,29 +3860,34 @@
               "values": {
                 "choice_ms": 10000
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             },
             {
               "name": "2",
@@ -3761,31 +3897,43 @@
                     3000,
                     5000
                   ]
+                },
+                "cue_hz": {
+                  "choice": [
+                    6000,
+                    9500,
+                    12000
+                  ]
                 }
               },
-              "types": [
+              "factors": [
                 {
-                  "name": "A left",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "reward",
-                    "on_right": "error",
-                    "a_x": 0.25,
-                    "b_x": 0.75
-                  }
-                },
-                {
-                  "name": "A right",
-                  "weight": 1,
-                  "values": {
-                    "on_left": "error",
-                    "on_right": "reward",
-                    "a_x": 0.75,
-                    "b_x": 0.25
-                  }
+                  "name": "side",
+                  "order": "random",
+                  "rows": [
+                    {
+                      "name": "A left",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "reward",
+                        "on_right": "error",
+                        "a_x": 0.25,
+                        "b_x": 0.75
+                      }
+                    },
+                    {
+                      "name": "A right",
+                      "weight": 1,
+                      "values": {
+                        "on_left": "error",
+                        "on_right": "reward",
+                        "a_x": 0.75,
+                        "b_x": 0.25
+                      }
+                    }
+                  ]
                 }
-              ],
-              "order": "random"
+              ]
             }
           ],
           "progression": {
@@ -3810,7 +3958,7 @@
       "level": 0,
       "trials": 0,
       "correct": 0,
-      "cursor": 0
+      "cursors": {}
     },
     "outcomes": [
       "correct",
@@ -3841,7 +3989,7 @@
           "level": 0,
           "trials": 1,
           "correct": 1,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3851,7 +3999,7 @@
           "level": 0,
           "trials": 2,
           "correct": 2,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3861,7 +4009,7 @@
           "level": 0,
           "trials": 3,
           "correct": 3,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3871,7 +4019,7 @@
           "level": 0,
           "trials": 4,
           "correct": 4,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3881,7 +4029,7 @@
           "level": 0,
           "trials": 5,
           "correct": 5,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3891,7 +4039,7 @@
           "level": 0,
           "trials": 6,
           "correct": 6,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3901,7 +4049,7 @@
           "level": 0,
           "trials": 7,
           "correct": 7,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3911,7 +4059,7 @@
           "level": 0,
           "trials": 8,
           "correct": 8,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3921,7 +4069,7 @@
           "level": 0,
           "trials": 9,
           "correct": 8,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3931,7 +4079,7 @@
           "level": 1,
           "trials": 0,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "level up"
       },
@@ -3941,7 +4089,7 @@
           "level": 1,
           "trials": 1,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3951,7 +4099,7 @@
           "level": 1,
           "trials": 2,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3961,7 +4109,7 @@
           "level": 1,
           "trials": 3,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3971,7 +4119,7 @@
           "level": 1,
           "trials": 4,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3981,7 +4129,7 @@
           "level": 1,
           "trials": 5,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -3991,7 +4139,7 @@
           "level": 1,
           "trials": 6,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -4001,7 +4149,7 @@
           "level": 1,
           "trials": 7,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -4011,7 +4159,7 @@
           "level": 1,
           "trials": 8,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -4021,7 +4169,7 @@
           "level": 1,
           "trials": 9,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "none"
       },
@@ -4031,7 +4179,7 @@
           "level": 0,
           "trials": 0,
           "correct": 0,
-          "cursor": 0
+          "cursors": {}
         },
         "action": "level down"
       }
