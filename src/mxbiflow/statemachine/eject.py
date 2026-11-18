@@ -1,9 +1,10 @@
 """Turn an experiment file into Python that builds the same stages.
 
-The code written is what one would write by hand with :class:`~.builder.StageBuilder`:
-one function per stage, pictures and sounds as files beside it. It is for the day a
-stage needs Python hooks; from then on the Python file is the experiment, since hooks
-cannot go back into the file. cogforge's node positions (``layout``) are left out.
+The code written is what one would write by hand with :mod:`~.stage`: every name an
+enum member, a trial's parameters a model, and states, transitions, stimuli and levels
+models that refer to them; pictures and sounds become files beside it. It is for the
+day a stage needs Python hooks; from then on the Python file is the experiment, since
+hooks cannot go back into the file. cogforge's node positions (``layout``) are left out.
 
 The source is a syntax tree printed by ``ast.unparse``, so it is valid Python whatever
 the names and texts are.
@@ -17,11 +18,11 @@ import re
 import subprocess
 import sys
 import urllib.request
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
-from . import builder
+from . import stage as stage_module
 from .models import (
     Amount1,
     BackgroundStimulus,
@@ -29,7 +30,7 @@ from .models import (
     CountProgression,
     Duration,
     Experiment,
-    Generator,
+    Factor,
     ImageStimulus,
     Level,
     Order,
@@ -40,7 +41,6 @@ from .models import (
     State,
     TextStimulus,
     TonesStimulus,
-    Transition,
     Value1,
     Value2,
     WavStimulus,
@@ -48,25 +48,32 @@ from .models import (
 from .runner import EXIT
 
 ASSETS = "assets"
-PARAMETERS = {
-    "time": "add_time",
-    "count": "add_count",
-    "number": "add_number",
-    "state": "add_target",
-    "stimulus": "add_stimulus_parameter",
+ANNOTATIONS = {"time": "Time", "count": "Count", "number": "float"}
+SUFFIXES = {
+    "rise": "Rise",
+    "fall": "Fall",
+    "high": "High",
+    "low": "Low",
+    "reached": "Reached",
+    "done": "Done",
+    "touch": "Touch",
 }
 
 
 class _Names:
     """Python names for the format's names, unique in one scope."""
 
-    def __init__(self, taken: Sequence[str]) -> None:
+    def __init__(self, taken: Iterable[str], lead: str = "_") -> None:
         self._taken = set(taken)
+        # What goes before a name that does not start as a Python name does.
+        self._lead = lead
 
     def new(self, name: str) -> str:
         base = re.sub(r"\W", "_", name)
+        if self._lead != "_":
+            base = base.lstrip("_")
         if not base or base[0].isdigit():
-            base = f"_{base}"
+            base = f"{self._lead}{base}"
         if keyword.iskeyword(base):
             base = f"{base}_"
         candidate, n = base, 1
@@ -113,45 +120,135 @@ def _media(data_url: str) -> tuple[str, bytes]:
         return response.headers.get_content_type(), response.read()
 
 
-class _StageSource:
-    """The function that builds one stage."""
+class _Enum:
+    """An enum of the format's names of one kind: its class and its members."""
 
-    def __init__(self, stage: Stage, function: str, files: dict[str, bytes]) -> None:
+    def __init__(self, name: str, values: Iterable[str]) -> None:
+        self.name = name
+        names = _Names([])
+        self.members = {value: names.new(value).upper() for value in values}
+
+    def __contains__(self, value: str) -> bool:
+        return value in self.members
+
+    def ref(self, value: str) -> ast.expr:
+        return ast.Attribute(ast.Name(self.name), self.members[value])
+
+    def definition(self) -> ast.ClassDef:
+        """``class States(StrEnum)``; ``auto()`` where it gives the name."""
+        body: list[ast.stmt] = [
+            ast.Assign(
+                [ast.Name(member, ast.Store())],
+                _call("auto") if member.lower() == value else ast.Constant(value),
+                lineno=0,
+            )
+            for value, member in self.members.items()
+        ]
+        return ast.ClassDef(self.name, [ast.Name("StrEnum")], [], body, [])
+
+
+class _StageSource:
+    """The enums, the parameters and the model of one stage."""
+
+    def __init__(
+        self, stage: Stage, prefix: str, variable: str, files: dict[str, bytes]
+    ) -> None:
         self.stage = stage
-        self.function = function
+        self.variable = variable
         self.files = files
-        self.used: set[str] = {"StageBuilder"}
-        names = _Names(["stage", "ASSETS", "Path", *builder.__all__])
+        self.used: set[str] = {"Stage", "State"}
         machine = stage.machine
-        self.parameters = {p.name: names.new(p.name) for p in machine.parameters}
-        self.stimuli = {s.name: names.new(s.name) for s in machine.stimuli}
+        levels = stage.levels
+        factors = [factor for level in levels for factor in level.factors]
+        hosts = [
+            t.event.removeprefix("host.")
+            for holder in (*machine.states, *machine.groups)
+            for t in holder.transitions
+            if t.event.startswith("host.")
+        ]
+        kinds: dict[str, Iterable[str]] = {
+            "States": [s.name for s in machine.states],
+            "Groups": [g.name for g in machine.groups],
+            "Stimuli": [s.name for s in machine.stimuli],
+            "Inputs": machine.channels.inputs,
+            "Outputs": machine.channels.outputs,
+            "Timers": [t.name for t in machine.timers],
+            "Generators": [g.name for g in machine.generators],
+            "Counters": [c.name for c in machine.counters],
+            "Levels": [level.name for level in levels if not level.name.isdecimal()],
+            "Factors": [factor.name for factor in factors],
+            "Rows": [row.name for factor in factors for row in factor.rows],
+            "HostEvents": hosts,
+        }
+        self.enums = {
+            kind: _Enum(f"{prefix}{kind}", dict.fromkeys(values))
+            for kind, values in kinds.items()
+        }
+        self.params_class = f"{prefix}Params"
+        self.refs = f"{variable}_p" if prefix else "p"
+        # A model's field cannot start with an underscore or be one of its methods.
+        fields = _Names(dir(stage_module.TrialParams), lead="p")
+        self.parameters = {p.name: fields.new(p.name) for p in machine.parameters}
+
+    # ---- references ------------------------------------------------------------
+
+    def _name(self, kind: str, value: str) -> ast.expr:
+        return self.enums[kind].ref(value)
+
+    def _param(self, name: str) -> ast.expr:
+        return ast.Attribute(ast.Name(self.refs), self.parameters[name])
 
     def _amount(self, value: Amount1 | Duration | ParamRef) -> ast.expr:
-        if isinstance(value, ParamRef):
-            return ast.Name(self.parameters[value.param])
-        return _expr(value.root)
+        return (
+            self._param(value.param)
+            if isinstance(value, ParamRef)
+            else _expr(value.root)
+        )
 
     def _unless(self, value: Amount1 | ParamRef, default: float) -> ast.expr | None:
         if isinstance(value, Amount1) and value.root == default:
             return None
         return self._amount(value)
 
-    def _stimulus(self, name: str | ParamRef) -> ast.expr:
-        if isinstance(name, ParamRef):
-            return ast.Name(self.parameters[name.param])
-        return ast.Name(self.stimuli[name]) if name in self.stimuli else _expr(name)
+    def _of(self, kinds: Sequence[str], value: str | ParamRef, where: str) -> ast.expr:
+        """A name of one of these kinds, or a parameter that names one."""
+        if isinstance(value, ParamRef):
+            return self._param(value.param)
+        for kind in kinds:
+            if value in self.enums[kind]:
+                return self._name(kind, value)
+        raise ValueError(
+            f'stage "{self.stage.name}", {where}: nothing is named "{value}"'
+        )
 
-    def _event(self, event: str) -> ast.expr:
-        """``f"{target}.touch"`` for a stimulus's event, so a rename is one edit."""
+    def _target(self, value: str | ParamRef, where: str) -> ast.expr:
+        if value == EXIT:
+            self.used.add("EXIT")
+            return ast.Name("EXIT")
+        return self._of(["States"], value, where)
+
+    def _model(self, name: str, *args: Any, **kwargs: Any) -> ast.Call:
+        self.used.add(name)
+        return _call(name, *args, **kwargs)
+
+    def _event(self, event: str, where: str) -> ast.Call:
+        if event == "timeout":
+            return self._model("Timeout")
+        if event == "screen.touch":
+            return self._model("ScreenTouch")
+        if event.startswith("host."):
+            return self._model("Host", self._name("HostEvents", event[5:]))
         name, _, suffix = event.rpartition(".")
-        if name in self.stimuli and suffix in ("touch", "done"):
-            return ast.JoinedStr(
-                [
-                    ast.FormattedValue(ast.Name(self.stimuli[name]), -1),
-                    ast.Constant(f".{suffix}"),
-                ]
+        kinds = {
+            "reached": ["Counters"],
+            "done": ["Timers", "Generators", "Stimuli"],
+            "touch": ["Stimuli"],
+        }.get(suffix, ["Inputs"])
+        if suffix not in SUFFIXES:
+            raise ValueError(
+                f'stage "{self.stage.name}", {where}: the event "{event}" is not known'
             )
-        return _expr(event)
+        return self._model(SUFFIXES[suffix], self._of(kinds, name, where))
 
     def _file(self, stimulus: str, data_url: str) -> ast.expr:
         media, data = _media(data_url)
@@ -162,202 +259,275 @@ class _StageSource:
                 f"no file extension for {media}"
             )
         taken = _Names([Path(name).stem for name in self.files])
-        name = taken.new(f"{self.function}_{stimulus}") + extension
+        name = taken.new(f"{self.variable}_{stimulus}") + extension
         self.files[name] = data
         return ast.BinOp(ast.Name("ASSETS"), ast.Div(), ast.Constant(name))
 
-    def _assign(self, variable: str, call: ast.Call) -> ast.stmt:
-        return ast.Assign([ast.Name(variable, ast.Store())], call, lineno=0)
+    # ---- the pieces -------------------------------------------------------------
 
-    def _parameters(self) -> list[ast.stmt]:
-        return [
-            self._assign(
-                self.parameters[p.name],
-                _call(f"stage.{PARAMETERS[p.type]}", p.name, p.default),
+    def _params(self) -> list[ast.stmt]:
+        """``class Params(TrialParams)`` and ``p = Params.refs()``."""
+        machine = self.stage.machine
+        if not machine.parameters:
+            return []
+        self.used.add("TrialParams")
+        body: list[ast.stmt] = []
+        for parameter in machine.parameters:
+            field = self.parameters[parameter.name]
+            default: Any = parameter.default
+            annotation = ANNOTATIONS.get(parameter.type, "str")
+            if parameter.type in ("time", "count"):
+                self.used.add(annotation)
+            elif parameter.type == "state":
+                default = self._target(parameter.default, parameter.name)
+                if parameter.default != EXIT:
+                    annotation = self.enums["States"].name
+            elif parameter.type == "stimulus":
+                default = self._of(["Stimuli"], parameter.default, parameter.name)
+                annotation = self.enums["Stimuli"].name
+            if field != parameter.name:
+                default = _call("Field", default, alias=parameter.name)
+            body.append(
+                ast.AnnAssign(
+                    ast.Name(field, ast.Store()),
+                    ast.Name(annotation),
+                    _expr(default),
+                    simple=1,
+                )
             )
-            for p in self.stage.machine.parameters
+        return [
+            ast.ClassDef(self.params_class, [ast.Name("TrialParams")], [], body, []),
+            ast.Assign(
+                [ast.Name(self.refs, ast.Store())],
+                _call(f"{self.params_class}.refs"),
+                lineno=0,
+            ),
         ]
 
-    def _stimuli(self) -> list[ast.stmt]:
-        body: list[ast.stmt] = []
+    @property
+    def needs_field(self) -> bool:
+        return any(field != name for name, field in self.parameters.items())
+
+    def _stimuli(self) -> list[ast.expr]:
+        stimuli: list[ast.expr] = []
         for s in self.stage.machine.stimuli:
+            name = self._name("Stimuli", s.name)
             if isinstance(s, BackgroundStimulus):
-                call = _call("stage.add_background", s.name, s.color)
+                stimuli.append(self._model("Background", name, s.color))
             elif isinstance(s, TonesStimulus):
                 tones = [
                     (self._amount(t.frequency), self._amount(t.duration))
                     for t in s.tones
                 ]
-                call = _call("stage.add_tones", s.name, tones, self._amount(s.duration))
+                stimuli.append(
+                    self._model("Tones", name, tones, self._amount(s.duration))
+                )
             elif isinstance(s, WavStimulus):
                 path = None if s.sound is None else self._file(s.name, s.sound)
-                call = _call(
-                    "stage.add_wav", s.name, _expr(path), duration_ms=s.duration
+                stimuli.append(
+                    self._model("Wav", name, _expr(path), duration_ms=s.duration)
                 )
             else:
-                where: dict[str, Any] = {
-                    "x": self._amount(s.x),
-                    "y": self._amount(s.y),
-                    "width": s.width,
-                    "height": s.height,
-                    "color": None if isinstance(s, ImageStimulus) else s.color,
-                    "size": None if s.size is Size.fraction else s.size.value,
-                }
-                first: list[Any] = [s.name]
+                first: list[Any] = [name]
                 if isinstance(s, ImageStimulus):
                     first.append(
                         _expr(None if s.image is None else self._file(s.name, s.image))
                     )
                 elif isinstance(s, TextStimulus):
                     first.append(s.text)
-                call = _call(f"stage.add_{s.kind}", *first, **where)
-            body.append(self._assign(self.stimuli[s.name], call))
-        return body
-
-    def _action(self, action: Any) -> ast.Call:
-        if isinstance(action, ClearAction):
-            self.used.add("clear")
-            return _call("clear")
-        ((kind, name),) = dict(action).items()
-        self.used.add(kind)
-        return _call(kind, self._stimulus(name))
-
-    def _state(self, state: State) -> ast.stmt:
-        call = _call(
-            "stage.add_state",
-            state.name,
-            hold=state.hold or None,
-            timeout=None if state.timeout is None else self._amount(state.timeout),
-            on_entry=[self._action(a) for a in state.on_entry] or None,
-            group=state.group,
-        )
-        return ast.Expr(call)
-
-    def _transition(self, source: str, transition: Transition) -> ast.stmt:
-        target: ast.expr
-        if isinstance(transition.target, ParamRef):
-            target = ast.Name(self.parameters[transition.target.param])
-        elif transition.target == EXIT:
-            self.used.add("EXIT")
-            target = ast.Name("EXIT")
-        else:
-            target = _expr(transition.target)
-        return ast.Expr(
-            _call("stage.add_transition", source, self._event(transition.event), target)
-        )
-
-    def _generator(self, g: Generator) -> ast.stmt:
-        return ast.Expr(
-            _call(
-                "stage.add_generator",
-                g.name,
-                g.output,
-                width=self._amount(g.width),
-                delay=self._unless(g.delay, 0),
-                period=self._unless(g.period, 0),
-                count=self._unless(g.count, 1),
-            )
-        )
-
-    def _level(self, level: Level) -> list[ast.stmt]:
-        values = {
-            name: value.uniform
-            if isinstance(value, Value1)
-            else value.choice
-            if isinstance(value, Value2)
-            else value
-            for name, value in level.values.items()
-        }
-        body: list[ast.stmt] = [
-            ast.Expr(
-                _call("stage.add_level", level.name, *([values] if values else []))
-            )
-        ]
-        for factor in level.factors:
-            weights = {row.name: row.weight for row in factor.rows if row.weight != 1}
-            body.append(
-                ast.Expr(
-                    _call(
-                        "stage.add_factor",
-                        level.name,
-                        factor.name,
-                        {row.name: row.values for row in factor.rows},
-                        weights=weights or None,
-                        order=None
-                        if factor.order is Order.random
-                        else factor.order.value,
+                size = None
+                if s.size is not Size.fraction:
+                    self.used.add("Size")
+                    size = ast.Attribute(ast.Name("Size"), s.size.name)
+                stimuli.append(
+                    self._model(
+                        s.kind.capitalize(),
+                        *first,
+                        x=self._amount(s.x),
+                        y=self._amount(s.y),
+                        width=s.width,
+                        height=s.height,
+                        color=None if isinstance(s, ImageStimulus) else s.color,
+                        size=size,
                     )
                 )
-            )
-        return body
+        return stimuli
 
-    def _rule(self) -> list[ast.stmt]:
+    def _action(self, action: Any, where: str) -> ast.Call:
+        if isinstance(action, ClearAction):
+            return self._model("Clear")
+        ((kind, name),) = dict(action).items()
+        kinds = {
+            "show": ["Stimuli"],
+            "hide": ["Stimuli"],
+            "play": ["Stimuli"],
+            "start": ["Timers", "Generators"],
+            "stop": ["Timers", "Generators", "Stimuli"],
+            "reset": ["Counters"],
+        }[kind]
+        return self._model(kind.capitalize(), self._of(kinds, name, where))
+
+    def _state(self, state: State) -> ast.Call:
+        outcome = self.stage.outcomes.get(state.name)
+        if outcome is not None:
+            self.used.add("Outcome")
+        return self._model(
+            "State",
+            self._name("States", state.name),
+            timeout=None if state.timeout is None else self._amount(state.timeout),
+            hold=[self._name("Outputs", name) for name in state.hold] or None,
+            on_entry=[self._action(a, state.name) for a in state.on_entry] or None,
+            group=None if state.group is None else self._name("Groups", state.group),
+            outcome=None
+            if outcome is None
+            else ast.Attribute(ast.Name("Outcome"), outcome.name),
+        )
+
+    def _values(self, values: dict[str, Any], where: str) -> ast.Dict:
+        """Values by parameter; a state or a stimulus as its enum member."""
+        types = {p.name: p.type for p in self.stage.machine.parameters}
+
+        def fixed(parameter: str, value: Any) -> Any:
+            if not isinstance(value, str):
+                return value
+            if types.get(parameter) == "state":
+                return self._target(value, where)
+            return self._of(["Stimuli", "States"], value, where)
+
+        items: dict[str, Any] = {}
+        for parameter, value in values.items():
+            if isinstance(value, Value1):
+                items[parameter] = self._model("Uniform", *value.uniform)
+            elif isinstance(value, Value2):
+                items[parameter] = self._model(
+                    "Choice", *(fixed(parameter, item) for item in value.choice)
+                )
+            else:
+                items[parameter] = fixed(parameter, value)
+        return ast.Dict(
+            [self._param(parameter) for parameter in items],
+            [_expr(value) for value in items.values()],
+        )
+
+    def _factor(self, factor: Factor, where: str) -> ast.Call:
+        order = None
+        if factor.order is not Order.random:
+            self.used.add("Order")
+            order = ast.Attribute(ast.Name("Order"), factor.order.name)
+        rows = [
+            self._model(
+                "Row",
+                self._name("Rows", row.name),
+                *([self._values(row.values, where)] if row.values else []),
+                weight=None if row.weight == 1 else row.weight,
+            )
+            for row in factor.rows
+        ]
+        return self._model(
+            "Factor", self._name("Factors", factor.name), rows, order=order
+        )
+
+    def _level(self, level: Level) -> ast.Call:
+        name = (
+            int(level.name)
+            if level.name.isdecimal() and str(int(level.name)) == level.name
+            else self._name("Levels", level.name)
+        )
+        return self._model(
+            "Level",
+            name,
+            *([self._values(level.values, level.name)] if level.values else []),
+            factors=[self._factor(f, level.name) for f in level.factors] or None,
+        )
+
+    def _rule(self) -> ast.expr | None:
         rule = self.stage.progression
         if isinstance(rule, RateProgression):
-            call = _call(
-                "stage.set_rate_rule",
-                min_trials=rule.min_trials,
-                up=rule.up,
-                down=rule.down,
+            return self._model(
+                "RateRule", min_trials=rule.min_trials, up=rule.up, down=rule.down
             )
-        elif isinstance(rule, CountProgression):
-            call = _call("stage.set_count_rule", rule.correct)
-        else:
-            return []
-        return [ast.Expr(call)]
+        if isinstance(rule, CountProgression):
+            return self._model("CountRule", rule.correct)
+        return None
 
-    def definition(self) -> ast.FunctionDef:
+    def definitions(self, stage_name: ast.expr) -> list[ast.stmt]:
+        """The stage's enums, its parameters and the stage itself."""
         stage, machine = self.stage, self.stage.machine
-        screen = (machine.screen.width, machine.screen.height)
         body: list[ast.stmt] = [
-            self._assign(
-                "stage",
-                _call(
-                    "StageBuilder",
-                    stage.name,
-                    inputs=machine.channels.inputs or None,
-                    outputs=machine.channels.outputs or None,
-                    screen=screen,
-                ),
+            enum.definition() for enum in self.enums.values() if enum.members
+        ]
+        body += self._params()
+        channels = {
+            kind: ast.Name(self.enums[kind].name) if self.enums[kind].members else None
+            for kind in ("Inputs", "Outputs")
+        }
+        transitions = [
+            self._model(
+                "On",
+                self._of(["States", "Groups"], holder.name, holder.name),
+                self._event(t.event, holder.name),
+                self._target(t.target, holder.name),
             )
+            for holder in (*machine.states, *machine.groups)
+            for t in holder.transitions
         ]
-        body += self._parameters()
-        body += self._stimuli()
-        body += [
-            ast.Expr(_call("stage.add_timer", t.name, self._amount(t.time)))
-            for t in machine.timers
-        ]
-        body += [self._generator(g) for g in machine.generators]
-        body += [
-            ast.Expr(_call("stage.add_counter", c.name, c.event, self._amount(c.limit)))
-            for c in machine.counters
-        ]
-        body += [
-            ast.Expr(
-                _call("stage.add_group", g.name, hold=g.hold or None, parent=g.group)
-            )
-            for g in machine.groups
-        ]
-        body += [self._state(state) for state in machine.states]
+        start = None
         if machine.states and machine.start != machine.states[0].name:
-            body.append(ast.Expr(_call("stage.set_start", machine.start)))
-        for holder in (*machine.states, *machine.groups):
-            body += [self._transition(holder.name, t) for t in holder.transitions]
-        body += [
-            ast.Expr(_call("stage.set_outcome", state, outcome.value))
-            for state, outcome in stage.outcomes.items()
-        ]
-        for level in stage.levels:
-            body += self._level(level)
-        body += self._rule()
-        body.append(ast.Return(ast.Name("stage")))
-        return ast.FunctionDef(
-            self.function,
-            ast.arguments(),
-            body,
-            returns=ast.Name("StageBuilder"),
-            lineno=0,
+            start = self._name("States", machine.start)
+        model = _call(
+            "Stage",
+            stage_name,
+            params=ast.Name(self.params_class) if machine.parameters else None,
+            inputs=channels["Inputs"],
+            outputs=channels["Outputs"],
+            screen=(machine.screen.width, machine.screen.height),
+            stimuli=self._stimuli() or None,
+            timers=[
+                self._model("Timer", self._name("Timers", t.name), self._amount(t.time))
+                for t in machine.timers
+            ]
+            or None,
+            generators=[
+                self._model(
+                    "Generator",
+                    self._name("Generators", g.name),
+                    self._name("Outputs", g.output),
+                    width=self._amount(g.width),
+                    delay=self._unless(g.delay, 0),
+                    period=self._unless(g.period, 0),
+                    count=self._unless(g.count, 1),
+                )
+                for g in machine.generators
+            ]
+            or None,
+            counters=[
+                self._model(
+                    "Counter",
+                    self._name("Counters", c.name),
+                    self._event(c.event, c.name),
+                    self._amount(c.limit),
+                )
+                for c in machine.counters
+            ]
+            or None,
+            groups=[
+                self._model(
+                    "Group",
+                    self._name("Groups", g.name),
+                    hold=[self._name("Outputs", name) for name in g.hold] or None,
+                    parent=None if g.group is None else self._name("Groups", g.group),
+                )
+                for g in machine.groups
+            ]
+            or None,
+            states=[self._state(state) for state in machine.states],
+            start=start,
+            transitions=transitions or None,
+            levels=[self._level(level) for level in stage.levels],
+            rule=self._rule(),
         )
+        body.append(ast.Assign([ast.Name(self.variable, ast.Store())], model, lineno=0))
+        return body
 
 
 def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, bytes]]:
@@ -367,29 +537,36 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
     beside it. ``origin`` names what the source was written from, for its docstring.
     """
     files: dict[str, bytes] = {}
-    functions = _Names(["scenes", "ASSETS", "Path", *builder.__all__])
-    stages = [
-        _StageSource(stage, functions.new(stage.name), files)
-        for stage in experiment.stages
-    ]
-    definitions = [stage.definition() for stage in stages]
+    several = len(experiment.stages) > 1
+    variables = _Names(["scenes", "ASSETS", "Path", "p", *stage_module.__all__])
+    stage_names = _Enum("Stages", [stage.name for stage in experiment.stages])
+    stages: list[_StageSource] = []
+    for stage in experiment.stages:
+        variable = variables.new(stage.name)
+        prefix = "".join(part.capitalize() for part in variable.split("_"))
+        stages.append(_StageSource(stage, prefix if several else "", variable, files))
+    definitions: list[ast.stmt] = [stage_names.definition()]
+    for stage in stages:
+        definitions += stage.definitions(stage_names.ref(stage.stage.name))
     used = sorted({"stage_scenes"}.union(*(stage.used for stage in stages)))
     animal_values = {a.name: a.values for a in experiment.animals if a.values}
     body: list[ast.stmt] = [
         ast.Expr(
             ast.Constant(
                 f"Written by `mxbiflow eject` from {origin}.\n\n"
-                "Register `scenes` with the scene manager. Add Python hooks to a stage "
-                "with\n`stage.on_trial(hook)` and `stage.on_enter(state, hook)` before "
-                "it is returned.\n"
+                "Register `scenes` with the scene manager. Give a stage its Python "
+                "with\n`on_trial`, `on_enter` and `rule`.\n"
             )
         ),
+        ast.ImportFrom("enum", [ast.alias("StrEnum"), ast.alias("auto")], 0),
         ast.ImportFrom(
-            "mxbiflow.statemachine.builder", [ast.alias(name) for name in used], 0
+            "mxbiflow.statemachine.stage", [ast.alias(name) for name in used], 0
         ),
     ]
+    if any(stage.needs_field for stage in stages):
+        body.append(ast.ImportFrom("pydantic", [ast.alias("Field")], 0))
     if files:
-        body.insert(1, ast.ImportFrom("pathlib", [ast.alias("Path")], 0))
+        body.insert(2, ast.ImportFrom("pathlib", [ast.alias("Path")], 0))
         parent = ast.Attribute(_call("Path", ast.Name("__file__")), "parent")
         body.append(
             ast.Assign(
@@ -404,13 +581,13 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
             [ast.Name("scenes", ast.Store())],
             _call(
                 "stage_scenes",
-                *(_call(stage.function) for stage in stages),
+                *(ast.Name(stage.variable) for stage in stages),
                 animal_values=animal_values or None,
             ),
             lineno=0,
         )
     )
-    return ast.unparse(ast.Module(body)) + "\n", files
+    return ast.unparse(ast.fix_missing_locations(ast.Module(body))) + "\n", files
 
 
 def eject(

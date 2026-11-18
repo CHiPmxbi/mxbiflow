@@ -1,37 +1,94 @@
 """Factors, choices, stimulus parameters and tones set per trial."""
 
 import unittest
+from enum import StrEnum, auto
 
-from mxbiflow.statemachine.builder import (
-    EXIT,
-    StageBuilder,
-    play,
-    show,
-    stage_scenes,
-)
+from mxbiflow.statemachine import machine_scenes
 from mxbiflow.statemachine.host import Progress, draw_trial, settle
 from mxbiflow.statemachine.models import Experiment
 from mxbiflow.statemachine.runner import Trial
+from mxbiflow.statemachine.stage import (
+    EXIT,
+    Choice,
+    CountRule,
+    Done,
+    Factor,
+    Level,
+    On,
+    Order,
+    Outcome,
+    Play,
+    Rect,
+    Row,
+    Show,
+    Stage,
+    State,
+    Time,
+    Tones,
+    TrialParams,
+    Uniform,
+    stage_scenes,
+)
 
 
-def pictures() -> StageBuilder:
+class S(StrEnum):
+    CUE = auto()
+
+
+class Stim(StrEnum):
+    A = auto()
+    B = auto()
+    LOW = auto()
+    HIGH = auto()
+
+
+class F(StrEnum):
+    PICTURE = auto()
+    SOUND = auto()
+
+
+class Params(TrialParams):
+    picture: Stim = Stim.A
+    sound: Stim = Stim.LOW
+    hz: float = 1000
+    tone_ms: Time = 100
+
+
+p = Params.refs()
+PICTURES = Factor(
+    F.PICTURE, [Row(Stim.A, {p.picture: Stim.A}), Row(Stim.B, {p.picture: Stim.B})]
+)
+SOUNDS = [Row(Stim.LOW, {p.sound: Stim.LOW}), Row(Stim.HIGH, {p.sound: Stim.HIGH})]
+
+
+def pictures(*levels: Level, rule: CountRule | None = None) -> Stage:
     """Show the picture and play the sound a trial draws."""
-    stage = StageBuilder("pictures", outputs=["reward"], screen=(200, 100))
-    picture = stage.add_stimulus_parameter("picture", "a")
-    sound = stage.add_stimulus_parameter("sound", "low")
-    hz = stage.add_number("hz", 1000)
-    tone_ms = stage.add_time("tone_ms", 100)
-    for name in ("a", "b"):
-        stage.add_rect(name, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
-    stage.add_tones("low", [(hz, tone_ms)], tone_ms)
-    stage.add_tones("high", [(8000, 50)], 50)
-    stage.add_state("cue", on_entry=[show(picture), play(sound)])
-    stage.add_transition("cue", "low.done", EXIT)
-    stage.add_transition("cue", "high.done", EXIT)
-    return stage
+    return Stage(
+        "pictures",
+        params=Params,
+        screen=(200, 100),
+        stimuli=[
+            *(
+                Rect(name, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
+                for name in (Stim.A, Stim.B)
+            ),
+            Tones(Stim.LOW, [(p.hz, p.tone_ms)], p.tone_ms),
+            Tones(Stim.HIGH, [(8000, 50)], 50),
+        ],
+        states=[
+            State(
+                S.CUE,
+                on_entry=[Show(p.picture), Play(p.sound)],
+                outcome=Outcome.correct,
+            )
+        ],
+        transitions=[On(S.CUE, Done(p.sound), EXIT)],
+        levels=levels,
+        rule=rule,
+    )
 
 
-def experiment_of(stage: StageBuilder) -> Experiment:
+def experiment_of(stage: Stage) -> Experiment:
     return Experiment(stages=[stage.build()[0]], animals=[])
 
 
@@ -42,20 +99,22 @@ def numbers(*values: float):
 
 class DrawTests(unittest.TestCase):
     def test_each_factor_draws_its_own_row_after_the_level_values(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1", {"hz": [500, 1000, 2000], "tone_ms": (100, 200)})
-        stage.add_factor(
-            level, "picture", {"a": {"picture": "a"}, "b": {"picture": "b"}}
-        )
-        stage.add_factor(
-            level,
-            "sound",
-            {"low": {"sound": "low"}, "high": {"sound": "high"}},
-            weights={"low": 3},
+        level = Level(
+            1,
+            {p.hz: Choice(500, 1000, 2000), p.tone_ms: Uniform(100, 200)},
+            factors=[
+                PICTURES,
+                Factor(
+                    F.SOUND, [Row(Stim.LOW, {p.sound: Stim.LOW}, weight=3), SOUNDS[1]]
+                ),
+            ],
         )
 
         draw = draw_trial(
-            experiment_of(stage), {}, Progress(0, 0), numbers(0.99, 0.505, 0.6, 0.8)
+            experiment_of(pictures(level)),
+            {},
+            Progress(0, 0),
+            numbers(0.99, 0.505, 0.6, 0.8),
         )
 
         # The choice, the range (rounded: a time), then one number per factor.
@@ -66,21 +125,14 @@ class DrawTests(unittest.TestCase):
         self.assertEqual(draw.cursors, {})
 
     def test_factors_in_turn_keep_a_cursor_each_and_use_no_random_number(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1")
-        stage.add_factor(
-            level,
-            "picture",
-            {"a": {"picture": "a"}, "b": {"picture": "b"}},
-            order="cycle",
+        level = Level(
+            1,
+            factors=[
+                Factor(F.PICTURE, PICTURES.rows, order=Order.cycle),
+                Factor(F.SOUND, [*SOUNDS, Row("again")], order=Order.cycle),
+            ],
         )
-        stage.add_factor(
-            level,
-            "sound",
-            {"low": {"sound": "low"}, "high": {"sound": "high"}, "again": {}},
-            order="cycle",
-        )
-        experiment = experiment_of(stage)
+        experiment = experiment_of(pictures(level))
 
         progress = Progress(0, 0)
         drawn: list[dict[str, str]] = []
@@ -100,16 +152,12 @@ class DrawTests(unittest.TestCase):
         self.assertEqual(progress.cursors, {"picture": 3, "sound": 3})
 
     def test_a_random_number_of_nearly_one_draws_the_last_row_with_weight(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1")
-        stage.add_factor(
-            level,
-            "picture",
-            {"a": {"picture": "a"}, "b": {"picture": "b"}},
-            weights={"b": 0},
-        )
+        rows = [PICTURES.rows[0], Row(Stim.B, {p.picture: Stim.B}, weight=0)]
+        level = Level(1, factors=[Factor(F.PICTURE, rows)])
 
-        draw = draw_trial(experiment_of(stage), {}, Progress(0, 0), numbers(1.0))
+        draw = draw_trial(
+            experiment_of(pictures(level)), {}, Progress(0, 0), numbers(1.0)
+        )
 
         self.assertEqual(draw.factors, {"picture": "a"})
 
@@ -121,11 +169,7 @@ class DrawTests(unittest.TestCase):
             draw_trial(experiment, {}, Progress(0, 3))
 
     def test_a_new_level_starts_its_factors_from_the_first_row(self) -> None:
-        stage = pictures()
-        stage.add_level("1")
-        stage.add_level("2")
-        stage.set_outcome("cue", "correct")
-        stage.set_count_rule(1)
+        stage = pictures(Level(1), Level(2), rule=CountRule(1))
 
         progress, action = settle(
             experiment_of(stage), Progress(0, 0, cursors={"picture": 5}), "correct"
@@ -136,28 +180,31 @@ class DrawTests(unittest.TestCase):
 
 
 class TrialTests(unittest.TestCase):
-    def test_the_stimuli_a_trial_names_are_shown_and_played(self) -> None:
+    def trial(self, **values: float | str) -> Trial:
         machine = pictures().build()[0].machine
-        values = {"picture": "b", "sound": "high", "hz": 1000, "tone_ms": 100}
+        return Trial(machine, values=dict(values))
 
-        trial = Trial(machine, values=dict(values))
+    def test_the_stimuli_a_trial_names_are_shown_and_played(self) -> None:
+        trial = self.trial(picture="b", sound="high", hz=1000, tone_ms=100)
 
         self.assertEqual(trial.shown, ["b"])
         self.assertEqual(trial.sounds, {"high": 50})
 
     def test_a_tones_length_is_the_trials(self) -> None:
-        machine = pictures().build()[0].machine
-        values = {"picture": "a", "sound": "low", "hz": 500, "tone_ms": 240}
-
-        trial = Trial(machine, values=dict(values))
+        trial = self.trial(picture="a", sound="low", hz=500, tone_ms=240)
 
         self.assertEqual(trial.sounds, {"low": 240})
 
-    def test_a_stimulus_that_is_not_there_is_said_in_the_log(self) -> None:
-        machine = pictures().build()[0].machine
-        values = {"picture": "low", "sound": "nothing", "hz": 500, "tone_ms": 0}
+    def test_an_event_of_a_stimulus_parameter_is_that_of_each_it_can_name(self) -> None:
+        level = Level(1, {p.sound: Choice(Stim.LOW, Stim.HIGH)})
+        machine = pictures(level).build()[0].machine
 
-        trial = Trial(machine, values=dict(values))
+        self.assertEqual(
+            [t.event for t in machine.states[0].transitions], ["low.done", "high.done"]
+        )
+
+    def test_a_stimulus_that_is_not_there_is_said_in_the_log(self) -> None:
+        trial = self.trial(picture="low", sound="nothing", hz=500, tone_ms=0)
 
         self.assertEqual(trial.shown, [])
         self.assertEqual(trial.sounds, {})
@@ -166,10 +213,7 @@ class TrialTests(unittest.TestCase):
         self.assertIn('no stimulus "nothing" ($sound)', texts)
 
     def test_a_tone_drawn_with_no_length_is_not_played(self) -> None:
-        machine = pictures().build()[0].machine
-        values = {"picture": "a", "sound": "low", "hz": 500, "tone_ms": 0}
-
-        trial = Trial(machine, values=dict(values))
+        trial = self.trial(picture="a", sound="low", hz=500, tone_ms=0)
 
         self.assertEqual(trial.sounds, {})
         self.assertIn(
@@ -178,69 +222,63 @@ class TrialTests(unittest.TestCase):
 
 
 class ValidationTests(unittest.TestCase):
-    def assert_refused(self, stage: StageBuilder, message: str) -> None:
+    def assert_refused(self, level: Level, message: str) -> None:
         with self.assertRaisesRegex(ValueError, message):
-            stage.build()
+            pictures(level).build()
 
     def test_a_parameter_set_by_the_level_and_a_factor_is_refused(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1", {"picture": "a"})
-        stage.add_factor(level, "which", {"b": {"picture": "b"}})
-        self.assert_refused(stage, "picture is set twice, by 1 and by which")
+        level = Level(1, {p.picture: Stim.A}, factors=[PICTURES])
+        self.assert_refused(level, "picture is set twice, by 1 and by picture")
 
     def test_a_parameter_set_by_two_factors_is_refused(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1")
-        stage.add_factor(level, "first", {"a": {"picture": "a"}})
-        stage.add_factor(level, "second", {"b": {"picture": "b"}})
-        self.assert_refused(stage, "picture is set twice, by first and by second")
+        level = Level(1, factors=[PICTURES, Factor("second", PICTURES.rows)])
+        self.assert_refused(level, "picture is set twice, by picture and by second")
 
     def test_a_factor_without_rows_or_weights_is_refused(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1")
-        stage.add_factor(level, "empty", {})
-        stage.add_factor(level, "never", {"a": {"picture": "a"}}, weights={"a": 0})
-        self.assert_refused(stage, "empty: the factor has no rows.*weight is 0")
+        never = Factor("never", [Row(Stim.A, {p.picture: Stim.A}, weight=0)])
+        level = Level(1, factors=[Factor("empty", []), never])
+        self.assert_refused(level, "empty: the factor has no rows.*weight is 0")
 
     def test_a_factor_named_twice_is_refused(self) -> None:
-        stage = pictures()
-        level = stage.add_level("1")
-        stage.add_factor(level, "same", {"a": {"picture": "a"}})
-        stage.add_factor(level, "same", {"x": {"hz": 1}})
-        self.assert_refused(stage, "the factor's name is used twice")
+        level = Level(1, factors=[PICTURES, Factor(F.PICTURE, [Row("x", {p.hz: 1})])])
+        self.assert_refused(level, "the factor's name is used twice")
 
     def test_a_stimulus_parameter_must_name_a_stimulus_of_its_use(self) -> None:
-        stage = pictures()
-        stage.add_level("1", {"picture": "low", "sound": ["a", "nothing"], "hz": "a"})
+        level = Level(
+            1,
+            {p.picture: Stim.LOW, p.sound: Choice(Stim.A, "nothing"), p.hz: Stim.A},
+        )
         self.assert_refused(
-            stage,
+            level,
             'picture: "low" is not a stimulus on the screen.*'
             'sound: "a" is not a sound.*sound: "nothing" is not a sound.*'
             "hz needs a number",
         )
 
     def test_a_stimulus_parameter_needs_a_name_not_a_number(self) -> None:
-        stage = pictures()
-        stage.add_level("1", {"picture": 1})
-        self.assert_refused(stage, "picture needs a stimulus")
+        self.assert_refused(Level(1, {p.picture: 1}), "picture needs a stimulus")
 
     def test_a_stimulus_parameter_both_shown_and_played_is_refused(self) -> None:
-        stage = StageBuilder("both")
-        either = stage.add_stimulus_parameter("either", "a")
-        stage.add_rect("a", x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
-        stage.add_state("cue", on_entry=[show(either), play(either)])
-        self.assert_refused(stage, "either is both shown and played")
+        class Both(TrialParams):
+            either: Stim = Stim.A
+
+        either = Both.refs().either
+        stage = Stage(
+            "both",
+            params=Both,
+            stimuli=[
+                Rect(Stim.A, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
+            ],
+            states=[State(S.CUE, on_entry=[Show(either), Play(either)])],
+        )
+        with self.assertRaisesRegex(ValueError, "either is both shown and played"):
+            stage.build()
 
     def test_an_experiment_file_with_such_a_level_does_not_become_scenes(self) -> None:
-        stage = pictures()
-        stage.add_level("1", {"picture": "a"})
-        built = stage.build()[0]
-        factor = {"name": "f", "order": "random", "rows": []}
-        broken = built.model_dump(mode="json", by_alias=True)
-        broken["levels"][0]["factors"] = [factor]
+        stage = pictures(Level(1, {p.picture: Stim.A}))
+        broken = stage.build()[0].model_dump(mode="json", by_alias=True)
+        broken["levels"][0]["factors"] = [{"name": "f", "order": "random", "rows": []}]
         experiment = Experiment.model_validate({"stages": [broken], "animals": []})
-
-        from mxbiflow.statemachine import machine_scenes
 
         with self.assertRaisesRegex(ValueError, "the factor has no rows"):
             machine_scenes(experiment)

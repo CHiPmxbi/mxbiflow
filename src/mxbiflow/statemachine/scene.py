@@ -35,7 +35,6 @@ from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
 from .host import (
     ACTIONS,
-    Action,
     Outcome,
     Progress,
     draw_trial,
@@ -50,6 +49,7 @@ from .models import (
     Experiment,
     ImageStimulus,
     Machine,
+    Outcomes,
     RectStimulus,
     Stage,
     TonesStimulus,
@@ -81,7 +81,7 @@ class Cursor(BaseModel):
 
 
 type Hook = Callable[["MachineScene"], None]
-type Rule = Callable[["MachineScene", Outcome], Action]
+type Rule = Callable[["MachineScene", Outcomes | None], SettlementAction]
 
 
 def check_channels(
@@ -248,7 +248,10 @@ class MachineScene(TrialScene):
 
     def decide(self) -> SettlementAction:
         rule = self.hooks.rule
-        decided = None if rule is None else rule(self, self._outcome)
+        decided = None
+        if rule is not None:
+            outcome = None if self._outcome == "none" else Outcomes(self._outcome)
+            decided = ACTIONS[rule(self, outcome)]
         self._settled, action = settle(
             self.experiment, self._progress, self._outcome, decided
         )
@@ -352,9 +355,20 @@ class MachineScene(TrialScene):
         """Send the machine the event ``host.<name>``."""
         self.trial.host(name, max(self._now(), self.trial.now))
 
-    def note(self, key: str, value: JsonValue) -> None:
-        """Keep a value in the trial's record, under ``extra``."""
-        self._extra[key] = value
+    def params[P: BaseModel](self, model: type[P]) -> P:
+        """This trial's parameter values as the stage's ``TrialParams`` model."""
+        return model.model_validate(self._values)
+
+    def set(self, parameter: object, value: float | str) -> None:
+        """Set a parameter of this trial (``Params.refs().<field>``), in ``on_trial``."""
+        name = str(parameter)
+        if name not in self._values:
+            raise KeyError(f"no parameter {name}")
+        self._values[name] = value
+
+    def note(self, extra: BaseModel) -> None:
+        """Keep a model's fields in the trial's record, under ``extra``."""
+        self._extra.update(extra.model_dump(mode="json"))
 
     def _resolve_known(self) -> None:
         """Give the framework the outcome as soon as a state has decided one.

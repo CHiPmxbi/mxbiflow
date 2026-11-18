@@ -1,3 +1,4 @@
+import ast
 import json
 import runpy
 import tempfile
@@ -6,103 +7,183 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from pydantic import Field
+
 from mxbiflow.__main__ import main
 from mxbiflow.statemachine import load_experiment
-from mxbiflow.statemachine.builder import (
-    EXIT,
-    StageBuilder,
-    clear,
-    hide,
-    play,
-    reset,
-    show,
-    start,
-    stop,
-)
 from mxbiflow.statemachine.eject import eject, python_source
-from mxbiflow.statemachine.models import Experiment, Stage
+from mxbiflow.statemachine.models import Experiment
+from mxbiflow.statemachine.models import Stage as StageData
+from mxbiflow.statemachine.stage import (
+    EXIT,
+    Background,
+    Choice,
+    Clear,
+    Count,
+    Counter,
+    CountRule,
+    Cross,
+    Done,
+    Factor,
+    Generator,
+    Group,
+    Hide,
+    Host,
+    Image,
+    Level,
+    On,
+    Order,
+    Outcome,
+    Play,
+    Reached,
+    Reset,
+    Rise,
+    Row,
+    Show,
+    Size,
+    Stage,
+    Start,
+    State,
+    Stop,
+    Text,
+    Time,
+    Timeout,
+    Timer,
+    Tones,
+    Touch,
+    TrialParams,
+    Uniform,
+    Wav,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXAMPLE = FIXTURES / "two_pictures.experiment.json"
 
 
-def everything() -> StageBuilder:
+class Odd(TrialParams):
+    """Parameters whose names are not Python's."""
+
+    wait_ms: Time = Field(1500, alias="wait ms")
+    licks: Count = Field(2, alias="2 licks")
+    stage: float = 0.25
+    after: str = "give"
+    hz: float = 4000
+    which: str = "show"
+    sound: str = "tone"
+
+
+def everything() -> Stage:
     """A stage that uses each thing the format has, with names that are not Python's."""
-    stage = StageBuilder(
-        "class", inputs=["lick left"], outputs=["reward", "laser"], screen=(800, 600)
-    )
-    wait_ms = stage.add_time("wait ms", 1500)
-    licks = stage.add_count("2 licks", 2)
-    x = stage.add_number("stage", 0.25)
-    after = stage.add_target("after", "give")
-    hz = stage.add_number("hz", 4000)
-    which = stage.add_stimulus_parameter("which", "show")
-    sound = stage.add_stimulus_parameter("sound", "tone")
-    stage.add_background("grey", "#808080")
-    cue = stage.add_cross(
-        "show", x=x, y=0.5, width=40, height=40, size="px", color="#ffffff"
-    )
-    stage.add_text(
-        'say "go"', 'it\'s "go"\n', x=0.5, y=0.1, width=0.5, height=0.1, color="#000000"
-    )
-    stage.add_image("frame", None, x=0.5, y=0.5, width=0.2, height=0.2)
-    tone = stage.add_tones("tone", [(hz, 100), (0, wait_ms)], 600)
-    stage.add_tones("long", [(500, 50.5)], wait_ms)
-    stage.add_wav("silence", None, duration_ms=250)
-    stage.add_timer("limit", wait_ms)
-    stage.add_generator("pulses", "laser", width=5, period=20, count=0)
-    stage.add_generator("one", "laser", width=wait_ms, delay=3)
-    stage.add_counter("licked", "lick left.rise", licks)
-    stage.add_group("all")
-    stage.add_group("trial", hold=["laser"], parent="all")
-    stage.add_state("give", hold=["reward"], timeout=100, group="all")
-    stage.add_state(
-        "wait",
-        on_entry=[
-            show(cue),
-            hide(cue),
-            show(which),
-            hide(which),
-            play(sound),
-            stop(sound),
-            clear(),
-            play(tone),
-            start("limit"),
-            stop("pulses"),
-            stop(tone),
-            reset("licked"),
+    p = Odd.refs()
+    return Stage(
+        "class",
+        params=Odd,
+        inputs=["lick left"],
+        outputs=["reward", "laser"],
+        screen=(800, 600),
+        stimuli=[
+            Background("grey", "#808080"),
+            Cross(
+                "show",
+                x=p.stage,
+                y=0.5,
+                width=40,
+                height=40,
+                size=Size.px,
+                color="#ffffff",
+            ),
+            Text(
+                'say "go"',
+                'it\'s "go"\n',
+                x=0.5,
+                y=0.1,
+                width=0.5,
+                height=0.1,
+                color="#000000",
+            ),
+            Image("frame", None, x=0.5, y=0.5, width=0.2, height=0.2),
+            Tones("tone", [(p.hz, 100), (0, p.wait_ms)], 600),
+            Tones("long", [(500, 50.5)], p.wait_ms),
+            Wav("silence", None, duration_ms=250),
         ],
-        timeout=wait_ms,
-        group="trial",
+        timers=[Timer("limit", p.wait_ms)],
+        generators=[
+            Generator("pulses", "laser", width=5, period=20, count=0),
+            Generator("one", "laser", width=p.wait_ms, delay=3),
+        ],
+        counters=[Counter("licked", Rise("lick left"), p.licks)],
+        groups=[Group("all"), Group("trial", hold=["laser"], parent="all")],
+        states=[
+            State(
+                "give",
+                timeout=100,
+                hold=["reward"],
+                group="all",
+                outcome=Outcome.correct,
+            ),
+            State(
+                "wait",
+                timeout=p.wait_ms,
+                group="trial",
+                on_entry=[
+                    Show("show"),
+                    Hide("show"),
+                    Show(p.which),
+                    Hide(p.which),
+                    Play(p.sound),
+                    Stop(p.sound),
+                    Clear(),
+                    Play("tone"),
+                    Start("limit"),
+                    Stop("pulses"),
+                    Stop("tone"),
+                    Reset("licked"),
+                ],
+            ),
+        ],
+        start="wait",
+        transitions=[
+            On("give", Timeout(), EXIT),
+            On("wait", Touch("show"), p.after),
+            On("wait", Done("tone"), "give"),
+            On("wait", Host("go"), "give"),
+            On("trial", Reached("licked"), "give"),
+            On("all", Done("limit"), EXIT),
+        ],
+        levels=[
+            Level("easy"),
+            Level(
+                "hard",
+                {
+                    p.wait_ms: Uniform(500, 900.5),
+                    p.licks: 3,
+                    p.hz: Choice(4000, 8000),
+                    p.sound: Choice("tone"),
+                },
+                factors=[
+                    Factor(
+                        "side",
+                        [
+                            Row("left", {p.stage: 0.25, p.after: "give"}),
+                            Row("right", {p.stage: 0.75}, weight=2.5),
+                        ],
+                        order=Order.cycle,
+                    ),
+                    Factor(
+                        "which",
+                        [
+                            Row("cue", {p.which: "show"}),
+                            Row("frame", {p.which: "frame"}),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+        rule=CountRule(5),
     )
-    stage.set_start("wait")
-    stage.add_transition("give", "timeout", EXIT)
-    stage.add_transition("wait", f"{cue}.touch", after)
-    stage.add_transition("wait", f"{tone}.done", "give")
-    stage.add_transition("wait", "host.go", "give")
-    stage.add_transition("trial", "licked.reached", "give")
-    stage.add_transition("all", "limit.done", EXIT)
-    stage.set_outcome("give", "correct")
-    stage.add_level("easy")
-    hard = stage.add_level(
-        "hard",
-        {"wait ms": (500, 900.5), "2 licks": 3, "hz": [4000, 8000], "sound": ["tone"]},
-    )
-    stage.add_factor(
-        hard,
-        "side",
-        {"left": {"stage": 0.25, "after": "give"}, "right": {"stage": 0.75}},
-        weights={"right": 2.5},
-        order="cycle",
-    )
-    stage.add_factor(
-        hard, "which", {"cue": {"which": "show"}, "frame": {"which": "frame"}}
-    )
-    stage.set_count_rule(5)
-    return stage
 
 
-def plain(stage: Stage) -> dict[str, Any]:
+def plain(stage: StageData) -> dict[str, Any]:
     """A stage as data, without what a round trip need not keep.
 
     cogforge's node positions are not written, and a picture or sound comes back as
@@ -119,25 +200,23 @@ def plain(stage: Stage) -> dict[str, Any]:
     return data
 
 
-def rebuilt(experiment: Experiment, directory: Path) -> list[Stage]:
-    """The stages built by the Python written for ``experiment``."""
-    module = runpy.run_path(str(eject(experiment, directory, "a test")))
-    builders = [
-        value()
-        for value in module.values()
-        if getattr(value, "__module__", None) == "<run_path>"
-    ]
-    return [builder.build()[0] for builder in builders]
+def rebuilt(experiment: Experiment, directory: Path) -> tuple[list[StageData], str]:
+    """The stages built by the Python written for ``experiment``, and that Python."""
+    target = eject(experiment, directory, "a test")
+    module = runpy.run_path(str(target))
+    stages = [value for value in module.values() if isinstance(value, Stage)]
+    return [stage.build()[0] for stage in stages], target.read_text()
 
 
 class EjectTests(unittest.TestCase):
-    def assert_round_trip(self, experiment: Experiment) -> None:
+    def assert_round_trip(self, experiment: Experiment) -> str:
         with tempfile.TemporaryDirectory() as directory:
-            stages = rebuilt(experiment, Path(directory))
+            stages, source = rebuilt(experiment, Path(directory))
         self.assertEqual(
             [plain(stage) for stage in stages],
             [plain(stage) for stage in experiment.stages],
         )
+        return source
 
     def test_the_example_comes_back_the_same(self) -> None:
         self.assert_round_trip(load_experiment(EXAMPLE))
@@ -152,12 +231,33 @@ class EjectTests(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.assert_round_trip(Experiment.model_validate(case["experiment"]))
 
-    def test_stages_of_one_name_in_python_get_their_own_functions(self) -> None:
+    def test_every_name_is_an_enum_member(self) -> None:
+        source = self.assert_round_trip(load_experiment(EXAMPLE))
+
+        self.assertIn("class States(StrEnum):", source)
+        self.assertIn("    WAIT = auto()", source)
+        # A name that is not what auto() gives keeps its spelling.
+        self.assertIn('    A_LEFT = "A left"', source)
+        self.assertIn("    on_left: States = States.REWARD", source)
+        self.assertIn("On(States.CHOICE, Rise(Inputs.LICK_LEFT), p.on_left)", source)
+        self.assertIn("Choice(6000, 9500, 12000)", source)
+        # No name is looked up by a string: the only ones left are colours.
+        body = source[source.index("discriminate = Stage(") :]
+        strings = [
+            node.value
+            for node in ast.walk(ast.parse(body))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        ]
+        self.assertTrue(all(s.startswith("#") or s.endswith(".svg") for s in strings))
+
+    def test_stages_get_their_own_enums(self) -> None:
         stage, _ = everything().build()
         other = stage.model_copy(update={"name": "class_"})
-        source, _ = python_source(Experiment(stages=[stage, other], animals=[]), "x")
-        self.assertIn("def class_()", source)
-        self.assertIn("def class__2()", source)
+        source = self.assert_round_trip(Experiment(stages=[stage, other], animals=[]))
+
+        self.assertIn("class ClassStates(StrEnum):", source)
+        self.assertIn("class Class2States(StrEnum):", source)
+        self.assertIn('wait_ms: Time = Field(1500, alias="wait ms")', source)
 
     def test_pictures_become_files_and_animal_values_are_kept(self) -> None:
         experiment = load_experiment(EXAMPLE)
@@ -181,7 +281,7 @@ class EjectTests(unittest.TestCase):
             main(["eject", str(EXAMPLE), directory])
             written = (Path(directory) / "stages.py").read_text()
         self.assertIn("two_pictures.experiment.json", written)
-        self.assertIn("scenes = stage_scenes(discriminate())", written)
+        self.assertIn("scenes = stage_scenes(discriminate)", written)
 
 
 if __name__ == "__main__":

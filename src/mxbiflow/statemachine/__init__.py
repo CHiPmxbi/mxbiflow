@@ -9,7 +9,7 @@ An experiment runs by registering its stages' scenes::
     scene_manager.register(machine_scenes(load_experiment(path)))
 
 A stage can also be written in Python, with states and transitions added by name and
-Python hooks for what the data cannot say (`builder`)::
+Python hooks for what the data cannot say (`stage`)::
 
     scene_manager.register(stage_scenes(stage))
 
@@ -21,14 +21,14 @@ conformance cases (`tests/fixtures/conformance`).
 
 from pathlib import Path
 
-from .builder import StageBuilder, stage_scenes
 from .models import Experiment
 from .scene import MachineScene, machine_scenes
+from .stage import Stage, stage_scenes
 
 __all__ = [
     "Experiment",
     "MachineScene",
-    "StageBuilder",
+    "Stage",
     "load_experiment",
     "machine_scenes",
     "stage_scenes",
