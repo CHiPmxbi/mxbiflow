@@ -351,7 +351,7 @@ class MachineScene(TrialScene):
         return self._trial
 
     @property
-    def now(self) -> float:
+    def now_ms(self) -> float:
         """Milliseconds from the start of the trial."""
         return self._now()
 

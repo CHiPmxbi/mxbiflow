@@ -55,7 +55,7 @@ FIELDS = {
     "State": ["name"],
     "Group": ["name"],
     "On": ["source", "event", "target"],
-    "Timer": ["name", "time"],
+    "Timer": ["name", "time_ms"],
     "Counter": ["name", "event", "limit"],
     "Generator": ["name", "output"],
     "Background": ["name", "color"],
@@ -300,22 +300,26 @@ class _StageSource:
         for parameter in machine.parameters:
             field = self.parameters[parameter.name]
             default: Any = parameter.default
-            annotation = ANNOTATIONS.get(parameter.type, "str")
-            if parameter.type in ("time", "count"):
-                self.used.add(annotation)
-            elif parameter.type == "state":
+            annotation: ast.expr
+            if parameter.type == "state":
                 default = self._target(parameter.default, parameter.name)
-                if parameter.default != EXIT:
-                    annotation = self.enums["States"].name
+                # A parameter that starts at the exit is not one of the states' enum.
+                of = "str" if parameter.default == EXIT else self.enums["States"].name
+                annotation = self._marked("StateParam", of)
             elif parameter.type == "stimulus":
                 default = self._of(["Stimuli"], parameter.default, parameter.name)
-                annotation = self.enums["Stimuli"].name
+                annotation = self._marked("StimulusParam", self.enums["Stimuli"].name)
+            else:
+                name = ANNOTATIONS[parameter.type]
+                if name != "float":
+                    self.used.add(name)
+                annotation = ast.Name(name)
             if field != parameter.name:
                 default = _call("Field", default, alias=parameter.name)
             body.append(
                 ast.AnnAssign(
                     ast.Name(field, ast.Store()),
-                    ast.Name(annotation),
+                    annotation,
                     _expr(default),
                     simple=1,
                 )
@@ -328,6 +332,11 @@ class _StageSource:
                 lineno=0,
             ),
         ]
+
+    def _marked(self, marker: str, of: str) -> ast.expr:
+        """``StateParam[States]``: what a parameter names, and from which enum."""
+        self.used.add(marker)
+        return ast.Subscript(ast.Name(marker), ast.Name(of))
 
     @property
     def needs_field(self) -> bool:
@@ -399,7 +408,7 @@ class _StageSource:
         return self._model(
             "State",
             self._name("States", state.name),
-            timeout=None if state.timeout is None else self._amount(state.timeout),
+            timeout_ms=None if state.timeout is None else self._amount(state.timeout),
             hold=[self._name("Outputs", name) for name in state.hold] or None,
             on_entry=[self._action(a, state.name) for a in state.on_entry] or None,
             group=None if state.group is None else self._name("Groups", state.group),
@@ -517,9 +526,9 @@ class _StageSource:
                     "Generator",
                     self._name("Generators", g.name),
                     self._name("Outputs", g.output),
-                    width=self._amount(g.width),
-                    delay=self._unless(g.delay, 0),
-                    period=self._unless(g.period, 0),
+                    width_ms=self._amount(g.width),
+                    delay_ms=self._unless(g.delay, 0),
+                    period_ms=self._unless(g.period, 0),
                     count=self._unless(g.count, 1),
                 )
                 for g in machine.generators

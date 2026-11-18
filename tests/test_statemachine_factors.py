@@ -23,6 +23,7 @@ from mxbiflow.statemachine.stage import (
     Show,
     Stage,
     State,
+    StimulusParam,
     Time,
     Tones,
     TrialParams,
@@ -48,8 +49,8 @@ class F(StrEnum):
 
 
 class Params(TrialParams):
-    picture: Stim = Stim.A
-    sound: Stim = Stim.LOW
+    picture: StimulusParam[Stim] = Stim.A
+    sound: StimulusParam[Stim] = Stim.LOW
     hz: float = 1000
     tone_ms: Time = 100
 
@@ -295,7 +296,7 @@ class ValidationTests(unittest.TestCase):
 
     def test_a_stimulus_parameter_both_shown_and_played_is_refused(self) -> None:
         class Both(TrialParams):
-            either: Stim = Stim.A
+            either: StimulusParam[Stim] = Stim.A
 
         either = Both.refs().either
         stage = Stage(

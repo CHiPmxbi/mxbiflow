@@ -44,6 +44,8 @@ from mxbiflow.statemachine.stage import (
     Stage,
     Start,
     State,
+    StateParam,
+    StimulusParam,
     Stop,
     Text,
     Time,
@@ -66,10 +68,10 @@ class Odd(TrialParams):
     wait_ms: Time = Field(1500, alias="wait ms")
     licks: Count = Field(2, alias="2 licks")
     stage: float = 0.25
-    after: str = "give"
+    after: StateParam[str] = "give"
     hz: float = 4000
-    which: str = "show"
-    sound: str = "tone"
+    which: StimulusParam[str] = "show"
+    sound: StimulusParam[str] = "tone"
 
 
 def everything() -> Stage:
@@ -106,24 +108,24 @@ def everything() -> Stage:
             Tones(name="long", tones=[(500, 50.5)], duration_ms=p.wait_ms),
             Wav(name="silence", path=None, duration_ms=250),
         ],
-        timers=[Timer(name="limit", time=p.wait_ms)],
+        timers=[Timer(name="limit", time_ms=p.wait_ms)],
         generators=[
-            Generator(name="pulses", output="laser", width=5, period=20, count=0),
-            Generator(name="one", output="laser", width=p.wait_ms, delay=3),
+            Generator(name="pulses", output="laser", width_ms=5, period_ms=20, count=0),
+            Generator(name="one", output="laser", width_ms=p.wait_ms, delay_ms=3),
         ],
         counters=[Counter(name="licked", event=Rise("lick left"), limit=p.licks)],
         groups=[Group(name="all"), Group(name="trial", hold=["laser"], parent="all")],
         states=[
             State(
                 name="give",
-                timeout=100,
+                timeout_ms=100,
                 hold=["reward"],
                 group="all",
                 outcome=Outcome.correct,
             ),
             State(
                 name="wait",
-                timeout=p.wait_ms,
+                timeout_ms=p.wait_ms,
                 group="trial",
                 on_entry=[
                     Show("show"),
@@ -238,7 +240,7 @@ class EjectTests(unittest.TestCase):
         self.assertIn("    WAIT = auto()", source)
         # A name that is not what auto() gives keeps its spelling.
         self.assertIn('    A_LEFT = "A left"', source)
-        self.assertIn("    on_left: States = States.REWARD", source)
+        self.assertIn("    on_left: StateParam[States] = States.REWARD", source)
         self.assertIn(
             "On(source=States.CHOICE, event=Rise(Inputs.LICK_LEFT), target=p.on_left)",
             source,

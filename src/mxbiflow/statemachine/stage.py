@@ -29,10 +29,10 @@ so a plain ``str`` works wherever an enum member does.
             Rect(name=Stim.TARGET, x=0.5, y=0.3, width=0.3, height=0.3, color="#ffffff")
         ],
         states=[
-            State(name=S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
+            State(name=S.WAIT, timeout_ms=5000, on_entry=[Show(Stim.TARGET)]),
             State(
                 name=S.GIVE,
-                timeout=p.reward_ms,
+                timeout_ms=p.reward_ms,
                 hold=[Out.REWARD],
                 on_entry=[Clear()],
                 outcome=Outcome.correct,
@@ -59,7 +59,7 @@ import mimetypes
 from collections.abc import Iterable, Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Self, cast
+from typing import Annotated, Any, ClassVar, Self, TypeVar, cast
 
 import soundfile
 from pydantic import (
@@ -118,6 +118,8 @@ __all__ = [
     "Stage",
     "Start",
     "State",
+    "StateParam",
+    "StimulusParam",
     "Stop",
     "Text",
     "Time",
@@ -162,6 +164,12 @@ class _Kind:
 Time = Annotated[float, _Kind("time")]
 #: A parameter that is a whole number of something.
 Count = Annotated[int, _Kind("count")]
+_N = TypeVar("_N", bound=str)
+#: A parameter that names where a transition leads: ``StateParam[S]`` for the states'
+#: enum ``S``, ``StateParam[str]`` for plain names.
+StateParam = Annotated[_N, _Kind("state")]
+#: A parameter that names the stimulus to show or play: ``StimulusParam[Stim]``.
+StimulusParam = Annotated[_N, _Kind("stimulus")]
 
 type Fixed = float | str
 type Amount = float | Ref
@@ -173,8 +181,9 @@ class TrialParams(BaseModel):
     """A trial's parameters: subclass it with a field for each.
 
     The field's type says what the parameter is: :data:`Time`, :data:`Count`, ``float``
-    for any other number, the enum of the states for where a transition leads, the
-    enum of the stimuli for which one to show or play. Its default is the parameter's.
+    for any other number, :data:`StateParam` for where a transition leads and
+    :data:`StimulusParam` for which stimulus to show or play. A field of any other
+    type is refused. Its default is the parameter's.
     A field's alias is the parameter's name when that is not a Python name. Defaults
     known only when the stage is made (from a configuration) are an instance of the
     model, given to the stage as ``defaults``.
@@ -277,7 +286,7 @@ type Action = Show | Hide | Clear | Play | Start | Stop | Reset
 
 @dataclass(frozen=True, config=_CONFIG)
 class Timeout:
-    """The state's ``timeout`` ran out."""
+    """The state's ``timeout_ms`` ran out."""
 
 
 @dataclass(frozen=True, config=_CONFIG)
@@ -350,13 +359,13 @@ type Event = (
 class State:
     """A state; the first one of a stage is where a trial starts.
 
-    ``hold`` are outputs high while the machine is in the state. When ``timeout`` runs
+    ``hold`` are outputs high while the machine is in the state. When ``timeout_ms`` runs
     out the event is :class:`Timeout`. A trial's outcome is that of the last state
     entered that has one.
     """
 
     name: Name
-    timeout: Amount | None = None
+    timeout_ms: Amount | None = None
     hold: Sequence[Name] = ()
     on_entry: Sequence[Action] = ()
     group: Name | None = None
@@ -390,7 +399,7 @@ class Timer:
     """A time that runs across states; the event is :class:`Done`."""
 
     name: Name
-    time: Amount
+    time_ms: Amount
 
 
 @dataclass(frozen=True, config=_CONFIG, kw_only=True)
@@ -408,9 +417,9 @@ class Generator:
 
     name: Name
     output: Name
-    width: Amount
-    delay: Amount = 0
-    period: Amount = 0
+    width_ms: Amount
+    delay_ms: Amount = 0
+    period_ms: Amount = 0
     count: Amount = 1
 
 
@@ -622,7 +631,6 @@ class Stage(BaseModel):
     # ---- to the format ---------------------------------------------------------
 
     def _parameters(self) -> list[dict[str, Any]]:
-        states = set(_names(s.name for s in self.states)) | {EXIT}
         parameters: list[dict[str, Any]] = []
         if self.defaults is not None and not isinstance(self.defaults, self.params):
             raise ValueError(f"the defaults are not a {self.params.__name__}")
@@ -637,11 +645,15 @@ class Stage(BaseModel):
                 default = field.default
             if kinds:
                 kind = kinds[0]
-            elif isinstance(default, str):
-                kind = "state" if str(default) in states else "stimulus"
-                default = str(default)
-            else:
+            elif field.annotation is float:
                 kind = "number"
+            else:
+                raise ValueError(
+                    f"parameter {name}: its type does not say what it is; use Time, "
+                    "Count, float, StateParam[...] or StimulusParam[...]"
+                )
+            if isinstance(default, str):
+                default = str(default)
             parameters.append({"name": name, "type": kind, "default": default})
         return parameters
 
@@ -819,15 +831,16 @@ class Stage(BaseModel):
                 },
                 "parameters": self._parameters(),
                 "timers": [
-                    {"name": str(t.name), "time": _amount(t.time)} for t in self.timers
+                    {"name": str(t.name), "time": _amount(t.time_ms)}
+                    for t in self.timers
                 ],
                 "generators": [
                     {
                         "name": str(g.name),
                         "output": str(g.output),
-                        "delay": _amount(g.delay),
-                        "width": _amount(g.width),
-                        "period": _amount(g.period),
+                        "delay": _amount(g.delay_ms),
+                        "width": _amount(g.width_ms),
+                        "period": _amount(g.period_ms),
                         "count": _amount(g.count),
                     }
                     for g in self.generators
@@ -857,7 +870,9 @@ class Stage(BaseModel):
                         "name": str(s.name),
                         "group": None if s.group is None else str(s.group),
                         "hold": _names(s.hold),
-                        "timeout": None if s.timeout is None else _amount(s.timeout),
+                        "timeout": None
+                        if s.timeout_ms is None
+                        else _amount(s.timeout_ms),
                         "onEntry": [self._action(a) for a in s.on_entry],
                         "transitions": transitions.get(str(s.name), []),
                     }
