@@ -31,7 +31,8 @@ def state(name: str, **parts: Any) -> dict[str, Any]:
 def stage(
     name: str,
     screen: tuple[int, int] = (200, 100),
-    target: tuple[int, int] = (150, 20),
+    target: tuple[float, float] = (0.75, 0.2),
+    size: float = 20,
 ) -> dict[str, Any]:
     """Touch the target for a reward; leaving the beam ends the trial."""
     level = {"values": {}, "types": [], "order": "random"}
@@ -76,8 +77,9 @@ def stage(
                     "name": "target",
                     "x": target[0],
                     "y": target[1],
-                    "width": 20,
-                    "height": 20,
+                    "size": "px",
+                    "width": size,
+                    "height": size,
                     "color": "#ff0000",
                 },
                 {
@@ -258,7 +260,7 @@ class MachineSceneTests(unittest.TestCase):
 
     def test_an_upright_screen_is_drawn_and_touched_turned(self) -> None:
         # The animal sees 100×200, its top at the right edge of the rig's 200×100.
-        scenes = experiment(stage("touch", screen=(100, 200), target=(20, 150)))
+        scenes = experiment(stage("touch", screen=(100, 200), target=(0.2, 0.75)))
         scene = self.trial(scenes, self.context(scenes))
         screen = Surface((200, 100))
         scene.draw(screen)
@@ -273,10 +275,11 @@ class MachineSceneTests(unittest.TestCase):
         raw["machine"]["stimuli"][0] = {
             "kind": "image",
             "name": "target",
-            "x": 150,
-            "y": 20,
-            "width": 20,
-            "height": 20,
+            "x": 0.75,
+            "y": 0.2,
+            "size": "fraction",
+            "width": 0.1,
+            "height": 0.1,
             "image": "data:image/svg+xml;charset=utf-8,"
             + quote(
                 '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
@@ -312,8 +315,24 @@ class MachineSceneTests(unittest.TestCase):
 
         self.rewarder.give_reward.assert_called_once()
 
-    def test_a_screen_of_another_size_fails(self) -> None:
-        scenes = experiment(stage("touch", screen=(300, 300)))
+    def test_the_rig_screen_counts_not_the_experiment_reference(self) -> None:
+        # Laid out on a 400×200 reference; this rig's screen is 200×100.
+        scenes = experiment(stage("touch", screen=(400, 200)))
+        scene = self.trial(scenes, self.context(scenes))
+        screen = Surface((200, 100))
 
-        with self.assertRaisesRegex(ValueError, "300×300"):
+        scene.draw(screen)
+
+        self.assertEqual(screen.get_at((150, 20)), (255, 0, 0, 255))
+
+    def test_a_stimulus_that_does_not_fit_the_rig_screen_fails(self) -> None:
+        scenes = experiment(stage("touch", size=150))
+
+        with self.assertRaisesRegex(ValueError, '"target" does not fit'):
+            self.trial(scenes, self.context(scenes))
+
+    def test_a_position_outside_the_screen_fails(self) -> None:
+        scenes = experiment(stage("touch", target=(1.2, 0.5)))
+
+        with self.assertRaisesRegex(ValueError, '"target" is outside the screen'):
             self.trial(scenes, self.context(scenes))
