@@ -22,23 +22,33 @@ so a plain ``str`` works wherever an enum member does.
     p = Params.refs()
 
     touch = Stage(
-        "touch",
+        name="touch",
         params=Params,
         outputs=Out,
-        stimuli=[Rect(Stim.TARGET, x=0.5, y=0.3, width=0.3, height=0.3, color="#ffffff")],
+        stimuli=[
+            Rect(name=Stim.TARGET, x=0.5, y=0.3, width=0.3, height=0.3, color="#ffffff")
+        ],
         states=[
-            State(S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
-            State(S.GIVE, timeout=p.reward_ms, hold=[Out.REWARD], on_entry=[Clear()],
-                  outcome=Outcome.correct),
+            State(name=S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
+            State(
+                name=S.GIVE,
+                timeout=p.reward_ms,
+                hold=[Out.REWARD],
+                on_entry=[Clear()],
+                outcome=Outcome.correct,
+            ),
         ],
         transitions=[
-            On(S.WAIT, Touch(Stim.TARGET), S.GIVE),
-            On(S.WAIT, Timeout(), EXIT),
-            On(S.GIVE, Timeout(), EXIT),
+            On(source=S.WAIT, event=Touch(Stim.TARGET), target=S.GIVE),
+            On(source=S.WAIT, event=Timeout(), target=EXIT),
+            On(source=S.GIVE, event=Timeout(), target=EXIT),
         ],
     )
 
     scene_manager.register(stage_scenes(touch))
+
+A model with more than one field takes keyword arguments only, so each argument says
+what it is; an action or an event of one field (``Show(Stim.TARGET)``) may go without.
 
 What data cannot say is Python the host calls: ``on_trial`` before a trial, ``on_enter``
 when a state is entered, and a ``rule`` that moves the animal between levels.
@@ -47,6 +57,7 @@ when a state is entered, and a ``rule`` that moves the animal between levels.
 import base64
 import mimetypes
 from collections.abc import Iterable, Mapping, Sequence
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, Self, cast
 
@@ -192,7 +203,7 @@ class _Refs:
         return Ref(field.alias or name)
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Uniform:
     """A level's value drawn anew per trial from ``low`` to ``high``."""
 
@@ -335,7 +346,7 @@ type Event = (
 # ---- the machine --------------------------------------------------------------
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class State:
     """A state; the first one of a stage is where a trial starts.
 
@@ -345,23 +356,23 @@ class State:
     """
 
     name: Name
-    timeout: Amount | None = Field(default=None, kw_only=True)
-    hold: Sequence[Name] = Field(default=(), kw_only=True)
-    on_entry: Sequence[Action] = Field(default=(), kw_only=True)
-    group: Name | None = Field(default=None, kw_only=True)
-    outcome: Outcome | None = Field(default=None, kw_only=True)
+    timeout: Amount | None = None
+    hold: Sequence[Name] = ()
+    on_entry: Sequence[Action] = ()
+    group: Name | None = None
+    outcome: Outcome | None = None
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Group:
     """A group of states: its hold and its transitions apply in each of them."""
 
     name: Name
-    hold: Sequence[Name] = Field(default=(), kw_only=True)
-    parent: Name | None = Field(default=None, kw_only=True)
+    hold: Sequence[Name] = ()
+    parent: Name | None = None
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class On:
     """In state or group ``source``, ``event`` leads to ``target``.
 
@@ -374,7 +385,7 @@ class On:
     target: Name | Ref
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Timer:
     """A time that runs across states; the event is :class:`Done`."""
 
@@ -382,7 +393,7 @@ class Timer:
     time: Amount
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Counter:
     """Counts an event; at the limit the event is :class:`Reached`."""
 
@@ -391,22 +402,22 @@ class Counter:
     limit: Amount
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Generator:
     """A pulse or a pulse train on an output; ``count`` 0 runs until stopped."""
 
     name: Name
     output: Name
-    width: Amount = Field(kw_only=True)
-    delay: Amount = Field(default=0, kw_only=True)
-    period: Amount = Field(default=0, kw_only=True)
-    count: Amount = Field(default=1, kw_only=True)
+    width: Amount
+    delay: Amount = 0
+    period: Amount = 0
+    count: Amount = 1
 
 
 # ---- stimuli ------------------------------------------------------------------
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Background:
     name: Name
     color: str
@@ -426,40 +437,40 @@ class _Placed:
     size: Size = Size.fraction
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Image(_Placed):
     """A picture; ``None`` shows a frame with the stimulus's name."""
 
-    name: Name = Field(kw_only=False)
-    path: Path | None = Field(kw_only=False)
+    name: Name
+    path: Path | None
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Rect(_Placed):
-    name: Name = Field(kw_only=False)
-    color: str = Field(kw_only=True)
+    name: Name
+    color: str
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Circle(_Placed):
-    name: Name = Field(kw_only=False)
-    color: str = Field(kw_only=True)
+    name: Name
+    color: str
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Cross(_Placed):
-    name: Name = Field(kw_only=False)
-    color: str = Field(kw_only=True)
+    name: Name
+    color: str
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Text(_Placed):
-    name: Name = Field(kw_only=False)
-    text: str = Field(kw_only=False)
-    color: str = Field(kw_only=True)
+    name: Name
+    text: str
+    color: str
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Tones:
     """Tones as ``(frequency in Hz, duration in ms)``, repeated for ``duration_ms``.
 
@@ -471,7 +482,7 @@ class Tones:
     duration_ms: Amount
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Wav:
     """A sound file; its length is read from the file unless ``duration_ms`` is given.
 
@@ -480,7 +491,7 @@ class Wav:
 
     name: Name
     path: Path | None
-    duration_ms: float | None = Field(default=None, kw_only=True)
+    duration_ms: float | None = None
 
 
 type Stimulus = Background | Image | Rect | Circle | Cross | Text | Tones | Wav
@@ -489,17 +500,17 @@ type Stimulus = Background | Image | Rect | Circle | Cross | Text | Tones | Wav
 # ---- levels and level rules ---------------------------------------------------
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Row:
     """Values that go together, drawn as often as ``weight`` says."""
 
     name: Name
     # By parameter: a key is ``Params.refs().<field>``, read by the checker as the field.
     values: Mapping[Any, Fixed] = Field(default_factory=dict[Any, Fixed])
-    weight: float = Field(default=1, kw_only=True)
+    weight: float = 1
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Factor:
     """Something that varies from trial to trial at a level, by its own draw.
 
@@ -509,16 +520,16 @@ class Factor:
 
     name: Name
     rows: Sequence[Row]
-    order: Order = Field(default=Order.random, kw_only=True)
+    order: Order = Order.random
 
 
-@dataclass(frozen=True, config=_CONFIG)
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Level:
     """A level's parameter values, by parameter (``Params.refs()``), and its factors."""
 
     name: Name | int
     values: Mapping[Any, Value] = Field(default_factory=dict[Any, Value])
-    factors: Sequence[Factor] = Field(default=(), kw_only=True)
+    factors: Sequence[Factor] = ()
 
 
 @dataclass(frozen=True, config=_CONFIG, kw_only=True)
@@ -572,8 +583,8 @@ class Stage(BaseModel):
     #: The parameters' defaults, when they are not the fields' own.
     defaults: TrialParams | None = None
     #: Names, or the enum class of them.
-    inputs: Sequence[Name] = ()
-    outputs: Sequence[Name] = ()
+    inputs: Sequence[Name] | type[StrEnum] = ()
+    outputs: Sequence[Name] | type[StrEnum] = ()
     screen: tuple[int, int] = (1080, 1920)
     stimuli: Sequence[Stimulus] = ()
     timers: Sequence[Timer] = ()
@@ -602,9 +613,6 @@ class Stage(BaseModel):
         Start: "start",
         Reset: "reset",
     }
-
-    def __init__(self, name: Name, /, **fields: Any) -> None:
-        super().__init__(name=name, **fields)
 
     @field_validator("inputs", "outputs", mode="before")
     @classmethod

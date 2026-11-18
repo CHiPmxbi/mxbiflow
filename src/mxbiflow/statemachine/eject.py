@@ -49,6 +49,27 @@ from .runner import EXIT
 
 ASSETS = "assets"
 ANNOTATIONS = {"time": "Time", "count": "Count", "number": "float"}
+# The models with more than one field take keywords only: their first fields' names.
+FIELDS = {
+    "Uniform": ["low", "high"],
+    "State": ["name"],
+    "Group": ["name"],
+    "On": ["source", "event", "target"],
+    "Timer": ["name", "time"],
+    "Counter": ["name", "event", "limit"],
+    "Generator": ["name", "output"],
+    "Background": ["name", "color"],
+    "Image": ["name", "path"],
+    "Rect": ["name"],
+    "Circle": ["name"],
+    "Cross": ["name"],
+    "Text": ["name", "text"],
+    "Tones": ["name", "tones", "duration_ms"],
+    "Wav": ["name", "path"],
+    "Row": ["name", "values"],
+    "Factor": ["name", "rows"],
+    "Level": ["name", "values"],
+}
 SUFFIXES = {
     "rise": "Rise",
     "fall": "Fall",
@@ -228,8 +249,12 @@ class _StageSource:
         return self._of(["States"], value, where)
 
     def _model(self, name: str, *args: Any, **kwargs: Any) -> ast.Call:
+        """A stage model's constructor: all keywords, but for a model of one field."""
         self.used.add(name)
-        return _call(name, *args, **kwargs)
+        names = FIELDS.get(name)
+        if names is None:
+            return _call(name, *args, **kwargs)
+        return _call(name, **dict(zip(names, args, strict=False)), **kwargs)
 
     def _event(self, event: str, where: str) -> ast.Call:
         if event == "timeout":
@@ -476,7 +501,7 @@ class _StageSource:
             start = self._name("States", machine.start)
         model = _call(
             "Stage",
-            stage_name,
+            name=stage_name,
             params=ast.Name(self.params_class) if machine.parameters else None,
             inputs=channels["Inputs"],
             outputs=channels["Outputs"],
