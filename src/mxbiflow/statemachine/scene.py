@@ -35,6 +35,7 @@ from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
 from .host import (
     ACTIONS,
+    Action,
     Outcome,
     Progress,
     draw_trial,
@@ -80,6 +81,7 @@ class Cursor(BaseModel):
 
 
 type Hook = Callable[["MachineScene"], None]
+type Rule = Callable[["MachineScene", Outcome], Action]
 
 
 def check_channels(
@@ -115,6 +117,8 @@ class Hooks:
     on_trial: list[Hook] = field(default_factory=list["Hook"])
     #: By state name: called once each time the state is entered.
     on_enter: dict[str, list[Hook]] = field(default_factory=dict[str, list["Hook"]])
+    #: Decides whether the animal moves after a trial, in place of the stage's rule.
+    rule: Rule | None = None
 
 
 def machine_scenes(
@@ -232,6 +236,7 @@ class MachineScene(TrialScene):
         )
         self._run_hooks()
         self._apply(0)
+        self._resolve_known()
 
     def end(self) -> None:
         if self._trial is None:
@@ -242,7 +247,11 @@ class MachineScene(TrialScene):
         self._outcome = outcome_of(self._stage, self._trial)
 
     def decide(self) -> SettlementAction:
-        self._settled, action = settle(self.experiment, self._progress, self._outcome)
+        rule = self.hooks.rule
+        decided = None if rule is None else rule(self, self._outcome)
+        self._settled, action = settle(
+            self.experiment, self._progress, self._outcome, decided
+        )
         self.session.count_trial(self._outcome == "correct")
         return next(a for a, name in ACTIONS.items() if name == action)
 
@@ -307,9 +316,8 @@ class MachineScene(TrialScene):
         trial.advance(now)
         self._run_hooks()
         self._apply(now)
+        self._resolve_known()
         if trial.state is None:
-            outcome = outcome_of(self._stage, trial)
-            self.resolve(None if outcome == "none" else outcome == "correct")
             self.finish()
 
     def draw(self, screen: Surface) -> None:
@@ -347,6 +355,16 @@ class MachineScene(TrialScene):
     def note(self, key: str, value: JsonValue) -> None:
         """Keep a value in the trial's record, under ``extra``."""
         self._extra[key] = value
+
+    def _resolve_known(self) -> None:
+        """Give the framework the outcome as soon as a state has decided one.
+
+        The trial may go on (a reward, the time between trials); once its outcome is
+        known it is settled even when the animal leaves before it ends.
+        """
+        outcome = outcome_of(self._stage, self.trial)
+        if outcome != "none":
+            self.resolve(outcome == "correct")
 
     def _run_hooks(self) -> None:
         """Call the hooks of the states entered since the last call, in order."""

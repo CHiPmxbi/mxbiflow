@@ -324,7 +324,8 @@ runner and the host logic pass cogforge's conformance cases
 - **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl` with
   cogforge's fields (`animal`, `trial`, `stage`, `level`, `factors`, `values`, `outcome`,
   `action`, `states`, `events`). A trial stopped because the animal left or the run
-  ended is recorded but does not count towards the level rules.
+  ended is recorded; it counts towards the level rules once a state has decided its
+  outcome (the animal leaving during the time between trials), and not before.
 
 - **Levels**: a trial's parameters are the defaults, then the level's values (a range
   or a choice drawn anew), then one row of each of the level's factors, then the
@@ -393,6 +394,10 @@ scene_manager.register(stage_scenes(stage))
   when the state is entered. A hook has `scene.mxbiflow`, `scene.trial`, `scene.now`,
   `scene.fire(name)` to send the machine `host.<name>`, and `scene.note(key, value)` to
   keep a value under `extra` in the trial's record.
+- `set_rule(rule)` decides in Python whether the animal moves: `rule(scene, outcome)`
+  returns `"none"`, `"level up"`, `"level down"`, `"next stage"` or
+  `"previous stage"`, for a rule the rate and count rules cannot say. A move that does
+  not exist (up from the last level) stops the run.
 - A hook runs in the frame after its state was entered, so what it decides has
   one-frame resolution; what must be exact belongs in the machine.
 

@@ -29,7 +29,7 @@ import soundfile
 from ..scene.scene import Scene
 from .models import Experiment, ParamRef, Stage
 from .runner import EXIT
-from .scene import Hook, Hooks, machine_scenes
+from .scene import Hook, Hooks, Rule, machine_scenes
 from .validate import stage_problems
 
 __all__ = [
@@ -473,6 +473,16 @@ class StageBuilder:
     def set_count_rule(self, correct: int) -> None:
         """Move a level up after this many correct trials at the level."""
         self._progression = {"rule": "count", "correct": correct}
+
+    def set_rule(self, rule: Rule) -> None:
+        """Decide in Python whether the animal moves after a trial.
+
+        ``rule(scene, outcome)`` is called once for each settled trial and returns
+        ``"none"``, ``"level up"``, ``"level down"``, ``"next stage"`` or
+        ``"previous stage"``. It replaces ``set_rate_rule`` and ``set_count_rule``, for
+        a rule they cannot say; what it counts it keeps itself (``scene.session``).
+        """
+        self._hooks.rule = rule
 
     # ---- Python hooks --------------------------------------------------------
 
