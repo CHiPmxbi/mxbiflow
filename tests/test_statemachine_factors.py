@@ -56,33 +56,40 @@ class Params(TrialParams):
 
 p = Params.refs()
 PICTURES = Factor(
-    F.PICTURE, [Row(Stim.A, {p.picture: Stim.A}), Row(Stim.B, {p.picture: Stim.B})]
+    name=F.PICTURE,
+    rows=[
+        Row(name=Stim.A, values={p.picture: Stim.A}),
+        Row(name=Stim.B, values={p.picture: Stim.B}),
+    ],
 )
-SOUNDS = [Row(Stim.LOW, {p.sound: Stim.LOW}), Row(Stim.HIGH, {p.sound: Stim.HIGH})]
+SOUNDS = [
+    Row(name=Stim.LOW, values={p.sound: Stim.LOW}),
+    Row(name=Stim.HIGH, values={p.sound: Stim.HIGH}),
+]
 
 
 def pictures(*levels: Level, rule: CountRule | None = None) -> Stage:
     """Show the picture and play the sound a trial draws."""
     return Stage(
-        "pictures",
+        name="pictures",
         params=Params,
         screen=(200, 100),
         stimuli=[
             *(
-                Rect(name, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
+                Rect(name=name, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
                 for name in (Stim.A, Stim.B)
             ),
-            Tones(Stim.LOW, [(p.hz, p.tone_ms)], p.tone_ms),
-            Tones(Stim.HIGH, [(8000, 50)], 50),
+            Tones(name=Stim.LOW, tones=[(p.hz, p.tone_ms)], duration_ms=p.tone_ms),
+            Tones(name=Stim.HIGH, tones=[(8000, 50)], duration_ms=50),
         ],
         states=[
             State(
-                S.CUE,
+                name=S.CUE,
                 on_entry=[Show(p.picture), Play(p.sound)],
                 outcome=Outcome.correct,
             )
         ],
-        transitions=[On(S.CUE, Done(p.sound), EXIT)],
+        transitions=[On(source=S.CUE, event=Done(p.sound), target=EXIT)],
         levels=levels,
         rule=rule,
     )
@@ -100,12 +107,19 @@ def numbers(*values: float):
 class DrawTests(unittest.TestCase):
     def test_each_factor_draws_its_own_row_after_the_level_values(self) -> None:
         level = Level(
-            1,
-            {p.hz: Choice(500, 1000, 2000), p.tone_ms: Uniform(100, 200)},
+            name=1,
+            values={
+                p.hz: Choice(500, 1000, 2000),
+                p.tone_ms: Uniform(low=100, high=200),
+            },
             factors=[
                 PICTURES,
                 Factor(
-                    F.SOUND, [Row(Stim.LOW, {p.sound: Stim.LOW}, weight=3), SOUNDS[1]]
+                    name=F.SOUND,
+                    rows=[
+                        Row(name=Stim.LOW, values={p.sound: Stim.LOW}, weight=3),
+                        SOUNDS[1],
+                    ],
                 ),
             ],
         )
@@ -126,10 +140,12 @@ class DrawTests(unittest.TestCase):
 
     def test_factors_in_turn_keep_a_cursor_each_and_use_no_random_number(self) -> None:
         level = Level(
-            1,
+            name=1,
             factors=[
-                Factor(F.PICTURE, PICTURES.rows, order=Order.cycle),
-                Factor(F.SOUND, [*SOUNDS, Row("again")], order=Order.cycle),
+                Factor(name=F.PICTURE, rows=PICTURES.rows, order=Order.cycle),
+                Factor(
+                    name=F.SOUND, rows=[*SOUNDS, Row(name="again")], order=Order.cycle
+                ),
             ],
         )
         experiment = experiment_of(pictures(level))
@@ -152,8 +168,11 @@ class DrawTests(unittest.TestCase):
         self.assertEqual(progress.cursors, {"picture": 3, "sound": 3})
 
     def test_a_random_number_of_nearly_one_draws_the_last_row_with_weight(self) -> None:
-        rows = [PICTURES.rows[0], Row(Stim.B, {p.picture: Stim.B}, weight=0)]
-        level = Level(1, factors=[Factor(F.PICTURE, rows)])
+        rows = [
+            PICTURES.rows[0],
+            Row(name=Stim.B, values={p.picture: Stim.B}, weight=0),
+        ]
+        level = Level(name=1, factors=[Factor(name=F.PICTURE, rows=rows)])
 
         draw = draw_trial(
             experiment_of(pictures(level)), {}, Progress(0, 0), numbers(1.0)
@@ -169,7 +188,7 @@ class DrawTests(unittest.TestCase):
             draw_trial(experiment, {}, Progress(0, 3))
 
     def test_a_new_level_starts_its_factors_from_the_first_row(self) -> None:
-        stage = pictures(Level(1), Level(2), rule=CountRule(1))
+        stage = pictures(Level(name=1), Level(name=2), rule=CountRule(1))
 
         progress, action = settle(
             experiment_of(stage), Progress(0, 0, cursors={"picture": 5}), "correct"
@@ -196,7 +215,7 @@ class TrialTests(unittest.TestCase):
         self.assertEqual(trial.sounds, {"low": 240})
 
     def test_an_event_of_a_stimulus_parameter_is_that_of_each_it_can_name(self) -> None:
-        level = Level(1, {p.sound: Choice(Stim.LOW, Stim.HIGH)})
+        level = Level(name=1, values={p.sound: Choice(Stim.LOW, Stim.HIGH)})
         machine = pictures(level).build()[0].machine
 
         self.assertEqual(
@@ -227,26 +246,40 @@ class ValidationTests(unittest.TestCase):
             pictures(level).build()
 
     def test_a_parameter_set_by_the_level_and_a_factor_is_refused(self) -> None:
-        level = Level(1, {p.picture: Stim.A}, factors=[PICTURES])
+        level = Level(name=1, values={p.picture: Stim.A}, factors=[PICTURES])
         self.assert_refused(level, "picture is set twice, by 1 and by picture")
 
     def test_a_parameter_set_by_two_factors_is_refused(self) -> None:
-        level = Level(1, factors=[PICTURES, Factor("second", PICTURES.rows)])
+        level = Level(
+            name=1, factors=[PICTURES, Factor(name="second", rows=PICTURES.rows)]
+        )
         self.assert_refused(level, "picture is set twice, by picture and by second")
 
     def test_a_factor_without_rows_or_weights_is_refused(self) -> None:
-        never = Factor("never", [Row(Stim.A, {p.picture: Stim.A}, weight=0)])
-        level = Level(1, factors=[Factor("empty", []), never])
+        never = Factor(
+            name="never", rows=[Row(name=Stim.A, values={p.picture: Stim.A}, weight=0)]
+        )
+        level = Level(name=1, factors=[Factor(name="empty", rows=[]), never])
         self.assert_refused(level, "empty: the factor has no rows.*weight is 0")
 
     def test_a_factor_named_twice_is_refused(self) -> None:
-        level = Level(1, factors=[PICTURES, Factor(F.PICTURE, [Row("x", {p.hz: 1})])])
+        level = Level(
+            name=1,
+            factors=[
+                PICTURES,
+                Factor(name=F.PICTURE, rows=[Row(name="x", values={p.hz: 1})]),
+            ],
+        )
         self.assert_refused(level, "the factor's name is used twice")
 
     def test_a_stimulus_parameter_must_name_a_stimulus_of_its_use(self) -> None:
         level = Level(
-            1,
-            {p.picture: Stim.LOW, p.sound: Choice(Stim.A, "nothing"), p.hz: Stim.A},
+            name=1,
+            values={
+                p.picture: Stim.LOW,
+                p.sound: Choice(Stim.A, "nothing"),
+                p.hz: Stim.A,
+            },
         )
         self.assert_refused(
             level,
@@ -256,7 +289,9 @@ class ValidationTests(unittest.TestCase):
         )
 
     def test_a_stimulus_parameter_needs_a_name_not_a_number(self) -> None:
-        self.assert_refused(Level(1, {p.picture: 1}), "picture needs a stimulus")
+        self.assert_refused(
+            Level(name=1, values={p.picture: 1}), "picture needs a stimulus"
+        )
 
     def test_a_stimulus_parameter_both_shown_and_played_is_refused(self) -> None:
         class Both(TrialParams):
@@ -264,18 +299,18 @@ class ValidationTests(unittest.TestCase):
 
         either = Both.refs().either
         stage = Stage(
-            "both",
+            name="both",
             params=Both,
             stimuli=[
-                Rect(Stim.A, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
+                Rect(name=Stim.A, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
             ],
-            states=[State(S.CUE, on_entry=[Show(either), Play(either)])],
+            states=[State(name=S.CUE, on_entry=[Show(either), Play(either)])],
         )
         with self.assertRaisesRegex(ValueError, "either is both shown and played"):
             stage.build()
 
     def test_an_experiment_file_with_such_a_level_does_not_become_scenes(self) -> None:
-        stage = pictures(Level(1, {p.picture: Stim.A}))
+        stage = pictures(Level(name=1, values={p.picture: Stim.A}))
         broken = stage.build()[0].model_dump(mode="json", by_alias=True)
         broken["levels"][0]["factors"] = [{"name": "f", "order": "random", "rows": []}]
         experiment = Experiment.model_validate({"stages": [broken], "animals": []})

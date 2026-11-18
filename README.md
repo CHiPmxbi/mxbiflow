@@ -370,6 +370,8 @@ editor. Names are enum members, a trial's parameters are the fields of a `TrialP
 model, and states, transitions, stimuli and levels are models that refer to them, so
 the editor completes every reference and the type checker finds a misspelt one. A name
 is any string: a plain `str` works wherever an enum member does.
+A model with more than one field takes keyword arguments only, so each argument says
+what it is; an action or an event of one field (`Show(Stim.TARGET)`) may go without.
 
 ```python
 from enum import StrEnum, auto
@@ -377,8 +379,25 @@ from enum import StrEnum, auto
 from mxbiflow.scene.settlement import SettlementAction
 from mxbiflow.statemachine.scene import MachineScene
 from mxbiflow.statemachine.stage import (
-    EXIT, Choice, Circle, Clear, Factor, Host, Level, On, Outcome, Row, ScreenTouch,
-    Show, Stage, State, Time, Timeout, Touch, TrialParams, stage_scenes,
+    EXIT,
+    Choice,
+    Circle,
+    Clear,
+    Factor,
+    Host,
+    Level,
+    On,
+    Outcome,
+    Row,
+    ScreenTouch,
+    Show,
+    Stage,
+    State,
+    Time,
+    Timeout,
+    Touch,
+    TrialParams,
+    stage_scenes,
 )
 from pydantic import BaseModel
 
@@ -431,36 +450,51 @@ def rule(scene: MachineScene, outcome: Outcome | None) -> SettlementAction:
 
 
 touch = Stage(
-    "touch",
+    name="touch",
     params=Params,
     outputs=Out,
     stimuli=[
-        Circle(Stim.TARGET, x=p.target_x, y=0.3, width=0.3, height=0.3, color="#ffffff")
+        Circle(
+            name=Stim.TARGET,
+            x=p.target_x,
+            y=0.3,
+            width=0.3,
+            height=0.3,
+            color="#ffffff",
+        )
     ],
     states=[
-        State(S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
-        State(S.JUDGE, on_entry=[Clear()]),
-        State(S.FAST, timeout=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct),
-        State(S.SLOW, timeout=200, hold=[Out.REWARD], outcome=Outcome.correct),
-        State(S.MISS, timeout=2000, on_entry=[Clear()], outcome=Outcome.incorrect),
+        State(name=S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
+        State(name=S.JUDGE, on_entry=[Clear()]),
+        State(
+            name=S.FAST, timeout=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct
+        ),
+        State(name=S.SLOW, timeout=200, hold=[Out.REWARD], outcome=Outcome.correct),
+        State(name=S.MISS, timeout=2000, on_entry=[Clear()], outcome=Outcome.incorrect),
     ],
     transitions=[
-        On(S.WAIT, Touch(Stim.TARGET), S.JUDGE),
-        On(S.WAIT, ScreenTouch(), S.MISS),
-        On(S.WAIT, Timeout(), S.MISS),
-        On(S.JUDGE, Host(Verdict.FAST), S.FAST),
-        On(S.JUDGE, Host(Verdict.SLOW), S.SLOW),
-        *(On(state, Timeout(), EXIT) for state in (S.FAST, S.SLOW, S.MISS)),
+        On(source=S.WAIT, event=Touch(Stim.TARGET), target=S.JUDGE),
+        On(source=S.WAIT, event=ScreenTouch(), target=S.MISS),
+        On(source=S.WAIT, event=Timeout(), target=S.MISS),
+        On(source=S.JUDGE, event=Host(Verdict.FAST), target=S.FAST),
+        On(source=S.JUDGE, event=Host(Verdict.SLOW), target=S.SLOW),
+        *(
+            On(source=state, event=Timeout(), target=EXIT)
+            for state in (S.FAST, S.SLOW, S.MISS)
+        ),
     ],
     levels=[
-        Level(1, {p.reward_ms: 500}),
+        Level(name=1, values={p.reward_ms: 500}),
         Level(
-            2,
-            {p.reward_ms: Choice(200, 300)},  # one is drawn per trial
+            name=2,
+            values={p.reward_ms: Choice(200, 300)},  # one is drawn per trial
             factors=[
                 Factor(
-                    "place",
-                    [Row(Place.LEFT, {p.target_x: 0.3}), Row(Place.RIGHT, {p.target_x: 0.7})],
+                    name="place",
+                    rows=[
+                        Row(name=Place.LEFT, values={p.target_x: 0.3}),
+                        Row(name=Place.RIGHT, values={p.target_x: 0.7}),
+                    ],
                 )
             ],
         ),

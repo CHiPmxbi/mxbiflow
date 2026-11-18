@@ -78,17 +78,17 @@ def touch_stage(
     on_trial: Sequence[Hook] = (),
     on_judge: Hook | None = None,
     rule: Rule | CountRule | None = None,
-    levels: Sequence[Level] = (Level("near", {p.reward_ms: 80}),),
+    levels: Sequence[Level] = (Level(name="near", values={p.reward_ms: 80}),),
 ) -> Stage:
     """Touch the target: a fast touch is rewarded longer than a slow one."""
     return Stage(
-        "touch",
+        name="touch",
         params=Params,
         outputs=Out,
         screen=(200, 100),
         stimuli=[
             Rect(
-                Stim.TARGET,
+                name=Stim.TARGET,
                 x=p.target_x,
                 y=0.2,
                 width=20,
@@ -98,21 +98,29 @@ def touch_stage(
             )
         ],
         states=[
-            State(S.WAIT, timeout=1000, on_entry=[Show(Stim.TARGET)]),
-            State(S.JUDGE, on_entry=[Clear()]),
+            State(name=S.WAIT, timeout=1000, on_entry=[Show(Stim.TARGET)]),
+            State(name=S.JUDGE, on_entry=[Clear()]),
             State(
-                S.FAST, timeout=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct
+                name=S.FAST,
+                timeout=p.reward_ms,
+                hold=[Out.REWARD],
+                outcome=Outcome.correct,
             ),
-            State(S.SLOW, timeout=10, hold=[Out.REWARD], outcome=Outcome.correct),
-            State(S.MISS, timeout=10, on_entry=[Clear()], outcome=Outcome.incorrect),
+            State(name=S.SLOW, timeout=10, hold=[Out.REWARD], outcome=Outcome.correct),
+            State(
+                name=S.MISS, timeout=10, on_entry=[Clear()], outcome=Outcome.incorrect
+            ),
         ],
         transitions=[
-            On(S.WAIT, Touch(Stim.TARGET), S.JUDGE),
-            On(S.WAIT, ScreenTouch(), S.MISS),
-            On(S.WAIT, Timeout(), S.MISS),
-            On(S.JUDGE, Host(Verdict.FAST), S.FAST),
-            On(S.JUDGE, Host(Verdict.SLOW), S.SLOW),
-            *(On(state, Timeout(), EXIT) for state in (S.FAST, S.SLOW, S.MISS)),
+            On(source=S.WAIT, event=Touch(Stim.TARGET), target=S.JUDGE),
+            On(source=S.WAIT, event=ScreenTouch(), target=S.MISS),
+            On(source=S.WAIT, event=Timeout(), target=S.MISS),
+            On(source=S.JUDGE, event=Host(Verdict.FAST), target=S.FAST),
+            On(source=S.JUDGE, event=Host(Verdict.SLOW), target=S.SLOW),
+            *(
+                On(source=state, event=Timeout(), target=EXIT)
+                for state in (S.FAST, S.SLOW, S.MISS)
+            ),
         ],
         levels=levels,
         rule=CountRule(2) if rule is None else rule,
@@ -144,15 +152,15 @@ class StageTests(unittest.TestCase):
 
     def test_a_name_that_leads_nowhere_is_refused_with_its_place(self) -> None:
         stage = Stage(
-            "lost",
+            name="lost",
             outputs=Out,
             states=[
-                State(S.WAIT, on_entry=[Show("ghost")]),
-                State(S.FAST, hold=["laser"]),
+                State(name=S.WAIT, on_entry=[Show("ghost")]),
+                State(name=S.FAST, hold=["laser"]),
             ],
             transitions=[
-                On(S.WAIT, Host(Verdict.SLOW), "nowhere"),
-                On("nobody", Timeout(), EXIT),
+                On(source=S.WAIT, event=Host(Verdict.SLOW), target="nowhere"),
+                On(source="nobody", event=Timeout(), target=EXIT),
             ],
             on_enter={"gone": always_fast},
         )
@@ -180,11 +188,14 @@ class StageTests(unittest.TestCase):
             after: S
 
         stage = Stage(
-            "timed",
+            name="timed",
             params=Timed,
             defaults=Timed(wait_ms=300, after=S.FAST),
-            states=[State(S.WAIT, timeout=Timed.refs().wait_ms), State(S.FAST)],
-            transitions=[On(S.WAIT, Timeout(), Timed.refs().after)],
+            states=[
+                State(name=S.WAIT, timeout=Timed.refs().wait_ms),
+                State(name=S.FAST),
+            ],
+            transitions=[On(source=S.WAIT, event=Timeout(), target=Timed.refs().after)],
         )
 
         parameters = stage.build()[0].machine.parameters
@@ -193,13 +204,13 @@ class StageTests(unittest.TestCase):
             [("wait_ms", "time", 300), ("after", "state", "fast")],
         )
         with self.assertRaisesRegex(ValueError, "parameter wait_ms needs a default"):
-            Stage("none", params=Timed, states=[State(S.WAIT)]).build()
+            Stage(name="none", params=Timed, states=[State(name=S.WAIT)]).build()
 
     def test_plain_strings_name_things_as_enum_members_do(self) -> None:
         stage = Stage(
-            "plain",
-            states=[State("wait", timeout=10)],
-            transitions=[On("wait", Timeout(), EXIT)],
+            name="plain",
+            states=[State(name="wait", timeout=10)],
+            transitions=[On(source="wait", event=Timeout(), target=EXIT)],
         )
         data, _ = stage.build()
         self.assertEqual(data.machine.states[0].transitions[0].target, "exit")
@@ -309,7 +320,10 @@ class HookTests(unittest.TestCase):
         stage = touch_stage(
             on_judge=always_fast,
             rule=rule,
-            levels=[Level("near", {p.reward_ms: 80}), Level("far", {p.reward_ms: 20})],
+            levels=[
+                Level(name="near", values={p.reward_ms: 80}),
+                Level(name="far", values={p.reward_ms: 20}),
+            ],
         )
 
         first = self.run_trial(stage, touch_at=100)

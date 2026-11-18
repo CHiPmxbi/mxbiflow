@@ -76,15 +76,15 @@ def everything() -> Stage:
     """A stage that uses each thing the format has, with names that are not Python's."""
     p = Odd.refs()
     return Stage(
-        "class",
+        name="class",
         params=Odd,
         inputs=["lick left"],
         outputs=["reward", "laser"],
         screen=(800, 600),
         stimuli=[
-            Background("grey", "#808080"),
+            Background(name="grey", color="#808080"),
             Cross(
-                "show",
+                name="show",
                 x=p.stage,
                 y=0.5,
                 width=40,
@@ -93,36 +93,36 @@ def everything() -> Stage:
                 color="#ffffff",
             ),
             Text(
-                'say "go"',
-                'it\'s "go"\n',
+                name='say "go"',
+                text='it\'s "go"\n',
                 x=0.5,
                 y=0.1,
                 width=0.5,
                 height=0.1,
                 color="#000000",
             ),
-            Image("frame", None, x=0.5, y=0.5, width=0.2, height=0.2),
-            Tones("tone", [(p.hz, 100), (0, p.wait_ms)], 600),
-            Tones("long", [(500, 50.5)], p.wait_ms),
-            Wav("silence", None, duration_ms=250),
+            Image(name="frame", path=None, x=0.5, y=0.5, width=0.2, height=0.2),
+            Tones(name="tone", tones=[(p.hz, 100), (0, p.wait_ms)], duration_ms=600),
+            Tones(name="long", tones=[(500, 50.5)], duration_ms=p.wait_ms),
+            Wav(name="silence", path=None, duration_ms=250),
         ],
-        timers=[Timer("limit", p.wait_ms)],
+        timers=[Timer(name="limit", time=p.wait_ms)],
         generators=[
-            Generator("pulses", "laser", width=5, period=20, count=0),
-            Generator("one", "laser", width=p.wait_ms, delay=3),
+            Generator(name="pulses", output="laser", width=5, period=20, count=0),
+            Generator(name="one", output="laser", width=p.wait_ms, delay=3),
         ],
-        counters=[Counter("licked", Rise("lick left"), p.licks)],
-        groups=[Group("all"), Group("trial", hold=["laser"], parent="all")],
+        counters=[Counter(name="licked", event=Rise("lick left"), limit=p.licks)],
+        groups=[Group(name="all"), Group(name="trial", hold=["laser"], parent="all")],
         states=[
             State(
-                "give",
+                name="give",
                 timeout=100,
                 hold=["reward"],
                 group="all",
                 outcome=Outcome.correct,
             ),
             State(
-                "wait",
+                name="wait",
                 timeout=p.wait_ms,
                 group="trial",
                 on_entry=[
@@ -143,37 +143,37 @@ def everything() -> Stage:
         ],
         start="wait",
         transitions=[
-            On("give", Timeout(), EXIT),
-            On("wait", Touch("show"), p.after),
-            On("wait", Done("tone"), "give"),
-            On("wait", Host("go"), "give"),
-            On("trial", Reached("licked"), "give"),
-            On("all", Done("limit"), EXIT),
+            On(source="give", event=Timeout(), target=EXIT),
+            On(source="wait", event=Touch("show"), target=p.after),
+            On(source="wait", event=Done("tone"), target="give"),
+            On(source="wait", event=Host("go"), target="give"),
+            On(source="trial", event=Reached("licked"), target="give"),
+            On(source="all", event=Done("limit"), target=EXIT),
         ],
         levels=[
-            Level("easy"),
+            Level(name="easy"),
             Level(
-                "hard",
-                {
-                    p.wait_ms: Uniform(500, 900.5),
+                name="hard",
+                values={
+                    p.wait_ms: Uniform(low=500, high=900.5),
                     p.licks: 3,
                     p.hz: Choice(4000, 8000),
                     p.sound: Choice("tone"),
                 },
                 factors=[
                     Factor(
-                        "side",
-                        [
-                            Row("left", {p.stage: 0.25, p.after: "give"}),
-                            Row("right", {p.stage: 0.75}, weight=2.5),
+                        name="side",
+                        rows=[
+                            Row(name="left", values={p.stage: 0.25, p.after: "give"}),
+                            Row(name="right", values={p.stage: 0.75}, weight=2.5),
                         ],
                         order=Order.cycle,
                     ),
                     Factor(
-                        "which",
-                        [
-                            Row("cue", {p.which: "show"}),
-                            Row("frame", {p.which: "frame"}),
+                        name="which",
+                        rows=[
+                            Row(name="cue", values={p.which: "show"}),
+                            Row(name="frame", values={p.which: "frame"}),
                         ],
                     ),
                 ],
@@ -239,7 +239,10 @@ class EjectTests(unittest.TestCase):
         # A name that is not what auto() gives keeps its spelling.
         self.assertIn('    A_LEFT = "A left"', source)
         self.assertIn("    on_left: States = States.REWARD", source)
-        self.assertIn("On(States.CHOICE, Rise(Inputs.LICK_LEFT), p.on_left)", source)
+        self.assertIn(
+            "On(source=States.CHOICE, event=Rise(Inputs.LICK_LEFT), target=p.on_left)",
+            source,
+        )
         self.assertIn("Choice(6000, 9500, 12000)", source)
         # No name is looked up by a string: the only ones left are colours.
         body = source[source.index("discriminate = Stage(") :]
