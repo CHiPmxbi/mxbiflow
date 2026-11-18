@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, JsonValue
 
 from ..scene.settlement import (
     CountSettlementConfig,
@@ -85,6 +85,8 @@ class TrialRecord(BaseModel):
     action: Action
     states: list[Entered]
     events: list[Logged]
+    # What the stage's own Python code noted about the trial (MachineScene.note).
+    extra: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
 
 
 def start_of(experiment: Experiment, animal: Animal) -> Progress:
@@ -212,6 +214,7 @@ def record_of(
     trial: Trial,
     outcome: Outcome,
     action: Action,
+    extra: Mapping[str, JsonValue] | None = None,
 ) -> TrialRecord:
     stage = experiment.stages[progress.stage]
     return TrialRecord(
@@ -225,4 +228,5 @@ def record_of(
         action=action,
         states=[Entered(state=v.state, t=v.t) for v in trial.visited],
         events=[Logged(t=entry.t, text=entry.text) for entry in trial.log],
+        extra=dict(extra or {}),
     )

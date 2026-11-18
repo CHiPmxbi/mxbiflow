@@ -326,6 +326,64 @@ runner and the host logic pass cogforge's conformance cases
   `action`, `states`, `events`). A trial stopped because the animal left or the run
   ended is recorded but does not count towards the level rules.
 
+### A state machine written in Python
+
+`StageBuilder` (`mxbiflow.statemachine.builder`) has the classic interface: add states,
+add transitions on events, add timers, counters and stimuli, by name. It builds the same
+stage data that cogforge exports, so the runner, the records and the level rules are the
+same; nothing needs the graphical editor.
+
+```python
+from mxbiflow.statemachine.builder import EXIT, StageBuilder, clear, show, stage_scenes
+
+stage = StageBuilder("touch", outputs=["reward"])
+reward_ms = stage.add_time("reward_ms", 500)
+target = stage.add_circle("target", x=0.5, y=0.3, width=0.3, height=0.3, color="#ffffff")
+
+stage.add_state("wait", on_entry=[show(target)], timeout=5000)
+stage.add_state("judge", on_entry=[clear()])
+stage.add_state("fast", hold=["reward"], timeout=reward_ms)
+stage.add_state("slow", hold=["reward"], timeout=200)
+stage.add_state("miss", on_entry=[clear()], timeout=2000)
+
+stage.add_transition("wait", f"{target}.touch", "judge")
+stage.add_transition("wait", "screen.touch", "miss")
+stage.add_transition("wait", "timeout", "miss")
+stage.add_transition("judge", "host.fast", "fast")
+stage.add_transition("judge", "host.slow", "slow")
+for state in ("fast", "slow", "miss"):
+    stage.add_transition(state, "timeout", EXIT)
+
+stage.set_outcome("fast", "correct")
+stage.set_outcome("slow", "correct")
+stage.set_outcome("miss", "incorrect")
+stage.add_level("1", {"reward_ms": 500})
+stage.add_level("2", {"reward_ms": 300})
+stage.set_rate_rule(min_trials=20, up=0.8, down=0.2)
+
+
+def judge(scene):  # Python where the data cannot say it
+    scene.note("latency_ms", scene.now)
+    scene.fire("fast" if scene.now < 1500 else "slow")  # the event host.fast / host.slow
+
+
+stage.on_enter("judge", judge)
+
+scene_manager.register(stage_scenes(stage))
+```
+
+- The machine is data: a state holds outputs, does its entry actions and has
+  transitions tried in the order added; a group's hold and transitions apply in its
+  states. `build()` refuses a name that leads nowhere (a missing state, output,
+  stimulus, timer) and says where.
+- Hooks are the host's Python: `on_trial(hook)` runs before a trial and may change
+  `scene.values` (a stimulus sequence, a random choice); `on_enter(state, hook)` runs
+  when the state is entered. A hook has `scene.mxbiflow`, `scene.trial`, `scene.now`,
+  `scene.fire(name)` to send the machine `host.<name>`, and `scene.note(key, value)` to
+  keep a value under `extra` in the trial's record.
+- A hook runs in the frame after its state was entered, so what it decides has
+  one-frame resolution; what must be exact belongs in the machine.
+
 ## Experiment manifest and stage configurations
 
 `--describe` (`uv run main.py --describe`) prints the experiment's manifest as

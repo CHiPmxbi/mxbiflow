@@ -230,6 +230,11 @@ class Trial:
             return
         self._fire([f"{self.stimulus_at(x, y) or 'screen'}.touch"], t, 0)
 
+    def host(self, name: str, t: float) -> None:
+        """The host sends the event ``host.<name>``; its time is when it is taken."""
+        self.advance(t)
+        self._fire([f"host.{name}"], t, 0)
+
     def stop(self, t: float) -> None:
         """The host ends the trial."""
         self.advance(t)
