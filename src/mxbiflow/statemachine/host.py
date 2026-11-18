@@ -34,7 +34,7 @@ from .runner import Trial, Values, default_values
 type Outcome = Literal["correct", "incorrect", "miss", "none"]
 type Action = Literal["none", "level up", "level down", "next stage", "previous stage"]
 
-_ACTIONS: dict[SettlementAction, Action] = {
+ACTIONS: dict[SettlementAction, Action] = {
     SettlementAction.NONE: "none",
     SettlementAction.LEVEL_UP: "level up",
     SettlementAction.LEVEL_DOWN: "level down",
@@ -190,7 +190,7 @@ def settle(
                 total_levels=len(stage.levels), settlement_cycle=rule.correct
             ),
         ).action
-    action = _ACTIONS[decided]
+    action = ACTIONS[decided]
     if action == "level up":
         return Progress(progress.stage, progress.level + 1), action
     if action == "level down":

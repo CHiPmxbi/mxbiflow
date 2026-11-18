@@ -7,8 +7,9 @@ scheduler then starts the scene of the animal's stage for each trial.
 The experiment only names its channels; the rig's wiring says which device each one is
 (``channels`` in the hardware configuration, ``mxbi.json``): an input is high while its
 detector sees an animal, an output runs its rewarder while it is high. The touchscreen
-needs no mapping. A stopped trial (the animal left, the run ended) is recorded
-but does not count towards the level rules.
+needs no mapping. The trial's life cycle is :class:`~mxbiflow.scene.TrialScene`'s: a
+stopped trial (the animal left, the run ended) is recorded but does not count towards
+the level rules.
 """
 
 import io
@@ -27,10 +28,18 @@ from ..driver.audioplayer.audioplayer import AudioPlayer, LoadedWav, PlayTask
 from ..driver.audioplayer.puretone_generator import PureToneGenerator, PureToneUnit
 from ..driver.detector.detector import Detector
 from ..driver.rewarder.rewarder import Rewarder
-from ..infra.data_logger import DataLogger
-from ..models.animal import StageState
+from ..gameloop.settlement import SettlementAction
 from ..scene.scene import Scene
-from .host import Action, Progress, draw_trial, outcome_of, record_of, settle
+from ..scene.trial_scene import TrialScene
+from .host import (
+    ACTIONS,
+    Outcome,
+    Progress,
+    draw_trial,
+    outcome_of,
+    record_of,
+    settle,
+)
 from .models import (
     BackgroundStimulus,
     CircleStimulus,
@@ -56,12 +65,13 @@ type VisualStimulus = (
 type Sound = WavStimulus | TonesStimulus
 
 
-class LevelCounts(BaseModel):
-    """An animal's counts at ``level`` of a stage, kept in the stage's context."""
+class Cursor(BaseModel):
+    """The next trial type at ``level`` of a stage that takes them in turn.
+
+    Kept in the stage's context; the level's counts are the session's.
+    """
 
     level: int
-    trials: int = 0
-    correct: int = 0
     cursor: int = 0
 
 
@@ -117,7 +127,7 @@ def machine_scenes(
                 "experiment": experiment,
                 "wiring": wiring,
                 "stage_index": index,
-                "level_table": {"default": list(range(len(stage.levels)))},
+                "level_table": {"default": list(range(1, len(stage.levels) + 1))},
                 "_surfaces": {},
                 "_sounds": {},
             },
@@ -126,8 +136,11 @@ def machine_scenes(
     }
 
 
-class MachineScene(Scene):
-    """One trial of one stage; :func:`machine_scenes` makes the class of each stage."""
+class MachineScene(TrialScene):
+    """One trial of one stage; :func:`machine_scenes` makes the class of each stage.
+
+    The session's level ``n`` is the stage's ``n``-th level, counted from 1.
+    """
 
     experiment: ClassVar[Experiment]
     wiring: ClassVar[Wiring | None]
@@ -141,17 +154,14 @@ class MachineScene(Scene):
         return cls.experiment.stages[cls.stage_index].name
 
     def __init__(self) -> None:
-        super().__init__()
-        self._mxbiflow = get_mxbiflow()
-        self._session = self._mxbiflow.session
-        mxbi = self._mxbiflow.mxbi
-        self._aplayer: AudioPlayer = mxbi.aplayer
+        # What cannot run fails here, before the trial is counted.
+        context = get_mxbiflow()
+        mxbi = context.mxbi
         self._stage = self.experiment.stages[self.stage_index]
         self._machine: Machine = self._stage.machine
-
         channels = self.wiring
         if channels is None:
-            rig = self._session.mxbi_config.channels
+            rig = context.session.mxbi_config.channels
             channels = Wiring(inputs=rig.inputs, outputs=rig.outputs)
             check_channels(self._stage, channels)
         self._inputs: dict[str, Detector] = {
@@ -165,16 +175,23 @@ class MachineScene(Scene):
         self._rotated = self._screen_rotated(
             (mxbi.screen_size.width, mxbi.screen_size.height)
         )
+        # A level outside the stage's (a new animal's 0, one set by hand) is brought in.
+        state = context.session.require_current_animal().current_stage
+        level = min(max(state.level, 1), len(self._stage.levels))
+        if level != state.level:
+            state.reset_level(level)
+        super().__init__()
+        self._aplayer: AudioPlayer = mxbi.aplayer
 
-        self._animal = self._session.require_current_animal()
-        self._session.add_trial()
         progress = self._load_progress()
         own = next(
-            (a.values for a in self.experiment.animals if a.name == self._animal.name),
+            (a.values for a in self.experiment.animals if a.name == self.animal.name),
             {},
         )
         self._draw = draw_trial(self.experiment, own, progress)
         self._progress = replace(progress, cursor=self._draw.cursor)
+        self._settled: Progress = self._progress
+        self._outcome: Outcome = "none"
         self._values: Values = self._draw.values
 
         self._trial: Trial | None = None
@@ -183,24 +200,53 @@ class MachineScene(Scene):
         self._playing: dict[str, tuple[float, PlayTask | None]] = {}
         self._frame: tuple[list[str], Surface] | None = None
 
-    # ---- Scene ---------------------------------------------------------------
+    # ---- TrialScene ----------------------------------------------------------
 
-    def start(self) -> None:
+    def begin(self) -> None:
         self._started_ms = pygame.time.get_ticks()
         # The rig reports its own inputs, a photodiode among them: none is simulated.
         self._trial = Trial(
             self._machine, self._read_inputs(), 0, self._values, photodiode=False
         )
-        self._running = True
         self._apply(0)
 
-    def quit(self) -> None:
-        if not self._running or self._trial is None:
+    def end(self) -> None:
+        if self._trial is None:
             return
         now = self._now()
         self._trial.stop(now)
         self._apply(now)
-        self._finish(stopped=True)
+        self._outcome = outcome_of(self._stage, self._trial)
+
+    def decide(self) -> SettlementAction:
+        self._settled, action = settle(self.experiment, self._progress, self._outcome)
+        self.session.count_trial(self._outcome == "correct")
+        return next(a for a, name in ACTIONS.items() if name == action)
+
+    def record(self) -> BaseModel:
+        assert self._trial is not None
+        return record_of(
+            self.experiment,
+            self.animal.name,
+            self.info.trial_id,
+            self._progress,
+            self._draw,
+            self._trial,
+            self._outcome,
+            ACTIONS[self.action],
+        )
+
+    def move(self, action: SettlementAction) -> None:
+        settled = self._settled
+        if action in (SettlementAction.NEXT_STAGE, SettlementAction.PREV_STAGE):
+            self.session.enter_stage(
+                self.experiment.stages[settled.stage].name, settled.level + 1
+            )
+        else:
+            super().move(action)
+        self.session.set_stage_context(
+            _CONTEXT, Cursor(level=settled.level + 1, cursor=settled.cursor)
+        )
 
     def handle_event(self, event: Event) -> None:
         if not self._running or self._trial is None:
@@ -220,7 +266,8 @@ class MachineScene(Scene):
         self._trial.advance(now)
         self._apply(now)
         if self._trial.state is None:
-            self._finish(stopped=False)
+            outcome = outcome_of(self._stage, self._trial)
+            self.finish(None if outcome == "none" else outcome == "correct")
 
     def draw(self, screen: Surface) -> None:
         shown = self._trial.shown if self._trial is not None else []
@@ -354,69 +401,16 @@ class MachineScene(Scene):
     # ---- the host's side -----------------------------------------------------
 
     def _load_progress(self) -> Progress:
-        """Where the animal is: the session's stage and level, and its counts there."""
-        state = self._animal.current_stage
-        state.level = min(state.level, len(self._stage.levels) - 1)
-        counts = state.get_context(_CONTEXT, LevelCounts)
-        if counts is None or counts.level != state.level:
-            # A new level, or one set by hand: the counts start again.
-            counts = LevelCounts(level=state.level)
+        """Where the animal is: the session's stage, level and counts at the level."""
+        state = self.animal.current_stage
+        cursor = state.get_context(_CONTEXT, Cursor)
         return Progress(
             self.stage_index,
-            state.level,
-            counts.trials,
-            counts.correct,
-            counts.cursor,
-        )
-
-    def _finish(self, *, stopped: bool) -> None:
-        trial = self._trial
-        assert trial is not None
-        self._running = False
-        outcome = outcome_of(self._stage, trial)
-        progress: Progress = self._progress
-        action: Action = "none"
-        if not stopped:
-            progress, action = settle(self.experiment, self._progress, outcome)
-        record = record_of(
-            self.experiment,
-            self._animal.name,
-            self._animal.trial_id,
-            self._progress,
-            self._draw,
-            trial,
-            outcome,
-            action,
-        )
-        DataLogger(
-            self._session, animal=self._animal.name, stage=self._stage.name
-        ).save(record.model_dump(mode="json"))
-        self._mxbiflow.publish_trial(
-            record, correct=None if outcome == "none" else outcome == "correct"
-        )
-        self._store_progress(progress, action)
-
-    def _store_progress(self, progress: Progress, action: Action) -> None:
-        if action in ("next stage", "previous stage"):
-            target = self.experiment.stages[progress.stage].name
-            state = self._animal.stages.setdefault(
-                target, StageState(stage_name=target)
-            )
-            state.level = progress.level
-            state.level_trial_id = 0
-            self._session.set_current_stage(target)
-        elif action == "level up":
-            self._session.level_up()
-        elif action == "level down":
-            self._session.level_down()
-        self._session.set_stage_context(
-            _CONTEXT,
-            LevelCounts(
-                level=progress.level,
-                trials=progress.trials,
-                correct=progress.correct,
-                cursor=progress.cursor,
-            ),
+            state.level - 1,
+            state.level_counted,
+            state.level_correct,
+            # A new level, or one set by hand, takes its types from the first again.
+            cursor.cursor if cursor is not None and cursor.level == state.level else 0,
         )
 
 

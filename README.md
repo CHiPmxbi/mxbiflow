@@ -111,6 +111,34 @@ class MyScene:
     def draw(self, screen: Surface) -> None: ...
 ```
 
+### Trials
+
+A stage whose scene is one trial subclasses `TrialScene`, and the framework keeps the
+trial's life cycle. The scheduler makes an instance for each trial of the animal's
+stage; the instance counts the trial, and when it ends the framework records it in
+`<stage>/result.jsonl`, publishes it, settles the level and cancels the trial's timers
+and sounds, in that order.
+
+```python
+class Touch(TrialScene):
+    def begin(self) -> None: ...          # start the trial
+    def end(self) -> None: ...            # stop what it started; called once
+    def record(self) -> BaseModel: ...    # asked once, after settling
+    def settlement(self) -> RateSettlementConfig | CountSettlementConfig | None: ...
+    # handle_event, update and draw run the trial and call self.finish(correct)
+```
+
+- `self.info` is the animal's stage, level and trial numbers when the trial started;
+  `self.correct`, `self.aborted` and `self.action` are set before `record()` is asked.
+- `finish(correct)` ends the trial; `correct=None` leaves it out of accuracy and of the
+  level's counts.
+- A trial the framework ends first (the animal left, the run ended) is aborted: it is
+  recorded and published with `aborted` set, and not settled.
+- Levels count from 1. The counts a rule settles on are the session's
+  (`StageState.level_counted` and `level_correct`), and start again at every level
+  change, a manual one included. Without `settlement()` the level stays.
+- `decide()` and `move()` can be overridden for a rule of the stage's own.
+
 ## Logging
 
 mxbiflow never configures logging on import. For a batteries-included
@@ -268,10 +296,10 @@ runner and the host logic pass cogforge's conformance cases
 - **Screen**: stimuli are placed in the machine's screen pixels, which must be the
   rig's `screen_size`, or its transpose for an upright screen (drawn turned as the idle
   scene's picture is).
-- **Animals**: stage and level come from the session configuration, the level as an
-  index into the stage's levels; the experiment file's animals only give their own
-  parameter values. Counts at the level and the trial-type cursor are in the stage's
-  context `machine` of the session snapshot.
+- **Animals**: stage and level come from the session configuration; level `n` is the
+  stage's `n`-th level, from 1. The experiment file's animals only give their own
+  parameter values. Counts at the level are the session's; the trial-type cursor is in
+  the stage's context `machine`.
 - **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl` with
   cogforge's fields (`animal`, `trial`, `stage`, `level`, `type`, `values`, `outcome`,
   `action`, `states`, `events`). A trial stopped because the animal left or the run

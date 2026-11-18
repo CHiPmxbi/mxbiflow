@@ -7,7 +7,7 @@ from .bootstrap import init_gameloop
 from .commands import CommandRegistry, NoParams, RemoteCommand, Reply
 from .core.context import MXBIFlow, get_mxbiflow
 from .core.path import get_base_path, set_base_path
-from .scene import Scene, SceneManager
+from .scene import Scene, SceneManager, TrialScene
 
 __all__ = [
     "CommandRegistry",
@@ -17,6 +17,7 @@ __all__ = [
     "Reply",
     "Scene",
     "SceneManager",
+    "TrialScene",
     "get_base_path",
     "get_mxbiflow",
     "init_gameloop",

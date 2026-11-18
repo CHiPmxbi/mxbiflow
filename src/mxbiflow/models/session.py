@@ -529,6 +529,19 @@ class Session(BaseModel):
         animal_session.trial_id += 1
         self.checkpoint()
 
+    def count_trial(self, correct: bool) -> None:
+        """Count a finished trial of the current animal towards its level's settlement."""
+        stage = self.require_current_animal().current_stage
+        stage.level_counted += 1
+        stage.level_correct += correct
+        self.checkpoint()
+
+    def enter_stage(self, stage: str, level: int) -> None:
+        """Move the current animal to ``stage`` at ``level``, its level counts at zero."""
+        animal = self.require_current_animal()
+        animal.stages.setdefault(stage, StageState(stage_name=stage)).reset_level(level)
+        self.set_current_stage(stage)
+
     def level_up(
         self,
         *,
@@ -537,8 +550,7 @@ class Session(BaseModel):
     ) -> int:
         animal_state = self._resolve_animal(animal)
         stage_state = self._resolve_stage(animal=animal, stage=stage)
-        stage_state.level_trial_id = 0
-        stage_state.level += 1
+        stage_state.reset_level(stage_state.level + 1)
         if stage_state is animal_state.current_stage:
             self._persist_animal_progress(animal_state)
         self.checkpoint()
@@ -555,8 +567,7 @@ class Session(BaseModel):
         if stage_state.level == 0:
             raise ValueError("level cannot be less than 0")
 
-        stage_state.level_trial_id = 0
-        stage_state.level -= 1
+        stage_state.reset_level(stage_state.level - 1)
         if stage_state is animal_state.current_stage:
             self._persist_animal_progress(animal_state)
         self.checkpoint()

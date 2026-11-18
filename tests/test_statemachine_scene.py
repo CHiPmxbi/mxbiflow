@@ -13,7 +13,7 @@ from mxbiflow.driver import MXBIModel
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 from mxbiflow.statemachine.models import Experiment
-from mxbiflow.statemachine.scene import LevelCounts, Wiring, machine_scenes
+from mxbiflow.statemachine.scene import Cursor, Wiring, machine_scenes
 
 
 def state(name: str, **parts: Any) -> dict[str, Any]:
@@ -145,13 +145,13 @@ class MachineSceneTests(unittest.TestCase):
             get_rewarder=lambda _id: self.rewarder,
         )
         return SimpleNamespace(
-            session=self.session, mxbi=mxbi, publish_trial=self.publish
+            session=self.session, mxbi=mxbi, publish_trial=self.publish, timer=Mock()
         )
 
     def trial(self, scenes: Experiment, context: SimpleNamespace):
         """Start the next trial of the animal's stage at the current time."""
         animal = self.session.require_current_animal()
-        with patch("mxbiflow.statemachine.scene.get_mxbiflow", return_value=context):
+        with patch("mxbiflow.core.context._current_mxbiflow", context):
             scene = machine_scenes(scenes, WIRING)[animal.current_stage_name]()
         scene.start()
         return scene
@@ -221,12 +221,10 @@ class MachineSceneTests(unittest.TestCase):
         self.assertEqual(actions, ["none", "level up", "none", "next stage"])
         animal = self.session.require_current_animal()
         self.assertEqual(animal.current_stage_name, "second")
-        self.assertEqual(animal.current_stage.level, 0)
-        self.assertEqual(animal.stages["first"].level, 1)
-        self.assertEqual(
-            animal.current_stage.get_context("machine", LevelCounts),
-            LevelCounts(level=0),
-        )
+        second = animal.current_stage
+        self.assertEqual((second.level, second.level_counted), (1, 0))
+        self.assertEqual(animal.stages["first"].level, 2)
+        self.assertEqual(second.get_context("machine", Cursor), Cursor(level=1))
 
     def test_a_trial_the_animal_leaves_is_recorded_but_not_counted(self) -> None:
         scenes = experiment(stage("touch"))
@@ -239,10 +237,10 @@ class MachineSceneTests(unittest.TestCase):
         (record,) = self.records("touch")
         self.assertEqual(record["outcome"], "none")
         self.assertEqual(record["events"][-1], {"t": 40, "text": "trial stopped"})
-        counts = self.session.require_current_animal().current_stage.get_context(
-            "machine", LevelCounts
+        stage_state = self.session.require_current_animal().current_stage
+        self.assertEqual(
+            (stage_state.level_trial_id, stage_state.level_counted), (1, 0)
         )
-        self.assertEqual(counts, LevelCounts(level=0))
 
     def test_an_input_follows_its_detector(self) -> None:
         scenes = experiment(stage("touch"))
@@ -300,7 +298,7 @@ class MachineSceneTests(unittest.TestCase):
     def test_the_rig_configuration_wires_the_channels(self) -> None:
         scenes = experiment(stage("touch"))
         context = self.context(scenes)
-        with patch("mxbiflow.statemachine.scene.get_mxbiflow", return_value=context):
+        with patch("mxbiflow.core.context._current_mxbiflow", context):
             with self.assertRaisesRegex(ValueError, 'input "beam", output "reward"'):
                 machine_scenes(scenes)["touch"]()
             self.assertEqual(self.session.require_current_animal().trial_id, 0)
