@@ -14,14 +14,20 @@ from dataclasses import dataclass
 from .models import (
     Amount1,
     BackgroundStimulus,
+    CircleStimulus,
     ClearAction,
+    CrossStimulus,
     HideAction,
+    ImageStimulus,
     Machine,
     ParamRef,
     PlayAction,
+    RectStimulus,
     ResetAction,
     ShowAction,
+    Size,
     StopAction,
+    TextStimulus,
     TonesStimulus,
     Transition,
     WavStimulus,
@@ -35,6 +41,9 @@ _MAX_STEPS = 1000
 
 type Values = dict[str, float | str]
 type Amount = Amount1 | ParamRef
+type VisualStimulus = (
+    ImageStimulus | CircleStimulus | RectStimulus | CrossStimulus | TextStimulus
+)
 
 
 @dataclass(frozen=True)
@@ -67,12 +76,42 @@ def target_in(values: Values, target: ParamRef | str) -> str:
     return found if isinstance(found, str) else EXIT
 
 
+@dataclass(frozen=True)
+class Place:
+    """A visual stimulus on a screen: its centre and size in pixels."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+def place_of(
+    stimulus: VisualStimulus, values: Values, screen: tuple[float, float]
+) -> Place:
+    """Where the stimulus lands on a screen of this size with this trial's values.
+
+    Its centre is a fraction of the screen; a ``fraction`` size is of the screen's
+    width, for the width and the height.
+    """
+    width, height = screen
+    scale = 1 if stimulus.size is Size.px else width
+    return Place(
+        amount_in(values, stimulus.x) * width,
+        amount_in(values, stimulus.y) * height,
+        stimulus.width * scale,
+        stimulus.height * scale,
+    )
+
+
 class Trial:
     """One trial of ``machine`` with this trial's parameter ``values``.
 
     ``inputs`` are the input levels when the trial starts. With ``photodiode`` an input
     called ``screen_on`` is simulated: it flashes for one frame, one frame after every
     change of the screen. A rig with a real photodiode reports it as any other input.
+    ``screen`` is the size in pixels of the screen touches are on; the machine's own
+    is only cogforge's reference.
     """
 
     def __init__(
@@ -83,8 +122,10 @@ class Trial:
         values: Values | None = None,
         *,
         photodiode: bool = True,
+        screen: tuple[float, float] | None = None,
     ) -> None:
         self._machine = machine
+        self._screen = screen or (machine.screen.width, machine.screen.height)
         self._states = {state.name: state for state in machine.states}
         self._groups = {group.name: group for group in machine.groups}
         self._stimuli = {stimulus.name: stimulus for stimulus in machine.stimuli}
@@ -157,9 +198,10 @@ class Trial:
                 stimulus, (BackgroundStimulus, WavStimulus, TonesStimulus)
             ):
                 continue
+            place = place_of(stimulus, self.values, self._screen)
             if (
-                abs(x - amount_in(self.values, stimulus.x)) <= stimulus.width / 2
-                and abs(y - amount_in(self.values, stimulus.y)) <= stimulus.height / 2
+                abs(x - place.x) <= place.width / 2
+                and abs(y - place.y) <= place.height / 2
             ):
                 return name
         return None
@@ -182,7 +224,7 @@ class Trial:
         self._set_level(name, high, t)
 
     def touch(self, x: float, y: float, t: float) -> None:
-        """The animal touches the screen at ``(x, y)`` pixels of the machine's screen."""
+        """The animal touches the screen at ``(x, y)`` pixels."""
         self.advance(t)
         if self.state is None:
             return

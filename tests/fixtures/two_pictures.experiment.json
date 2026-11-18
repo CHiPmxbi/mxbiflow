@@ -37,12 +37,12 @@
           {
             "name": "a_x",
             "type": "number",
-            "default": 280
+            "default": 0.25
           },
           {
             "name": "b_x",
             "type": "number",
-            "default": 800
+            "default": 0.75
           }
         ],
         "timers": [],
@@ -198,8 +198,9 @@
           {
             "kind": "cross",
             "name": "fixation",
-            "x": 540,
-            "y": 700,
+            "x": 0.5,
+            "y": 0.36,
+            "size": "px",
             "width": 120,
             "height": 120,
             "color": "#ffffff"
@@ -210,9 +211,10 @@
             "x": {
               "param": "a_x"
             },
-            "y": 1200,
-            "width": 380,
-            "height": 380,
+            "y": 0.625,
+            "size": "fraction",
+            "width": 0.35,
+            "height": 0.35,
             "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cpolygon%20points%3D%2250%2C6%2096%2C92%204%2C92%22%20fill%3D%22%23f59e0b%22%2F%3E%3C%2Fsvg%3E"
           },
           {
@@ -221,9 +223,10 @@
             "x": {
               "param": "b_x"
             },
-            "y": 1200,
-            "width": 380,
-            "height": 380,
+            "y": 0.625,
+            "size": "fraction",
+            "width": 0.35,
+            "height": 0.35,
             "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2244%22%20fill%3D%22%233b82f6%22%2F%3E%3C%2Fsvg%3E"
           },
           {
@@ -260,8 +263,8 @@
               "values": {
                 "on_left": "reward",
                 "on_right": "error",
-                "a_x": 280,
-                "b_x": 800
+                "a_x": 0.25,
+                "b_x": 0.75
               }
             },
             {
@@ -270,8 +273,8 @@
               "values": {
                 "on_left": "error",
                 "on_right": "reward",
-                "a_x": 800,
-                "b_x": 280
+                "a_x": 0.75,
+                "b_x": 0.25
               }
             }
           ],
@@ -294,8 +297,8 @@
               "values": {
                 "on_left": "reward",
                 "on_right": "error",
-                "a_x": 280,
-                "b_x": 800
+                "a_x": 0.25,
+                "b_x": 0.75
               }
             },
             {
@@ -304,8 +307,8 @@
               "values": {
                 "on_left": "error",
                 "on_right": "reward",
-                "a_x": 800,
-                "b_x": 280
+                "a_x": 0.75,
+                "b_x": 0.25
               }
             }
           ],

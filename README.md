@@ -311,9 +311,12 @@ runner and the host logic pass cogforge's conformance cases
   its pin. A stage that uses a channel the rig does not wire fails with the channel's
   name before its first trial starts. The touchscreen needs no wiring: a touch is
   `<stimulus>.touch` or `screen.touch`.
-- **Screen**: stimuli are placed in the machine's screen pixels, which must be the
-  rig's `screen_size`, or its transpose for an upright screen (drawn turned as the idle
-  scene's picture is).
+- **Screen**: a stimulus's centre is a fraction of the screen as the animal sees it,
+  and its size is pixels or a fraction of the screen's width. The rig's `screen_size`
+  counts; the experiment's own screen is only cogforge's reference, and says whether
+  the layout is upright: when it is and the rig's framebuffer lies on its side, the
+  frame is drawn turned, as the idle scene's picture is. A stimulus that does not fit
+  the rig's screen, or a centre outside it, stops the run with the stimulus's name.
 - **Animals**: stage and level come from the session configuration; level `n` is the
   stage's `n`-th level, from 1. The experiment file's animals only give their own
   parameter values. Counts at the level are the session's; the trial-type cursor is in

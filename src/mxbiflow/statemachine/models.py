@@ -150,6 +150,11 @@ class ScreenSize(BaseModel):
     height: Annotated[int, Field(gt=0, le=9007199254740991)]
 
 
+class Size(StrEnum):
+    px = "px"
+    fraction = "fraction"
+
+
 class BackgroundStimulus(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -300,6 +305,7 @@ class ImageStimulus(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     x: Amount1 | ParamRef
     y: Amount1 | ParamRef
+    size: Size
     width: Annotated[float, Field(gt=0.0)]
     height: Annotated[float, Field(gt=0.0)]
     image: Annotated[str, StringConstraints(pattern=r"^data:image\/")] | None
@@ -314,6 +320,7 @@ class CircleStimulus(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     x: Amount1 | ParamRef
     y: Amount1 | ParamRef
+    size: Size
     width: Annotated[float, Field(gt=0.0)]
     height: Annotated[float, Field(gt=0.0)]
     color: Annotated[str, Field(pattern="^#[0-9a-fA-F]{6}$")]
@@ -328,6 +335,7 @@ class RectStimulus(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     x: Amount1 | ParamRef
     y: Amount1 | ParamRef
+    size: Size
     width: Annotated[float, Field(gt=0.0)]
     height: Annotated[float, Field(gt=0.0)]
     color: Annotated[str, Field(pattern="^#[0-9a-fA-F]{6}$")]
@@ -342,6 +350,7 @@ class CrossStimulus(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     x: Amount1 | ParamRef
     y: Amount1 | ParamRef
+    size: Size
     width: Annotated[float, Field(gt=0.0)]
     height: Annotated[float, Field(gt=0.0)]
     color: Annotated[str, Field(pattern="^#[0-9a-fA-F]{6}$")]
@@ -356,6 +365,7 @@ class TextStimulus(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     x: Amount1 | ParamRef
     y: Amount1 | ParamRef
+    size: Size
     width: Annotated[float, Field(gt=0.0)]
     height: Annotated[float, Field(gt=0.0)]
     color: Annotated[str, Field(pattern="^#[0-9a-fA-F]{6}$")]

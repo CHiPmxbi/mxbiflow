@@ -51,17 +51,13 @@ from .models import (
     Machine,
     RectStimulus,
     Stage,
-    TextStimulus,
     TonesStimulus,
     WavStimulus,
 )
-from .runner import Trial, Values, amount_in
+from .runner import Trial, Values, VisualStimulus, place_of
 
 _CONTEXT = "machine"
 
-type VisualStimulus = (
-    ImageStimulus | CircleStimulus | RectStimulus | CrossStimulus | TextStimulus
-)
 type Sound = WavStimulus | TonesStimulus
 
 
@@ -146,9 +142,12 @@ class MachineScene(TrialScene):
         self._outputs: dict[str, OutputChannel] = {
             name: mxbi.outputs[name] for name in self._machine.channels.outputs
         }
-        self._rotated = self._screen_rotated(
-            (mxbi.screen_size.width, mxbi.screen_size.height)
-        )
+        # The animal's screen: the rig's, turned a quarter when the experiment is laid
+        # out upright and the rig's framebuffer lies on its side (or the reverse).
+        rig = (mxbi.screen_size.width, mxbi.screen_size.height)
+        reference = self._machine.screen
+        self._rotated = (reference.width > reference.height) != (rig[0] > rig[1])
+        self._screen: tuple[int, int] = (rig[1], rig[0]) if self._rotated else rig
         # A level outside the stage's (a new animal's 0, one set by hand) is brought in.
         state = context.session.require_current_animal().current_stage
         level = min(max(state.level, 1), len(self._stage.levels))
@@ -167,6 +166,7 @@ class MachineScene(TrialScene):
         self._settled: Progress = self._progress
         self._outcome: Outcome = "none"
         self._values: Values = self._draw.values
+        self._check_places()
 
         self._trial: Trial | None = None
         self._started = 0.0
@@ -185,7 +185,14 @@ class MachineScene(TrialScene):
             channel.changes()  # what happened before the trial is not its events
             levels[name] = channel.level()
         # The rig reports its own inputs, a photodiode among them: none is simulated.
-        self._trial = Trial(self._machine, levels, 0, self._values, photodiode=False)
+        self._trial = Trial(
+            self._machine,
+            levels,
+            0,
+            self._values,
+            photodiode=False,
+            screen=self._screen,
+        )
         self._apply(0)
 
     def end(self) -> None:
@@ -232,7 +239,7 @@ class MachineScene(TrialScene):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             x, y = event.pos
             if self._rotated:
-                x, y = y, self._machine.screen.height - x
+                x, y = y, self._screen[1] - x
             self._touches.append((self._now(), x, y))
 
     def update(self, dt_s: float) -> None:
@@ -283,17 +290,23 @@ class MachineScene(TrialScene):
     def _now(self) -> float:
         return self._ms(monotonic())
 
-    def _screen_rotated(self, rig: tuple[int, int]) -> bool:
-        """Whether the animal's upright screen is the rig's screen turned a quarter."""
-        size = (self._machine.screen.width, self._machine.screen.height)
-        if size == rig:
-            return False
-        if size[::-1] == rig:
-            return True
-        raise ValueError(
-            f'stage "{self._stage.name}" is laid out for a {size[0]}×{size[1]} '
-            f"screen; this rig's is {rig[0]}×{rig[1]}"
-        )
+    def _check_places(self) -> None:
+        """Raise ``ValueError`` for a stimulus this trial cannot show on this screen."""
+        width, height = self._screen
+        for stimulus in self._machine.stimuli:
+            if isinstance(stimulus, (BackgroundStimulus, WavStimulus, TonesStimulus)):
+                continue
+            place = place_of(stimulus, self._values, self._screen)
+            if not (0 <= place.x <= width and 0 <= place.y <= height):
+                raise ValueError(
+                    f'stage "{self._stage.name}": the centre of "{stimulus.name}" is '
+                    "outside the screen (positions are fractions from 0 to 1)"
+                )
+            if place.width > width or place.height > height:
+                raise ValueError(
+                    f'stage "{self._stage.name}": "{stimulus.name}" does not fit '
+                    f"this rig's {width}×{height} screen"
+                )
 
     def _apply(self, now: float) -> None:
         """Drive the outputs and sounds to what the trial says they are at ``now``."""
@@ -340,8 +353,7 @@ class MachineScene(TrialScene):
     # ---- the screen ----------------------------------------------------------
 
     def _render(self, shown: list[str]) -> Surface:
-        screen = self._machine.screen
-        frame = Surface((screen.width, screen.height))
+        frame = Surface(self._screen)
         stimuli = {stimulus.name: stimulus for stimulus in self._machine.stimuli}
         for name in shown:
             stimulus = stimuli[name]
@@ -352,13 +364,12 @@ class MachineScene(TrialScene):
         return frame
 
     def _render_visual(self, frame: Surface, stimulus: VisualStimulus) -> None:
-        x = amount_in(self._values, stimulus.x)
-        y = amount_in(self._values, stimulus.y)
-        w, h = stimulus.width, stimulus.height
+        place = place_of(stimulus, self._values, self._screen)
+        w, h = place.width, place.height
         box = pygame.Rect(0, 0, round(w), round(h))
-        box.center = (round(x), round(y))
+        box.center = (round(place.x), round(place.y))
         if isinstance(stimulus, ImageStimulus):
-            image = self._image(stimulus)
+            image = self._image(stimulus, box.size)
             if image is not None:
                 frame.blit(image, box)
             else:
@@ -378,11 +389,10 @@ class MachineScene(TrialScene):
         else:
             _draw_text(frame, stimulus.text, stimulus.color, h, box.center)
 
-    def _image(self, stimulus: ImageStimulus) -> Surface | None:
+    def _image(self, stimulus: ImageStimulus, size: tuple[int, int]) -> Surface | None:
         if stimulus.name not in self._surfaces:
             surface = None
             if stimulus.image is not None:
-                size = (round(stimulus.width), round(stimulus.height))
                 kind, data = _data(stimulus.image)
                 if kind == "image/svg+xml":
                     surface = pygame.image.load_sized_svg(io.BytesIO(data), size)
