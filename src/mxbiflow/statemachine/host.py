@@ -183,9 +183,16 @@ def outcome_of(stage: Stage, trial: Trial) -> Outcome:
 
 
 def settle(
-    experiment: Experiment, progress: Progress, outcome: Outcome
+    experiment: Experiment,
+    progress: Progress,
+    outcome: Outcome,
+    decided_by_host: Action | None = None,
 ) -> tuple[Progress, Action]:
-    """Count the trial and decide whether the animal moves on."""
+    """Count the trial and decide whether the animal moves on.
+
+    ``decided_by_host`` is what a stage's own rule decided, in place of the stage's
+    ``progression``; a move it asks for that does not exist raises ``ValueError``.
+    """
     stage = experiment.stages[progress.stage]
     is_correct = outcome == "correct"
     counted = replace(
@@ -218,6 +225,20 @@ def settle(
             ),
         ).action
     action = ACTIONS[decided]
+    if decided_by_host is not None:
+        action = decided_by_host
+        possible = {
+            "none": True,
+            "level up": progress.level < len(stage.levels) - 1,
+            "level down": progress.level > 0,
+            "next stage": progress.stage < len(experiment.stages) - 1,
+            "previous stage": progress.stage > 0,
+        }
+        if not possible[action]:
+            raise ValueError(
+                f'stage "{stage.name}", level {progress.level + 1}: '
+                f'the stage\'s rule decided "{action}", which is not possible'
+            )
     if action == "level up":
         return Progress(progress.stage, progress.level + 1), action
     if action == "level down":

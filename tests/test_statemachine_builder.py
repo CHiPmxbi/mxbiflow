@@ -19,6 +19,7 @@ from mxbiflow.statemachine.builder import (
     show,
     stage_scenes,
 )
+from mxbiflow.statemachine.host import Action
 from mxbiflow.statemachine.runner import Trial
 from mxbiflow.statemachine.scene import MachineScene
 
@@ -181,3 +182,51 @@ class HookTests(unittest.TestCase):
         self.assertEqual(record["values"]["target_x"], 0.25)
         self.assertEqual(record["values"]["reward_ms"], 80)
         self.assertEqual(record["outcome"], "incorrect")
+
+    def test_a_rule_in_python_decides_whether_the_animal_moves(self) -> None:
+        stage = touch_stage()
+        stage.add_level("far", {"reward_ms": 20})
+        stage.on_enter("judge", lambda scene: scene.fire("fast"))
+        asked: list[tuple[str, int]] = []
+
+        def rule(scene: MachineScene, outcome: str) -> Action:
+            asked.append((outcome, scene.info.level))
+            return "level up" if len(asked) == 2 else "none"
+
+        stage.set_rule(rule)
+
+        first = self.run_trial(stage, touch_at=100)
+        second = self.run_trial(stage, touch_at=100)
+
+        # The stage's own rule (two correct trials) is not asked.
+        self.assertEqual((first["action"], second["action"]), ("none", "level up"))
+        self.assertEqual(asked, [("correct", 1), ("correct", 1)])
+        self.assertEqual(self.session.require_current_animal().current_stage.level, 2)
+
+    def test_a_rule_that_decides_a_move_that_does_not_exist_stops_the_run(self) -> None:
+        stage = touch_stage()
+        stage.on_enter("judge", lambda scene: scene.fire("fast"))
+        stage.set_rule(lambda scene, outcome: "level up")
+
+        with self.assertRaisesRegex(ValueError, '"level up", which is not possible'):
+            self.run_trial(stage, touch_at=100)
+
+    def test_a_trial_left_after_its_outcome_is_known_is_settled(self) -> None:
+        stage = touch_stage()
+        stage.on_enter("judge", lambda scene: scene.fire("fast"))
+        with patch("mxbiflow.context._current_mxbiflow", self.context):
+            scene = stage_scenes(stage)["touch"]()
+        scene.start()
+        self.now = 100
+        scene.handle_event(Event(MOUSEBUTTONDOWN, button=1, pos=(150, 20)))
+        scene.update(0)
+        scene.update(0)
+
+        # The animal leaves while the reward runs.
+        self.now = 120
+        scene.quit()
+
+        assert isinstance(scene, MachineScene)
+        self.assertFalse(scene.aborted)
+        state = self.session.require_current_animal().current_stage
+        self.assertEqual((state.level_counted, state.level_correct), (1, 1))
