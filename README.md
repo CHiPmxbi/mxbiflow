@@ -337,67 +337,133 @@ runner and the host logic pass cogforge's conformance cases
   with only zero weights, a stimulus parameter naming no stimulus of its use
   (`mxbiflow.statemachine.validate`).
 
-### A state machine written in Python
+### A stage written in Python
 
-`StageBuilder` (`mxbiflow.statemachine.builder`) has the classic interface: add states,
-add transitions on events, add timers, counters and stimuli, by name. It builds the same
-stage data that cogforge exports, so the runner, the records and the level rules are the
-same; nothing needs the graphical editor.
+`mxbiflow.statemachine.stage` writes a stage as the same data cogforge exports, so the
+runner, the records and the level rules are the same and nothing needs the graphical
+editor. Names are enum members, a trial's parameters are the fields of a `TrialParams`
+model, and states, transitions, stimuli and levels are models that refer to them, so
+the editor completes every reference and the type checker finds a misspelt one. A name
+is any string: a plain `str` works wherever an enum member does.
 
 ```python
-from mxbiflow.statemachine.builder import EXIT, StageBuilder, clear, show, stage_scenes
+from enum import StrEnum, auto
 
-stage = StageBuilder("touch", outputs=["reward"])
-reward_ms = stage.add_time("reward_ms", 500)
-target_x = stage.add_number("target_x", 0.5)
-target = stage.add_circle("target", x=target_x, y=0.3, width=0.3, height=0.3, color="#ffffff")
-
-stage.add_state("wait", on_entry=[show(target)], timeout=5000)
-stage.add_state("judge", on_entry=[clear()])
-stage.add_state("fast", hold=["reward"], timeout=reward_ms)
-stage.add_state("slow", hold=["reward"], timeout=200)
-stage.add_state("miss", on_entry=[clear()], timeout=2000)
-
-stage.add_transition("wait", f"{target}.touch", "judge")
-stage.add_transition("wait", "screen.touch", "miss")
-stage.add_transition("wait", "timeout", "miss")
-stage.add_transition("judge", "host.fast", "fast")
-stage.add_transition("judge", "host.slow", "slow")
-for state in ("fast", "slow", "miss"):
-    stage.add_transition(state, "timeout", EXIT)
-
-stage.set_outcome("fast", "correct")
-stage.set_outcome("slow", "correct")
-stage.set_outcome("miss", "incorrect")
-stage.add_level("1", {"reward_ms": 500})
-late = stage.add_level("2", {"reward_ms": [200, 300]})  # a list: one is drawn per trial
-stage.add_factor(late, "place", {"left": {"target_x": 0.3}, "right": {"target_x": 0.7}})
-stage.set_rate_rule(min_trials=20, up=0.8, down=0.2)
+from mxbiflow.scene.settlement import SettlementAction
+from mxbiflow.statemachine.scene import MachineScene
+from mxbiflow.statemachine.stage import (
+    EXIT, Choice, Circle, Clear, Factor, Host, Level, On, Outcome, Row, ScreenTouch,
+    Show, Stage, State, Time, Timeout, Touch, TrialParams, stage_scenes,
+)
+from pydantic import BaseModel
 
 
-def judge(scene):  # Python where the data cannot say it
-    scene.note("latency_ms", scene.now)
-    scene.fire("fast" if scene.now < 1500 else "slow")  # the event host.fast / host.slow
+class S(StrEnum):
+    WAIT = auto()
+    JUDGE = auto()
+    FAST = auto()
+    SLOW = auto()
+    MISS = auto()
 
 
-stage.on_enter("judge", judge)
+class Out(StrEnum):
+    REWARD = auto()
 
-scene_manager.register(stage_scenes(stage))
+
+class Stim(StrEnum):
+    TARGET = auto()
+
+
+class Verdict(StrEnum):
+    FAST = auto()
+    SLOW = auto()
+
+
+class Place(StrEnum):
+    LEFT = auto()
+    RIGHT = auto()
+
+
+class Params(TrialParams):
+    reward_ms: Time = 500
+    target_x: float = 0.5
+
+
+class Extra(BaseModel):
+    latency_ms: float
+
+
+p = Params.refs()  # the parameters themselves, where a value could stand
+
+
+def judge(scene: MachineScene) -> None:  # Python where the data cannot say it
+    scene.note(Extra(latency_ms=scene.now))
+    scene.fire(Verdict.FAST if scene.now < 1500 else Verdict.SLOW)
+
+
+def rule(scene: MachineScene, outcome: Outcome | None) -> SettlementAction:
+    return SettlementAction.NONE
+
+
+touch = Stage(
+    "touch",
+    params=Params,
+    outputs=Out,
+    stimuli=[
+        Circle(Stim.TARGET, x=p.target_x, y=0.3, width=0.3, height=0.3, color="#ffffff")
+    ],
+    states=[
+        State(S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
+        State(S.JUDGE, on_entry=[Clear()]),
+        State(S.FAST, timeout=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct),
+        State(S.SLOW, timeout=200, hold=[Out.REWARD], outcome=Outcome.correct),
+        State(S.MISS, timeout=2000, on_entry=[Clear()], outcome=Outcome.incorrect),
+    ],
+    transitions=[
+        On(S.WAIT, Touch(Stim.TARGET), S.JUDGE),
+        On(S.WAIT, ScreenTouch(), S.MISS),
+        On(S.WAIT, Timeout(), S.MISS),
+        On(S.JUDGE, Host(Verdict.FAST), S.FAST),
+        On(S.JUDGE, Host(Verdict.SLOW), S.SLOW),
+        *(On(state, Timeout(), EXIT) for state in (S.FAST, S.SLOW, S.MISS)),
+    ],
+    levels=[
+        Level(1, {p.reward_ms: 500}),
+        Level(
+            2,
+            {p.reward_ms: Choice(200, 300)},  # one is drawn per trial
+            factors=[
+                Factor(
+                    "place",
+                    [Row(Place.LEFT, {p.target_x: 0.3}), Row(Place.RIGHT, {p.target_x: 0.7})],
+                )
+            ],
+        ),
+    ],
+    rule=rule,
+    on_enter={S.JUDGE: judge},
+)
+
+scene_manager.register(stage_scenes(touch))
 ```
 
 - The machine is data: a state holds outputs, does its entry actions and has
-  transitions tried in the order added; a group's hold and transitions apply in its
+  transitions tried in the order given; a group's hold and transitions apply in its
   states. `build()` refuses a name that leads nowhere (a missing state, output,
   stimulus, timer) and says where.
-- Hooks are the host's Python: `on_trial(hook)` runs before a trial and may change
-  `scene.values` (a stimulus sequence, a random choice); `on_enter(state, hook)` runs
-  when the state is entered. A hook has `scene.mxbiflow`, `scene.trial`, `scene.now`,
-  `scene.fire(name)` to send the machine `host.<name>`, and `scene.note(key, value)` to
-  keep a value under `extra` in the trial's record.
-- `set_rule(rule)` decides in Python whether the animal moves: `rule(scene, outcome)`
-  returns `"none"`, `"level up"`, `"level down"`, `"next stage"` or
-  `"previous stage"`, for a rule the rate and count rules cannot say. A move that does
-  not exist (up from the last level) stops the run.
+- A parameter's type is its field's: `Time`, `Count`, `float` for any other number, the
+  states' enum for where a transition leads, the stimuli's for which one to show or
+  play. `Params.refs().reward_ms` is the parameter itself: put it where a state or a
+  stimulus takes a value, and use it as the key of a level's or a row's values. The
+  event of a stimulus parameter (`Touch(p.target)`) is that of each stimulus it can name.
+- Python is the host's: `on_trial` hooks run before a trial and may set its parameters
+  (`scene.set(p.target_x, 0.3)`); `on_enter` hooks run when their state is entered. A
+  hook has `scene.mxbiflow`, `scene.trial`, `scene.now`, `scene.params(Params)` for the
+  trial's values as the model, `scene.fire(name)` to send the machine `Host(name)`, and
+  `scene.note(model)` to keep a model's fields under `extra` in the trial's record.
+- `rule` moves the animal between levels: `RateRule`, `CountRule`, or Python for a rule
+  they cannot say, which gets the trial's `Outcome` and returns a `SettlementAction`. A
+  move that does not exist (up from the last level) stops the run.
 - A hook runs in the frame after its state was entered, so what it decides has
   one-frame resolution; what must be exact belongs in the machine.
 
@@ -410,8 +476,8 @@ and go on from there:
 mxbiflow eject experiment.json my-experiment
 ```
 
-writes `my-experiment/stages.py`, with one function per stage that builds it with
-`StageBuilder` as one would by hand, and the pictures and sounds as files in
+writes `my-experiment/stages.py`, with each stage as one would write it by hand (every
+name an enum member, the parameters a model), and the pictures and sounds as files in
 `my-experiment/assets`. Register its `scenes`:
 
 ```python

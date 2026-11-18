@@ -1,61 +1,134 @@
 import json
 import tempfile
 import unittest
+from collections.abc import Sequence
+from enum import StrEnum, auto
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock, patch
 
+from pydantic import BaseModel
 from pygame import MOUSEBUTTONDOWN, Event
 
 from mxbiflow.driver import MXBIModel
 from mxbiflow.driver.channels import RewarderOutput
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
-from mxbiflow.statemachine.builder import (
+from mxbiflow.scene.settlement import SettlementAction
+from mxbiflow.statemachine.runner import Trial
+from mxbiflow.statemachine.scene import Hook, MachineScene, Rule
+from mxbiflow.statemachine.stage import (
     EXIT,
-    StageBuilder,
-    clear,
-    show,
+    Clear,
+    CountRule,
+    Host,
+    Level,
+    On,
+    Outcome,
+    Rect,
+    ScreenTouch,
+    Show,
+    Size,
+    Stage,
+    State,
+    Time,
+    Timeout,
+    Touch,
+    TrialParams,
     stage_scenes,
 )
-from mxbiflow.statemachine.host import Action
-from mxbiflow.statemachine.runner import Trial
-from mxbiflow.statemachine.scene import MachineScene
 
 
-def touch_stage() -> StageBuilder:
+class S(StrEnum):
+    WAIT = auto()
+    JUDGE = auto()
+    FAST = auto()
+    SLOW = auto()
+    MISS = auto()
+
+
+class Out(StrEnum):
+    REWARD = auto()
+
+
+class Stim(StrEnum):
+    TARGET = auto()
+
+
+class Verdict(StrEnum):
+    FAST = auto()
+    SLOW = auto()
+
+
+class Params(TrialParams):
+    reward_ms: Time = 50
+    target_x: float = 0.75
+
+
+class Extra(BaseModel):
+    latency_ms: float
+
+
+p = Params.refs()
+
+
+def touch_stage(
+    *,
+    on_trial: Sequence[Hook] = (),
+    on_judge: Hook | None = None,
+    rule: Rule | CountRule | None = None,
+    levels: Sequence[Level] = (Level("near", {p.reward_ms: 80}),),
+) -> Stage:
     """Touch the target: a fast touch is rewarded longer than a slow one."""
-    stage = StageBuilder("touch", outputs=["reward"], screen=(200, 100))
-    reward_ms = stage.add_time("reward_ms", 50)
-    target_x = stage.add_number("target_x", 0.75)
-    target = stage.add_rect(
-        "target", x=target_x, y=0.2, width=20, height=20, size="px", color="#ff0000"
+    return Stage(
+        "touch",
+        params=Params,
+        outputs=Out,
+        screen=(200, 100),
+        stimuli=[
+            Rect(
+                Stim.TARGET,
+                x=p.target_x,
+                y=0.2,
+                width=20,
+                height=20,
+                size=Size.px,
+                color="#ff0000",
+            )
+        ],
+        states=[
+            State(S.WAIT, timeout=1000, on_entry=[Show(Stim.TARGET)]),
+            State(S.JUDGE, on_entry=[Clear()]),
+            State(
+                S.FAST, timeout=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct
+            ),
+            State(S.SLOW, timeout=10, hold=[Out.REWARD], outcome=Outcome.correct),
+            State(S.MISS, timeout=10, on_entry=[Clear()], outcome=Outcome.incorrect),
+        ],
+        transitions=[
+            On(S.WAIT, Touch(Stim.TARGET), S.JUDGE),
+            On(S.WAIT, ScreenTouch(), S.MISS),
+            On(S.WAIT, Timeout(), S.MISS),
+            On(S.JUDGE, Host(Verdict.FAST), S.FAST),
+            On(S.JUDGE, Host(Verdict.SLOW), S.SLOW),
+            *(On(state, Timeout(), EXIT) for state in (S.FAST, S.SLOW, S.MISS)),
+        ],
+        levels=levels,
+        rule=CountRule(2) if rule is None else rule,
+        on_trial=on_trial,
+        on_enter={} if on_judge is None else {S.JUDGE: on_judge},
     )
-    stage.add_state("wait", on_entry=[show(target)], timeout=1000)
-    stage.add_state("judge", on_entry=[clear()])
-    stage.add_state("fast", hold=["reward"], timeout=reward_ms)
-    stage.add_state("slow", hold=["reward"], timeout=10)
-    stage.add_state("miss", on_entry=[clear()], timeout=10)
-    stage.add_transition("wait", f"{target}.touch", "judge")
-    stage.add_transition("wait", "screen.touch", "miss")
-    stage.add_transition("wait", "timeout", "miss")
-    stage.add_transition("judge", "host.fast", "fast")
-    stage.add_transition("judge", "host.slow", "slow")
-    for state in ("fast", "slow", "miss"):
-        stage.add_transition(state, "timeout", EXIT)
-    stage.set_outcome("fast", "correct")
-    stage.set_outcome("slow", "correct")
-    stage.set_outcome("miss", "incorrect")
-    stage.add_level("near", {"reward_ms": 80})
-    stage.set_count_rule(correct=2)
-    return stage
 
 
-class StageBuilderTests(unittest.TestCase):
+def always_fast(scene: MachineScene) -> None:
+    scene.fire(Verdict.FAST)
+
+
+class StageTests(unittest.TestCase):
     def test_the_built_machine_runs_as_data(self) -> None:
         stage, _ = touch_stage().build()
-        trial = Trial(stage.machine)
+        trial = Trial(stage.machine, screen=(200, 100))
 
         trial.touch(150, 20, 100)
         self.assertEqual(trial.state, "judge")
@@ -70,10 +143,19 @@ class StageBuilderTests(unittest.TestCase):
         self.assertEqual(stage.levels[0].values, {"reward_ms": 80})
 
     def test_a_name_that_leads_nowhere_is_refused_with_its_place(self) -> None:
-        stage = touch_stage()
-        stage.add_transition("wait", "host.skip", "nowhere")
-        stage.add_state("lit", hold=["laser"], on_entry=[show("ghost")])
-        stage.on_enter("gone", lambda scene: None)
+        stage = Stage(
+            "lost",
+            outputs=Out,
+            states=[
+                State(S.WAIT, on_entry=[Show("ghost")]),
+                State(S.FAST, hold=["laser"]),
+            ],
+            transitions=[
+                On(S.WAIT, Host(Verdict.SLOW), "nowhere"),
+                On("nobody", Timeout(), EXIT),
+            ],
+            on_enter={"gone": always_fast},
+        )
 
         with self.assertRaises(ValueError) as raised:
             stage.build()
@@ -81,15 +163,25 @@ class StageBuilderTests(unittest.TestCase):
         message = str(raised.exception)
         for part in (
             'wait: no state "nowhere"',
-            'lit: no output "laser"',
-            'lit: show "ghost" does not exist',
+            'fast: no output "laser"',
+            'wait: show "ghost" does not exist',
+            'a transition from "nobody", which is no state or group',
             'no state "gone"',
         ):
             self.assertIn(part, message)
 
-    def test_a_transition_from_an_unknown_state_is_refused(self) -> None:
-        with self.assertRaisesRegex(ValueError, 'no state or group "ghost"'):
-            touch_stage().add_transition("ghost", "timeout", EXIT)
+    def test_a_parameter_that_is_not_one_is_refused_where_it_is_written(self) -> None:
+        with self.assertRaisesRegex(AttributeError, "no parameter rewardms"):
+            _ = p.rewardms  # pyright: ignore[reportAttributeAccessIssue]
+
+    def test_plain_strings_name_things_as_enum_members_do(self) -> None:
+        stage = Stage(
+            "plain",
+            states=[State("wait", timeout=10)],
+            transitions=[On("wait", Timeout(), EXIT)],
+        )
+        data, _ = stage.build()
+        self.assertEqual(data.machine.states[0].transitions[0].target, "exit")
 
 
 class HookTests(unittest.TestCase):
@@ -129,7 +221,7 @@ class HookTests(unittest.TestCase):
             timer=Mock(),
         )
 
-    def run_trial(self, stage: StageBuilder, touch_at: int) -> dict[str, Any]:
+    def run_trial(self, stage: Stage, touch_at: int) -> dict[str, Any]:
         """One trial touched at the target's default place; returns its record."""
         with patch("mxbiflow.context._current_mxbiflow", self.context):
             scene = stage_scenes(stage)["touch"]()
@@ -145,14 +237,12 @@ class HookTests(unittest.TestCase):
         return json.loads(path.read_text().splitlines()[-1])
 
     def test_a_hook_judges_the_touch_and_sends_the_machine_its_verdict(self) -> None:
-        stage = touch_stage()
-
         def judge(scene: MachineScene) -> None:
             latency = scene.now
-            scene.note("latency_ms", latency)
-            scene.fire("fast" if latency < 300 else "slow")
+            scene.note(Extra(latency_ms=latency))
+            scene.fire(Verdict.FAST if latency < 300 else Verdict.SLOW)
 
-        stage.on_enter("judge", judge)
+        stage = touch_stage(on_judge=judge)
 
         fast = self.run_trial(stage, touch_at=100)
         slow = self.run_trial(stage, touch_at=400)
@@ -168,52 +258,54 @@ class HookTests(unittest.TestCase):
         # Two correct trials: the count rule has nowhere to go and stays.
         self.assertEqual(slow["action"], "none")
 
-    def test_a_hook_sets_the_values_of_the_trial_before_it_starts(self) -> None:
-        stage = touch_stage()
-        stage.on_enter("judge", lambda scene: scene.fire("fast"))
+    def test_a_hook_sets_and_reads_the_values_of_the_trial(self) -> None:
+        seen: list[Params] = []
 
-        @stage.on_trial
         def move_target(scene: MachineScene) -> None:
             # The target is elsewhere: the touch at its default place misses.
-            scene.values["target_x"] = 0.25
+            scene.set(p.target_x, 0.25)
+            seen.append(scene.params(Params))
+
+        stage = touch_stage(on_trial=[move_target], on_judge=always_fast)
 
         record = self.run_trial(stage, touch_at=100)
 
+        self.assertEqual(seen, [Params(reward_ms=80, target_x=0.25)])
         self.assertEqual(record["values"]["target_x"], 0.25)
-        self.assertEqual(record["values"]["reward_ms"], 80)
         self.assertEqual(record["outcome"], "incorrect")
 
     def test_a_rule_in_python_decides_whether_the_animal_moves(self) -> None:
-        stage = touch_stage()
-        stage.add_level("far", {"reward_ms": 20})
-        stage.on_enter("judge", lambda scene: scene.fire("fast"))
-        asked: list[tuple[str, int]] = []
+        asked: list[tuple[Outcome | None, int]] = []
 
-        def rule(scene: MachineScene, outcome: str) -> Action:
+        def rule(scene: MachineScene, outcome: Outcome | None) -> SettlementAction:
             asked.append((outcome, scene.info.level))
-            return "level up" if len(asked) == 2 else "none"
+            return (
+                SettlementAction.LEVEL_UP if len(asked) == 2 else SettlementAction.NONE
+            )
 
-        stage.set_rule(rule)
+        stage = touch_stage(
+            on_judge=always_fast,
+            rule=rule,
+            levels=[Level("near", {p.reward_ms: 80}), Level("far", {p.reward_ms: 20})],
+        )
 
         first = self.run_trial(stage, touch_at=100)
         second = self.run_trial(stage, touch_at=100)
 
-        # The stage's own rule (two correct trials) is not asked.
         self.assertEqual((first["action"], second["action"]), ("none", "level up"))
-        self.assertEqual(asked, [("correct", 1), ("correct", 1)])
+        self.assertEqual(asked, [(Outcome.correct, 1), (Outcome.correct, 1)])
         self.assertEqual(self.session.require_current_animal().current_stage.level, 2)
 
     def test_a_rule_that_decides_a_move_that_does_not_exist_stops_the_run(self) -> None:
-        stage = touch_stage()
-        stage.on_enter("judge", lambda scene: scene.fire("fast"))
-        stage.set_rule(lambda scene, outcome: "level up")
+        stage = touch_stage(
+            on_judge=always_fast, rule=lambda scene, outcome: SettlementAction.LEVEL_UP
+        )
 
         with self.assertRaisesRegex(ValueError, '"level up", which is not possible'):
             self.run_trial(stage, touch_at=100)
 
     def test_a_trial_left_after_its_outcome_is_known_is_settled(self) -> None:
-        stage = touch_stage()
-        stage.on_enter("judge", lambda scene: scene.fire("fast"))
+        stage = touch_stage(on_judge=always_fast)
         with patch("mxbiflow.context._current_mxbiflow", self.context):
             scene = stage_scenes(stage)["touch"]()
         scene.start()

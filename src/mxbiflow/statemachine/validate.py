@@ -1,7 +1,7 @@
 """What is wrong with an experiment's levels: cogforge's ``validateExperiment``.
 
 cogforge refuses these while an experiment is edited; a file written by hand or by
-``StageBuilder`` has not been through it, and each of them would otherwise go wrong
+``Stage`` has not been through it, and each of them would otherwise go wrong
 silently in a trial (one value overriding another, a stimulus never shown).
 """
 
