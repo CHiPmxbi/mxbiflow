@@ -1,10 +1,10 @@
 """Runs a stage's trial state machine in the game loop, one scene per trial.
 
-A stage is a class; the scheduler makes an instance of the animal's stage for each
-trial. What the trial does is the stage's machine, which is data. Which values the
-trial gets, and what its outcome does to the animal's level, is the stage's Python:
-:class:`MachineTrial` for a stage written in Python, :func:`machine_scenes` for the
-stages of a cogforge file, which run with their parameters' defaults.
+The scheduler makes a scene for each trial of the animal's stage. What the trial does
+is its machine, which is data. Which values the trial gets, and what its record does to
+the animal's level, is the stage's Python (:class:`~.stage.Stage`), whose trial is a
+:class:`MachineTrial`. The stages of a cogforge file (:func:`machine_scenes`) run with
+their parameters' defaults.
 
 Without cagelab-2 the machine is evaluated once per frame: timeouts, timers, sounds and
 outputs have one-frame resolution. An input change carries the time its channel gives
@@ -39,6 +39,7 @@ from ..driver.audioplayer import (
 )
 from ..driver.channels import InputChannel, OutputChannel
 from ..scene.scene import Scene
+from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
 from ..task import Task
 from .host import ACTIONS, Entered, Logged, Outcome, TrialRecord, outcome_of
@@ -51,10 +52,10 @@ from .models import (
     ImageStimulus,
     Outcomes,
     RectStimulus,
-    Stage,
     TonesStimulus,
     WavStimulus,
 )
+from .models import Stage as StageData
 from .runner import (
     Trial,
     Values,
@@ -64,11 +65,12 @@ from .runner import (
     duration_of,
     place_of,
 )
+from .stage import Stage, stage_of
 from .validate import machine_problems, value_problems
 
 
 def check_channels(
-    stage: Stage, inputs: Collection[str], outputs: Collection[str]
+    stage: StageData, inputs: Collection[str], outputs: Collection[str]
 ) -> None:
     """Raise ``ValueError`` when the stage uses a channel the rig does not wire."""
     missing = [
@@ -91,7 +93,7 @@ def check_channels(
 class Loaded:
     """A stage's machine as the format's data, with what was decoded for it."""
 
-    stage: Stage
+    stage: StageData
     # Decoded pictures and sounds, kept across the stage's trials.
     surfaces: dict[str, Surface | None] = field(
         default_factory=dict[str, Surface | None]
@@ -243,7 +245,7 @@ class MachineScene(TrialScene):
         self._apply(now)
         self._outcome = outcome_of(self._stage, self._trial)
 
-    def record(self) -> BaseModel:
+    def record(self) -> TrialRecord:
         trial = self.trial
         return TrialRecord(
             animal=self.animal.name,
@@ -503,36 +505,52 @@ class _FileScene(MachineScene):
 
 
 class MachineTrial[P: TrialParams](MachineScene):
-    """A stage written in Python: one trial of a :class:`~.machine.Machine`.
+    """The trial of a stage written in Python: one run of a :class:`~.machine.Machine`.
 
-    The stage gives the machine (``machine``) and this trial's values (``params``, an
-    instance of the machine's parameters); ``given`` is that instance afterwards. Moving
-    the animal between levels is ``settlement`` or ``decide``, as in any
-    :class:`~mxbiflow.scene.TrialScene`.
+    The trial keeps nothing from one run to the next. It gives its machine
+    (``machine``), is given its values by its stage (:class:`~.stage.Stage`; ``given``
+    is that instance of the machine's parameters) and gives back its record, which its
+    stage reads to decide whether the animal moves. Its own code notes what the record
+    should carry::
 
-        class Touch(MachineTrial[Params]):
+        class TouchingTrial(MachineTrial[Params]):
             def machine(self) -> Machine:
                 return MACHINE
-
-            def params(self) -> Params:
-                return Params(reward_ms=choice((300, 500)))
 
             @on_enter(S.GIVE)
             def note_reward(self) -> None:
                 self.note(Reward(length_ms=self.given.reward_ms))
+
+    It is registered through its stage: ``Touching.scene()``.
     """
 
+    #: The stage the trial belongs to; set by :meth:`~.stage.Stage.scene`.
+    stage_type: ClassVar[type[Stage[Any]]]
     # The machines built so far, by stage, with the model each was built from: the
     # same model is built once, another (a changed configuration) again.
     _built: ClassVar[dict[str, tuple[Machine, Loaded]]] = {}
+
+    @classmethod
+    def bound_stage(cls) -> type[Stage[Any]]:
+        """The stage the trial was registered through."""
+        if not hasattr(cls, "stage_type"):
+            raise TypeError(
+                f"{cls.__name__} is a stage's trial: register its stage's scene()"
+            )
+        return cls.stage_type
+
+    @classmethod
+    def name(cls) -> str:
+        return cls.bound_stage().name()
 
     @abstractmethod
     def machine(self) -> Machine:
         """The trial's machine; return the same object while it does not change."""
 
-    @abstractmethod
-    def params(self) -> P:
-        """This trial's parameter values."""
+    @property
+    def stage(self) -> Stage[P]:
+        """The animal's stage object."""
+        return stage_of(self.bound_stage(), run=self.mxbiflow, animal=self.animal)
 
     def load(self) -> Loaded:
         machine = self.machine()
@@ -543,8 +561,11 @@ class MachineTrial[P: TrialParams](MachineScene):
         return built[1]
 
     def values(self) -> Mapping[str, float | str]:
-        self.given: P = self.params()
+        self.given: P = self.stage.next_trial()
         return self.given.model_dump(mode="json", by_alias=True)
+
+    def decide(self) -> SettlementAction:
+        return self.stage.decide(self.record())
 
 
 def _data(url: str) -> tuple[str, bytes]:

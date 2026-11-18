@@ -48,7 +48,7 @@ A model with more than one field takes keyword arguments only, so each argument 
 what it is; an action or an event of one field (``Show(Stim.TARGET)``) may go without.
 
 The machine is only the trial. Which values a trial gets, and what its outcome does to
-the animal's level, is the stage's own Python: :class:`~.scene.MachineTrial`.
+the animal's level, is the stage's own Python: :class:`~.stage.Stage`.
 """
 
 import base64
@@ -503,7 +503,7 @@ class Machine:
     Times are milliseconds. ``inputs`` and ``outputs`` are the channels the machine
     uses, wired by the rig. ``screen`` is the layout's reference and says whether it is
     upright; stimuli are placed by fractions of the rig's screen. The trial's values
-    are the stage's to give (:class:`~.scene.MachineTrial`); ``defaults`` are what the
+    are the stage's to give (:class:`~.stage.Stage`); ``defaults`` are what the
     format keeps for a parameter a trial leaves out.
     """
 

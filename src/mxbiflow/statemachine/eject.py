@@ -166,6 +166,7 @@ class _StageSource:
         prefix: str,
         variable: str,
         class_name: str,
+        trial_class: str,
         files: dict[str, bytes],
     ) -> None:
         self.stage = stage
@@ -173,6 +174,7 @@ class _StageSource:
         self.files = files
         self.used: set[str] = {"Machine", "State", "TrialParams"}
         self.class_name = class_name
+        self.trial_class = trial_class
         self.machine = f"{variable.upper()}_MACHINE" if prefix else "MACHINE"
         machine = stage.machine
         hosts = [
@@ -482,11 +484,11 @@ class _StageSource:
             transitions=transitions or None,
         )
         body.append(ast.Assign([ast.Name(self.machine, ast.Store())], model, lineno=0))
-        body.append(self._stage_class(stage_name))
+        body += self._stage_classes(stage_name)
         return body
 
-    def _stage_class(self, stage_name: ast.expr) -> ast.ClassDef:
-        """The stage: its machine, and each trial with the parameters' defaults."""
+    def _stage_classes(self, stage_name: ast.expr) -> list[ast.stmt]:
+        """The stage's trial, and the stage giving each trial the defaults."""
         params = self.params_class if self.stage.machine.parameters else "TrialParams"
 
         def method(
@@ -500,18 +502,31 @@ class _StageSource:
                 ast.Name(returns),
             )
 
-        return ast.ClassDef(
-            self.class_name,
-            [ast.Subscript(ast.Name("MachineTrial"), ast.Name(params))],
-            [],
-            [
-                # The stage keeps the name it has in the file.
-                method("name", "str", stage_name, of_class=True),
-                method("machine", "Machine", ast.Name(self.machine)),
-                method("params", params, _call(params)),
-            ],
-            [],
-        )
+        return [
+            ast.ClassDef(
+                self.trial_class,
+                [ast.Subscript(ast.Name("MachineTrial"), ast.Name(params))],
+                [],
+                [method("machine", "Machine", ast.Name(self.machine))],
+                [],
+            ),
+            ast.ClassDef(
+                self.class_name,
+                [ast.Subscript(ast.Name("Stage"), ast.Name(params))],
+                [],
+                [
+                    ast.Assign(
+                        [ast.Name("trial", ast.Store())],
+                        ast.Name(self.trial_class),
+                        lineno=0,
+                    ),
+                    # The stage keeps the name it has in the file.
+                    method("name", "str", stage_name, of_class=True),
+                    method("next_trial", params, _call(params)),
+                ],
+                [],
+            ),
+        ]
 
 
 def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, bytes]]:
@@ -522,7 +537,15 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
     """
     files: dict[str, bytes] = {}
     several = len(experiment.stages) > 1
-    taken = ["scenes", "ASSETS", "Path", "p", "MachineTrial", *machine_module.__all__]
+    taken = [
+        "scenes",
+        "ASSETS",
+        "Path",
+        "p",
+        "MachineTrial",
+        "Stage",
+        *machine_module.__all__,
+    ]
     variables = _Names(taken)
     classes = _Names(taken)
     stage_names = _Enum("Stages", [stage.name for stage in experiment.stages])
@@ -530,12 +553,14 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
     for stage in experiment.stages:
         variable = variables.new(stage.name)
         prefix = "".join(part.capitalize() for part in variable.split("_"))
+        class_name = classes.new(prefix or "Stage")
         stages.append(
             _StageSource(
                 stage,
                 prefix if several else "",
                 variable,
-                classes.new(prefix or "Stage"),
+                class_name,
+                classes.new(f"{class_name}Trial"),
                 files,
             )
         )
@@ -547,9 +572,9 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
         ast.Expr(
             ast.Constant(
                 f"Written by `mxbiflow eject` from {origin}.\n\n"
-                "Register `scenes` with the scene manager. A stage's `params` gives "
-                "each trial\nits values; `settlement` or `decide` moves the animal "
-                "between levels.\n"
+                "Register `scenes` with the scene manager. A stage's `next_trial` "
+                "gives each\ntrial its values; its `decide` reads the trial's record "
+                "and moves the animal\nbetween levels.\n"
             )
         ),
         ast.ImportFrom("enum", [ast.alias("StrEnum"), ast.alias("auto")], 0),
@@ -557,6 +582,7 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
             "mxbiflow.statemachine.machine", [ast.alias(name) for name in used], 0
         ),
         ast.ImportFrom("mxbiflow.statemachine.scene", [ast.alias("MachineTrial")], 0),
+        ast.ImportFrom("mxbiflow.statemachine.stage", [ast.alias("Stage")], 0),
     ]
     if any(stage.needs_field for stage in stages):
         body.append(ast.ImportFrom("pydantic", [ast.alias("Field")], 0))
@@ -574,7 +600,7 @@ def python_source(experiment: Experiment, origin: str) -> tuple[str, dict[str, b
     body.append(
         ast.Assign(
             [ast.Name("scenes", ast.Store())],
-            ast.List([ast.Name(stage.class_name) for stage in stages]),
+            ast.List([_call(f"{stage.class_name}.scene") for stage in stages]),
             lineno=0,
         )
     )

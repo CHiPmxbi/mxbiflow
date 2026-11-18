@@ -51,6 +51,7 @@ from mxbiflow.statemachine.machine import (
 from mxbiflow.statemachine.models import Experiment
 from mxbiflow.statemachine.models import Stage as StageData
 from mxbiflow.statemachine.scene import MachineTrial
+from mxbiflow.statemachine.stage import Stage
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXAMPLE = FIXTURES / "two_pictures.experiment.json"
@@ -170,6 +171,7 @@ def rebuilt(experiment: Experiment, directory: Path) -> tuple[list[StageData], s
     target = eject(experiment, directory, "a test")
     module = runpy.run_path(str(target))
     stages: list[type[MachineTrial[Any]]] = module["scenes"]
+    assert all(issubclass(stage.bound_stage(), Stage) for stage in stages)
     machines = [value for value in module.values() if isinstance(value, Machine)]
     built = [
         machine.build(stage.name())
@@ -230,15 +232,21 @@ class EjectTests(unittest.TestCase):
         self.assertIn("class ClassStates(StrEnum):", source)
         self.assertIn("class Class2States(StrEnum):", source)
         self.assertIn('wait_ms: Time = Field(1500, alias="wait ms")', source)
-        self.assertIn("class Class(MachineTrial[ClassParams]):", source)
-        self.assertIn("scenes = [Class, Class2]", source)
+        self.assertIn("class ClassTrial(MachineTrial[ClassParams]):", source)
+        self.assertIn("class Class(Stage[ClassParams]):", source)
+        self.assertIn("    trial = Class2Trial", source)
+        self.assertIn("scenes = [Class.scene(), Class2.scene()]", source)
 
     def test_a_written_stage_runs_its_trials_with_the_defaults(self) -> None:
         source = self.assert_round_trip(load_experiment(EXAMPLE))
 
-        self.assertIn("class Discriminate(MachineTrial[Params]):", source)
+        self.assertIn("class DiscriminateTrial(MachineTrial[Params]):", source)
+        self.assertIn("class Discriminate(Stage[Params]):", source)
+        self.assertIn("    trial = DiscriminateTrial", source)
         self.assertIn("        return Stages.DISCRIMINATE", source)
-        self.assertIn("        return Params()", source)
+        self.assertIn(
+            "    def next_trial(self) -> Params:\n        return Params()", source
+        )
 
     def test_pictures_become_files(self) -> None:
         source, files = python_source(load_experiment(EXAMPLE), "x")
@@ -259,7 +267,7 @@ class EjectTests(unittest.TestCase):
             main(["eject", str(EXAMPLE), directory])
             written = (Path(directory) / "stages.py").read_text()
         self.assertIn("two_pictures.experiment.json", written)
-        self.assertIn("scenes = [Discriminate]", written)
+        self.assertIn("scenes = [Discriminate.scene()]", written)
 
 
 if __name__ == "__main__":

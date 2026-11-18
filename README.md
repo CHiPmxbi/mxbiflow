@@ -350,9 +350,11 @@ copied from cogforge).
 
 ### A stage written in Python
 
-A stage is a class, `MachineTrial`: it gives the trial's machine and each trial's
-values, and moves the animal between levels with `settlement` or `decide`, as any
-`TrialScene` does. The machine (`mxbiflow.statemachine.machine`) is written so that the
+A stage is two classes. Its trial, a `MachineTrial`, keeps nothing from one trial to
+the next: it gives the trial's machine, is given its values and gives back a record.
+The `Stage` is what goes on from trial to trial: `next_trial()` gives each trial its
+values and `decide(record)` reads each record and says whether the animal moves. The
+scheduler that calls them is the framework's. The machine (`mxbiflow.statemachine.machine`) is written so that the
 editor and the type checker see every reference: a name is an enum member, the trial's
 parameters are the fields of a `TrialParams` model, and states, transitions and stimuli
 are models that refer to them. A name is any string: a plain `str` works wherever an
@@ -363,12 +365,14 @@ action or an event of one field (`Show(Stim.TARGET)`) may go without.
 from enum import StrEnum, auto
 from random import choice
 
-from mxbiflow.scene.settlement import CountSettlementConfig
+from mxbiflow.scene.settlement import SettlementAction
+from mxbiflow.statemachine.host import TrialRecord
 from mxbiflow.statemachine.machine import (
     EXIT, Circle, Clear, Host, Machine, On, Outcome, ScreenTouch, Show, State, Time,
     Timeout, Touch, TrialParams,
 )
 from mxbiflow.statemachine.scene import MachineTrial, on_enter
+from mxbiflow.statemachine.stage import Stage
 from pydantic import BaseModel
 
 
@@ -440,19 +444,9 @@ MACHINE = Machine(
 )
 
 
-class Touching(MachineTrial[Params]):
-    level_table = {"default": [1, 2]}
-
+class TouchingTrial(MachineTrial[Params]):
     def machine(self) -> Machine:
         return MACHINE
-
-    def params(self) -> Params:  # this trial's values
-        if self.info.level == 1:
-            return Params(reward_ms=500)
-        return Params(reward_ms=choice((200, 300)), target_x=choice((0.3, 0.7)))
-
-    def settlement(self) -> CountSettlementConfig:  # up after 20 correct trials
-        return CountSettlementConfig(total_levels=2, settlement_cycle=20)
 
     @on_enter(S.JUDGE)  # Python where the data cannot say it
     def judge(self) -> None:
@@ -460,7 +454,25 @@ class Touching(MachineTrial[Params]):
         self.fire(Verdict.FAST if self.now_ms < 1500 else Verdict.SLOW)
 
 
-scene_manager.register([Touching])
+class Touching(Stage[Params]):
+    trial = TouchingTrial
+    level_table = {"default": [1, 2]}
+    correct = 0  # at the animal's level
+
+    def next_trial(self) -> Params:  # the next trial's values
+        if self.level == 1:
+            return Params(reward_ms=500)
+        return Params(reward_ms=choice((200, 300)), target_x=choice((0.3, 0.7)))
+
+    def decide(self, record: TrialRecord) -> SettlementAction:  # up after 20 correct
+        self.correct += record.outcome == Outcome.correct
+        if self.correct < 20 or record.level == 2:
+            return SettlementAction.NONE
+        self.correct = 0
+        return SettlementAction.LEVEL_UP
+
+
+scene_manager.register([Touching.scene()])
 ```
 
 - The machine is data: a state holds outputs, does its entry actions and has
@@ -474,18 +486,23 @@ scene_manager.register([Touching])
   parameter itself: put it where a state or a stimulus takes a value. An event is a
   stimulus's, not a parameter's: for the touch of a stimulus a parameter names, give
   each stimulus it can name its own transition.
-- `params()` gives each trial its values as an instance of the parameters, so each is
-  checked where it is written; `self.given` is that instance afterwards. `machine()`
-  returns the same object while the machine does not change; it is built once, and
-  again when a stage returns another (one made from a changed configuration).
+- `next_trial()` gives each trial its values as an instance of the parameters, so each
+  is checked where it is written; the trial's `self.given` is that instance.
+  `machine()` returns the same object while the machine does not change; it is built
+  once, and again when a trial returns another (one made from a changed configuration).
+- There is one stage object for each animal in a run: `self.animal`, `self.session`
+  and `self.level` are the animal's, and what the stage keeps in memory (a count, a
+  staircase) lasts the run. What must outlast the run belongs in the session's stage
+  context. A trial reaches its stage as `self.stage`.
 - A method marked `@on_enter(state)` runs when the state is entered, in the frame
   after: what it decides has one-frame resolution, and what must be exact belongs in
   the machine. It has `self.trial`, `self.now_ms`, `self.outcome`, `self.fire(name)` to
   send the machine `Host(name)`, and `self.note(model)` to keep a model's fields under
   `extra` in the trial's record.
-- `settlement()` or `decide()` moves the animal between levels as in any `TrialScene`;
-  `self.outcome` is the trial's outcome and `self.trial.visited` the states it went
-  through.
+- `decide(record)` is called for each trial that reached an outcome, before the trial
+  is written: `record.outcome` is its outcome, `record.states` the states it went
+  through and `record.extra` what its methods noted. What it returns moves the animal
+  and is the record's `action`. By default the animal stays.
 
 ### An experiment file
 

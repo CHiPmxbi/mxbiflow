@@ -17,7 +17,8 @@ from mxbiflow.driver.audioplayer import AudioFormat
 from mxbiflow.driver.channels import RewarderOutput
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
-from mxbiflow.scene.settlement import CountSettlementConfig, SettlementAction
+from mxbiflow.scene.settlement import SettlementAction
+from mxbiflow.statemachine.host import TrialRecord
 from mxbiflow.statemachine.machine import (
     EXIT,
     Clear,
@@ -41,6 +42,7 @@ from mxbiflow.statemachine.machine import (
 )
 from mxbiflow.statemachine.runner import Trial
 from mxbiflow.statemachine.scene import MachineTrial, on_enter
+from mxbiflow.statemachine.stage import Stage
 
 
 class S(StrEnum):
@@ -130,9 +132,23 @@ MACHINE = Machine(
 )
 
 
-class TouchStage(MachineTrial[Params]):
+class TouchTrial(MachineTrial[Params]):
     """Touch the target: a fast touch is rewarded longer than a slow one."""
 
+    def machine(self) -> Machine:
+        return MACHINE
+
+    @on_enter(S.JUDGE)
+    def judge(self) -> None:
+        latency_ms = self.now_ms
+        self.note(Extra(latency_ms=latency_ms))
+        self.fire(Verdict.FAST if latency_ms < 300 else Verdict.SLOW)
+
+
+class Touching(Stage[Params]):
+    """Gives the trials the tests' values; up after two correct trials at a level."""
+
+    trial = TouchTrial
     level_table: ClassVar[dict[str, list[int]]] = {"default": [1, 2]}
     #: The values of the next trials, for the tests to set.
     next_params: ClassVar[Params] = Params()
@@ -141,21 +157,21 @@ class TouchStage(MachineTrial[Params]):
     def name(cls) -> str:
         return "touch"
 
-    def machine(self) -> Machine:
-        return MACHINE
+    def __init__(self, *, session: Session, animal: Animal) -> None:
+        super().__init__(session=session, animal=animal)
+        self.decided: list[TrialRecord] = []
 
-    def params(self) -> Params:
+    def next_trial(self) -> Params:
         return self.next_params
 
-    def settlement(self) -> CountSettlementConfig:
-        # Up after two correct trials at the level.
-        return CountSettlementConfig(total_levels=2, settlement_cycle=2)
-
-    @on_enter(S.JUDGE)
-    def judge(self) -> None:
-        latency_ms = self.now_ms
-        self.note(Extra(latency_ms=latency_ms))
-        self.fire(Verdict.FAST if latency_ms < 300 else Verdict.SLOW)
+    def decide(self, record: TrialRecord) -> SettlementAction:
+        self.decided.append(record)
+        correct = sum(
+            r.outcome == Outcome.correct and r.level == record.level
+            for r in self.decided
+        )
+        is_up = correct >= 2 and record.level < 2
+        return SettlementAction.LEVEL_UP if is_up else SettlementAction.NONE
 
 
 class MachineTests(unittest.TestCase):
@@ -290,6 +306,13 @@ class MachineTests(unittest.TestCase):
         )
 
 
+class Run(SimpleNamespace):
+    """What stands in for the run's context; hashable, as the context is."""
+
+    def __hash__(self) -> int:
+        return id(self)
+
+
 class MachineTrialTests(unittest.TestCase):
     def setUp(self) -> None:
         directory = tempfile.TemporaryDirectory()
@@ -300,7 +323,7 @@ class MachineTrialTests(unittest.TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.addCleanup(setattr, TouchStage, "next_params", Params())
+        self.addCleanup(setattr, Touching, "next_params", Params())
 
         config = AnimalConfig(name="a", stage="touch", level=1)
         animal = Animal(
@@ -321,7 +344,7 @@ class MachineTrialTests(unittest.TestCase):
             format=AudioFormat(sample_rate_hz=8000, channels=1),
             prepare=lambda sound: sound,
         )
-        self.context = SimpleNamespace(
+        self.context = Run(
             session=self.session,
             mxbi=SimpleNamespace(
                 screen_size=SimpleNamespace(width=200, height=100),
@@ -333,9 +356,9 @@ class MachineTrialTests(unittest.TestCase):
             timer=Mock(),
         )
 
-    def start(self, stage: type[MachineTrial[Any]] = TouchStage) -> Any:
+    def start(self, stage: type[Stage[Any]] = Touching) -> Any:
         with patch("mxbiflow.context._current_mxbiflow", self.context):
-            scene = stage()
+            scene = stage.scene()()
         self.started = self.now
         scene.start()
         return scene
@@ -369,7 +392,7 @@ class MachineTrialTests(unittest.TestCase):
 
     def test_the_stage_gives_each_trial_its_values(self) -> None:
         # The target is on the left: a touch at its default place misses.
-        TouchStage.next_params = Params(reward_ms=80, target=Stim.LEFT)
+        Touching.next_params = Params(reward_ms=80, target=Stim.LEFT)
 
         missed = self.run_trial(touch=(150, 20))
         hit = self.run_trial(touch=(50, 20))
@@ -388,26 +411,25 @@ class MachineTrialTests(unittest.TestCase):
         )
 
     def test_the_stage_reads_its_values_back_as_the_model(self) -> None:
-        TouchStage.next_params = Params(reward_ms=80)
+        Touching.next_params = Params(reward_ms=80)
 
         scene = self.start()
 
         self.assertEqual(scene.given, Params(reward_ms=80))
         self.assertIsNone(scene.outcome)
 
-    def test_the_stages_settlement_moves_the_animal(self) -> None:
+    def test_the_stage_reads_each_record_and_moves_the_animal(self) -> None:
         actions = [self.run_trial()["action"] for _ in range(2)]
 
         self.assertEqual(actions, ["none", "level up"])
-        state = self.session.require_current_animal().current_stage
-        self.assertEqual((state.level, state.level_counted), (2, 0))
+        self.assertEqual(self.session.require_current_animal().current_stage.level, 2)
 
-    def test_a_stage_may_decide_in_its_own_way(self) -> None:
-        asked: list[Outcome | None] = []
+    def test_a_stage_decides_from_the_record_before_it_is_written(self) -> None:
+        asked: list[tuple[str, str, int]] = []
 
-        class Picky(TouchStage):
-            def decide(self) -> SettlementAction:
-                asked.append(self.outcome)
+        class Picky(Touching):
+            def decide(self, record: TrialRecord) -> SettlementAction:
+                asked.append((record.outcome, record.action, self.level))
                 return SettlementAction.LEVEL_UP
 
         scene = self.start(Picky)
@@ -417,12 +439,12 @@ class MachineTrialTests(unittest.TestCase):
         self.now = 600
         scene.update(0)
 
-        self.assertEqual(asked, [Outcome.correct])
+        self.assertEqual(asked, [("correct", "none", 1)])
         self.assertEqual(self.session.require_current_animal().current_stage.level, 2)
 
     def test_a_value_the_machine_cannot_take_stops_the_run(self) -> None:
         # A sound where a picture is shown.
-        TouchStage.next_params = Params(target=Stim.LOW)
+        Touching.next_params = Params(target=Stim.LOW)
 
         with self.assertRaisesRegex(
             ValueError,
@@ -431,9 +453,12 @@ class MachineTrialTests(unittest.TestCase):
             self.start()
 
     def test_a_method_for_a_state_the_machine_has_not_stops_the_run(self) -> None:
-        class Lost(TouchStage):
+        class LostTrial(TouchTrial):
             @on_enter("gone")
             def never(self) -> None: ...
+
+        class Lost(Touching):
+            trial = LostTrial
 
         with self.assertRaisesRegex(ValueError, r"on_enter of no state: \['gone'\]"):
             self.start(Lost)
@@ -450,8 +475,22 @@ class MachineTrialTests(unittest.TestCase):
         scene.quit()
 
         self.assertFalse(scene.aborted)
-        state = self.session.require_current_animal().current_stage
-        self.assertEqual((state.level_counted, state.level_correct), (1, 1))
+        self.assertEqual([r.outcome for r in scene.stage.decided], ["correct"])
+
+    def test_an_animal_keeps_its_stage_object_for_the_run(self) -> None:
+        first = self.start()
+        first.quit()
+        second = self.start()
+
+        self.assertIs(first.stage, second.stage)
+        self.assertIs(first.stage.animal, self.session.require_current_animal())
+
+    def test_a_trial_without_its_stage_is_refused(self) -> None:
+        with (
+            patch("mxbiflow.context._current_mxbiflow", self.context),
+            self.assertRaisesRegex(TypeError, r"register its stage's scene\(\)"),
+        ):
+            TouchTrial()
 
     def test_a_machine_is_built_once_for_its_trials(self) -> None:
         real = Machine.build
