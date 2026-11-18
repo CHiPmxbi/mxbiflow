@@ -297,6 +297,23 @@ class MachineSceneTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'output "reward"'):
             machine_scenes(experiment(stage("touch")), Wiring(inputs={"beam": 0}))
 
+    def test_the_rig_configuration_wires_the_channels(self) -> None:
+        scenes = experiment(stage("touch"))
+        context = self.context(scenes)
+        with patch("mxbiflow.statemachine.scene.get_mxbiflow", return_value=context):
+            with self.assertRaisesRegex(ValueError, 'input "beam", output "reward"'):
+                machine_scenes(scenes)["touch"]()
+            self.assertEqual(self.session.require_current_animal().trial_id, 0)
+
+            self.session.mxbi_config.channels.inputs["beam"] = 0
+            self.session.mxbi_config.channels.outputs["reward"] = 0
+            scene = machine_scenes(scenes)["touch"]()
+        scene.start()
+
+        self.touch(scene, (150, 20), at=10)
+
+        self.rewarder.give_reward.assert_called_once()
+
     def test_a_screen_of_another_size_fails(self) -> None:
         scenes = experiment(stage("touch", screen=(300, 300)))
 

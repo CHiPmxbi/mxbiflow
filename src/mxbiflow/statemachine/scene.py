@@ -4,9 +4,10 @@ Without cagelab-2 the machine is evaluated once per frame, so every time has one
 resolution. Register the scenes of :func:`machine_scenes` with the scene manager; the
 scheduler then starts the scene of the animal's stage for each trial.
 
-Channels are mapped by the :class:`Wiring` given with the experiment: an input is high
-while its detector sees an animal, an output runs its rewarder while it is high. The
-touchscreen needs no mapping. A stopped trial (the animal left, the run ended) is recorded
+The experiment only names its channels; the rig's wiring says which device each one is
+(``channels`` in the hardware configuration, ``mxbi.json``): an input is high while its
+detector sees an animal, an output runs its rewarder while it is high. The touchscreen
+needs no mapping. A stopped trial (the animal left, the run ended) is recorded
 but does not count towards the level rules.
 """
 
@@ -66,7 +67,11 @@ class LevelCounts(BaseModel):
 
 @dataclass(frozen=True)
 class Wiring:
-    """The experiment's channels by name: which of the rig's devices each one is."""
+    """A rig's channels by name: which of its devices each one is.
+
+    The rig configuration's ``channels``; given to :func:`machine_scenes` instead, it
+    replaces them (tests, a rig without the configuration).
+    """
 
     #: Input name to detector id.
     inputs: dict[str, int] = field(default_factory=dict)
@@ -75,7 +80,7 @@ class Wiring:
 
 
 def check_channels(stage: Stage, channels: Wiring) -> None:
-    """Raise ``ValueError`` when the stage uses a channel the wiring does not map."""
+    """Raise ``ValueError`` when the stage uses a channel the rig does not wire."""
     missing = [
         f'{kind} "{name}"'
         for kind, names, mapped in (
@@ -87,18 +92,23 @@ def check_channels(stage: Stage, channels: Wiring) -> None:
     ]
     if missing:
         raise ValueError(
-            f'stage "{stage.name}" uses {", ".join(missing)}, which the experiment\'s '
-            "wiring does not map"
+            f'stage "{stage.name}" uses {", ".join(missing)}, which this rig does not '
+            "wire: add them under channels in the hardware configuration (mxbi.json)"
         )
 
 
-def machine_scenes(experiment: Experiment, wiring: Wiring) -> dict[str, type[Scene]]:
+def machine_scenes(
+    experiment: Experiment, wiring: Wiring | None = None
+) -> dict[str, type[Scene]]:
     """One scene class per stage of ``experiment``, by stage name.
 
-    Raises ``ValueError`` when a stage uses a channel ``wiring`` does not map.
+    The channels are wired by the rig configuration, or by ``wiring`` when given. A
+    stage that uses a channel without a wire raises ``ValueError``: here for a given
+    ``wiring``, else when its first trial is made, before the trial starts.
     """
-    for stage in experiment.stages:
-        check_channels(stage, wiring)
+    if wiring is not None:
+        for stage in experiment.stages:
+            check_channels(stage, wiring)
     return {
         stage.name: type(
             f"MachineScene[{stage.name}]",
@@ -120,7 +130,7 @@ class MachineScene(Scene):
     """One trial of one stage; :func:`machine_scenes` makes the class of each stage."""
 
     experiment: ClassVar[Experiment]
-    wiring: ClassVar[Wiring]
+    wiring: ClassVar[Wiring | None]
     stage_index: ClassVar[int]
     # Decoded pictures and sounds of the stage, kept across its trials.
     _surfaces: ClassVar[dict[str, Surface | None]]
@@ -140,6 +150,10 @@ class MachineScene(Scene):
         self._machine: Machine = self._stage.machine
 
         channels = self.wiring
+        if channels is None:
+            rig = self._session.mxbi_config.channels
+            channels = Wiring(inputs=rig.inputs, outputs=rig.outputs)
+            check_channels(self._stage, channels)
         self._inputs: dict[str, Detector] = {
             name: mxbi.get_detector(channels.inputs[name])
             for name in self._machine.channels.inputs

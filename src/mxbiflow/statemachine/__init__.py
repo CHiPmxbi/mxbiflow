@@ -6,7 +6,7 @@ run `uv run datamodel-codegen`.
 
 An experiment runs by registering its stages' scenes::
 
-    scene_manager.register(machine_scenes(load_experiment(path), wiring))
+    scene_manager.register(machine_scenes(load_experiment(path)))
 
 `runner` and `host` are ports of cogforge's `simulate.ts` and `host.ts` and pass its
 conformance cases (`tests/fixtures/conformance`).

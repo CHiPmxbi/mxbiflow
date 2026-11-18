@@ -246,10 +246,9 @@ An experiment designed in cogforge (stages, each a trial state machine with leve
 trial types, outcomes and level rules) runs without stage code:
 
 ```python
-from mxbiflow.statemachine import Wiring, load_experiment, machine_scenes
+from mxbiflow.statemachine import load_experiment, machine_scenes
 
-wiring = Wiring(inputs={"beam": 0}, outputs={"reward": 0})
-scene_manager.register(machine_scenes(load_experiment(Path("experiment.json")), wiring))
+scene_manager.register(machine_scenes(load_experiment(Path("experiment.json"))))
 ```
 
 Each stage becomes a scene of its name, and one scene instance is one trial
@@ -259,12 +258,13 @@ Schema (`uv run datamodel-codegen` after copying a new `experiment.schema.json`)
 runner and the host logic pass cogforge's conformance cases
 (`tests/fixtures/conformance/cases.json`, copied from cogforge).
 
-- **Channels** belong to the experiment, not to the rig configuration: the `Wiring`
-  maps an input to a detector id (high while that detector sees an animal) and an
-  output to a rewarder id (it runs while the output is high). A stage that uses an
-  unmapped channel is refused when the scenes are made. The touchscreen needs no
-  mapping: a touch is `<stimulus>.touch` or `screen.touch`. The wiring will be read
-  from the experiment file once cogforge's format has it.
+- **Channels**: the experiment only names them; the wiring is the rig's, in the hardware
+  configuration: `"channels": {"inputs": {"beam": 0}, "outputs": {"reward": 0}}`. An
+  input is a detector id and is high while that detector sees an animal; an output is a
+  rewarder id that runs while the output is high. A stage that uses a channel the rig
+  does not wire fails with the channel's name before its first trial starts. The
+  touchscreen needs no wiring: a touch is `<stimulus>.touch` or `screen.touch`.
+  `machine_scenes(experiment, Wiring(...))` replaces the rig's wiring, for tests.
 - **Screen**: stimuli are placed in the machine's screen pixels, which must be the
   rig's `screen_size`, or its transpose for an upright screen (drawn turned as the idle
   scene's picture is).
