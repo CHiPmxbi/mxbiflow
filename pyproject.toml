@@ -58,8 +58,21 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "datamodel-code-generator>=0.97.0",
     "loguru>=0.7.3",
     "prompt-toolkit>=3.0.53",
     "pyright[nodejs]>=1.1.411",
     "ruff>=0.16.4",
 ]
+
+# The experiment format is defined in cogforge; `uv run datamodel-codegen` regenerates the
+# models after copying a new cogforge schema/experiment.schema.json over the input file.
+[tool.datamodel-codegen]
+input = "src/mxbiflow/statemachine/experiment.schema.json"
+input-file-type = "jsonschema"
+output = "src/mxbiflow/statemachine/models.py"
+output-model-type = "pydantic_v2.BaseModel"
+preset = "practical-py314-20261113"
+formatters = ["ruff-format", "ruff-check"]
+disable-timestamp = true
+skip-root-model = true
