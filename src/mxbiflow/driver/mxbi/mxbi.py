@@ -3,6 +3,7 @@ from typing import Any
 
 from ..audioplayer import AudioPlayer
 from ..audioplayer.frequency_response_table import FrequencyResponseTable
+from ..channels import InputChannel, OutputChannel
 from ..detector.detector import Detector
 from ..eyetracker.eyetracker import Eyetracker
 from ..rewarder.rewarder import Rewarder
@@ -17,6 +18,8 @@ class MXBI:
         detector: Detector | dict[int, Detector],
         eyetracker: Eyetracker | dict[int, Eyetracker] | None = None,
         frequency_response_table: FrequencyResponseTable | None = None,
+        inputs: Mapping[str, InputChannel] | None = None,
+        outputs: Mapping[str, OutputChannel] | None = None,
     ):
         if not isinstance(screen_size, Screen):
             screen_size = Screen(width=screen_size[0], height=screen_size[1])
@@ -27,6 +30,9 @@ class MXBI:
             eyetracker, "eyetracker"
         )
         self._aplayer = AudioPlayer(frequency_response_table=frequency_response_table)
+        #: State machines' channels by name, as the rig configuration wires them.
+        self.inputs: dict[str, InputChannel] = dict(inputs or {})
+        self.outputs: dict[str, OutputChannel] = dict(outputs or {})
 
     @staticmethod
     def _normalize(obj, name: str) -> dict[int, Any]:
@@ -97,6 +103,8 @@ class MXBI:
             eyetracker.quit()
         for detector in self._detector.values():
             detector.quit()
+        for channel in (*self.inputs.values(), *self.outputs.values()):
+            channel.close()
         for rewarder in self._rewarder.values():
             rewarder.close()
 

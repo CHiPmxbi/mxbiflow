@@ -1,9 +1,17 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from py_mx_eye import MxEye, MxEyeConfig
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..audioplayer.frequency_response_table import FrequencyResponseTable
+from ..channels import (
+    DetectorInput,
+    GpioInput,
+    GpioOutput,
+    InputChannel,
+    OutputChannel,
+    RewarderOutput,
+)
 from ..detector import (
     BeambreakContinuousDetector,
     Detector,
@@ -32,23 +40,87 @@ from ..rewarder import (
 from .mxbi import MXBI
 
 
-class ChannelsModel(BaseModel):
-    """The channels of state machines (:mod:`mxbiflow.statemachine`) on this rig.
+class DetectorInputModel(BaseModel):
+    """High while the detector sees an animal."""
 
-    A machine names its inputs and outputs; the rig says which device each one is.
+    model_config = ConfigDict(title="Detector")
+
+    type: Literal["detector"] = "detector"
+    id: int = Field(default=0, ge=0, title="Detector id")
+
+
+class GpioInputModel(BaseModel):
+    """A GPIO pin, such as a lick port or a photodiode; its edges are timed."""
+
+    model_config = ConfigDict(title="GPIO pin")
+
+    type: Literal["gpio"] = "gpio"
+    pin: int = Field(ge=0)
+    pull_up: bool | None = Field(
+        default=False,
+        title="Pull-up",
+        description=(
+            "Internal resistor: pull-up (the input is high when the pin is low), "
+            "pull-down (high when the pin is high), or none with active_high set"
+        ),
+    )
+    active_high: bool | None = Field(
+        default=None,
+        title="Active high",
+        description="Which pin level is high; only for a pin without a resistor",
+    )
+    bounce_ms: int | None = Field(
+        default=None,
+        gt=0,
+        title="Debounce (ms)",
+        description="Ignore changes that follow one within this time",
+    )
+
+    @model_validator(mode="after")
+    def _validate_active_state(self) -> GpioInputModel:
+        if (self.pull_up is None) != (self.active_high is not None):
+            raise ValueError("set active_high exactly when pull_up is null")
+        return self
+
+
+class RewarderOutputModel(BaseModel):
+    """The rewarder runs while the output is high."""
+
+    model_config = ConfigDict(title="Rewarder")
+
+    type: Literal["rewarder"] = "rewarder"
+    id: int = Field(default=0, ge=0, title="Rewarder id")
+
+
+class GpioOutputModel(BaseModel):
+    """A GPIO pin driven high while the output is high."""
+
+    model_config = ConfigDict(title="GPIO pin")
+
+    type: Literal["gpio"] = "gpio"
+    pin: int = Field(ge=0)
+    active_high: bool = Field(default=True, title="Active high")
+
+
+type InputChannelModel = Annotated[
+    DetectorInputModel | GpioInputModel, Field(discriminator="type")
+]
+type OutputChannelModel = Annotated[
+    RewarderOutputModel | GpioOutputModel, Field(discriminator="type")
+]
+
+
+class ChannelsModel(BaseModel):
+    """The wiring of state machines' channels (:mod:`mxbiflow.statemachine`) on this rig.
+
+    A machine names its inputs and outputs; the rig says what each name is wired to.
     """
 
     model_config = ConfigDict(title="State machine channels")
 
-    inputs: dict[str, Annotated[int, Field(ge=0)]] = Field(
-        default_factory=dict,
-        title="Inputs",
-        description="Input name to detector id: high while the detector sees an animal",
-    )
-    outputs: dict[str, Annotated[int, Field(ge=0)]] = Field(
-        default_factory=dict,
-        title="Outputs",
-        description="Output name to rewarder id: it runs while the output is high",
+    inputs: dict[str, InputChannelModel] = Field(default_factory=dict, title="Inputs")
+    outputs: dict[str, OutputChannelModel] = Field(
+        default_factory=dict, title="Outputs"
     )
 
 
@@ -74,16 +146,51 @@ class MXBIModel(BaseModel):
 
 
 def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
+    rewarders = _build_rewarders(config.rewarders, logger)
+    detectors = _build_detectors(config.detectors)
     return MXBI(
         config.screen_size,
-        _build_rewarders(config.rewarders, logger),
-        _build_detectors(config.detectors),
+        rewarders,
+        detectors,
         _build_eyetrackers(config.eyetrackers),
         # An empty table is no table: stages test for None before looking up a volume.
         FrequencyResponseTable(config.frequency_response_table)
         if config.frequency_response_table
         else None,
+        inputs={
+            name: _make_input(name, wire, detectors)
+            for name, wire in config.channels.inputs.items()
+        },
+        outputs={
+            name: _make_output(name, wire, rewarders)
+            for name, wire in config.channels.outputs.items()
+        },
     )
+
+
+def _make_input(
+    name: str, wire: InputChannelModel, detectors: dict[int, Detector]
+) -> InputChannel:
+    if isinstance(wire, GpioInputModel):
+        return GpioInput(
+            wire.pin,
+            pull_up=wire.pull_up,
+            active_high=wire.active_high,
+            bounce_s=wire.bounce_ms / 1000 if wire.bounce_ms else None,
+        )
+    if wire.id not in detectors:
+        raise ValueError(f'input "{name}" is wired to detector {wire.id}, not enabled')
+    return DetectorInput(detectors[wire.id])
+
+
+def _make_output(
+    name: str, wire: OutputChannelModel, rewarders: dict[int, Rewarder]
+) -> OutputChannel:
+    if isinstance(wire, GpioOutputModel):
+        return GpioOutput(wire.pin, active_high=wire.active_high)
+    if wire.id not in rewarders:
+        raise ValueError(f'output "{name}" is wired to rewarder {wire.id}, not enabled')
+    return RewarderOutput(rewarders[wire.id])
 
 
 def _build_rewarders(

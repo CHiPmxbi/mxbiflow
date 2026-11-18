@@ -1,19 +1,22 @@
 """Runs a cogforge experiment's stages in the game loop, one scene per trial.
 
-Without cagelab-2 the machine is evaluated once per frame, so every time has one-frame
-resolution. Register the scenes of :func:`machine_scenes` with the scene manager; the
-scheduler then starts the scene of the animal's stage for each trial.
+Without cagelab-2 the machine is evaluated once per frame: timeouts, timers, sounds and
+outputs have one-frame resolution. An input change carries the time its channel gives
+it, which for a GPIO pin is when the edge happened. Register the scenes of
+:func:`machine_scenes` with the scene manager; the scheduler then starts the scene of
+the animal's stage for each trial.
 
-The experiment only names its channels; the rig's wiring says which device each one is
-(``channels`` in the hardware configuration, ``mxbi.json``): an input is high while its
-detector sees an animal, an output runs its rewarder while it is high. The touchscreen
-needs no mapping. The trial's life cycle is :class:`~mxbiflow.scene.TrialScene`'s: a
+The experiment only names its channels; the rig wires each name to a device or a GPIO
+pin (``channels`` in the hardware configuration, :mod:`mxbiflow.driver.channels`). The
+touchscreen needs no wiring. The trial's life cycle is :class:`~mxbiflow.scene.TrialScene`'s: a
 stopped trial (the animal left, the run ended) is recorded but does not count towards
 the level rules.
 """
 
 import io
-from dataclasses import dataclass, field, replace
+from collections.abc import Callable, Collection
+from dataclasses import replace
+from time import monotonic
 from typing import ClassVar
 from urllib.request import urlopen
 
@@ -26,8 +29,7 @@ from pygame.event import Event
 from ..context import get_mxbiflow
 from ..driver.audioplayer.audioplayer import AudioPlayer, LoadedWav, PlayTask
 from ..driver.audioplayer.puretone_generator import PureToneGenerator, PureToneUnit
-from ..driver.detector.detector import Detector
-from ..driver.rewarder.rewarder import Rewarder
+from ..driver.channels import InputChannel, OutputChannel
 from ..scene.scene import Scene
 from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
@@ -56,8 +58,6 @@ from .models import (
 from .runner import Trial, Values, amount_in
 
 _CONTEXT = "machine"
-# The rewarder runs for a given time; a held output asks for this long and stops it.
-_HOLD_MS = 600_000
 
 type VisualStimulus = (
     ImageStimulus | CircleStimulus | RectStimulus | CrossStimulus | TextStimulus
@@ -75,30 +75,18 @@ class Cursor(BaseModel):
     cursor: int = 0
 
 
-@dataclass(frozen=True)
-class Wiring:
-    """A rig's channels by name: which of its devices each one is.
-
-    The rig configuration's ``channels``; given to :func:`machine_scenes` instead, it
-    replaces them (tests, a rig without the configuration).
-    """
-
-    #: Input name to detector id.
-    inputs: dict[str, int] = field(default_factory=dict)
-    #: Output name to rewarder id.
-    outputs: dict[str, int] = field(default_factory=dict)
-
-
-def check_channels(stage: Stage, channels: Wiring) -> None:
+def check_channels(
+    stage: Stage, inputs: Collection[str], outputs: Collection[str]
+) -> None:
     """Raise ``ValueError`` when the stage uses a channel the rig does not wire."""
     missing = [
         f'{kind} "{name}"'
-        for kind, names, mapped in (
-            ("input", stage.machine.channels.inputs, channels.inputs),
-            ("output", stage.machine.channels.outputs, channels.outputs),
+        for kind, names, wired in (
+            ("input", stage.machine.channels.inputs, inputs),
+            ("output", stage.machine.channels.outputs, outputs),
         )
         for name in names
-        if name not in mapped
+        if name not in wired
     ]
     if missing:
         raise ValueError(
@@ -107,25 +95,18 @@ def check_channels(stage: Stage, channels: Wiring) -> None:
         )
 
 
-def machine_scenes(
-    experiment: Experiment, wiring: Wiring | None = None
-) -> dict[str, type[Scene]]:
+def machine_scenes(experiment: Experiment) -> dict[str, type[Scene]]:
     """One scene class per stage of ``experiment``, by stage name.
 
-    The channels are wired by the rig configuration, or by ``wiring`` when given. A
-    stage that uses a channel without a wire raises ``ValueError``: here for a given
-    ``wiring``, else when its first trial is made, before the trial starts.
+    A stage that uses a channel the rig does not wire raises ``ValueError`` when its
+    first trial is made, before the trial starts.
     """
-    if wiring is not None:
-        for stage in experiment.stages:
-            check_channels(stage, wiring)
     return {
         stage.name: type(
             f"MachineScene[{stage.name}]",
             (MachineScene,),
             {
                 "experiment": experiment,
-                "wiring": wiring,
                 "stage_index": index,
                 "level_table": {"default": list(range(1, len(stage.levels) + 1))},
                 "_surfaces": {},
@@ -143,7 +124,6 @@ class MachineScene(TrialScene):
     """
 
     experiment: ClassVar[Experiment]
-    wiring: ClassVar[Wiring | None]
     stage_index: ClassVar[int]
     # Decoded pictures and sounds of the stage, kept across its trials.
     _surfaces: ClassVar[dict[str, Surface | None]]
@@ -159,18 +139,12 @@ class MachineScene(TrialScene):
         mxbi = context.mxbi
         self._stage = self.experiment.stages[self.stage_index]
         self._machine: Machine = self._stage.machine
-        channels = self.wiring
-        if channels is None:
-            rig = context.session.mxbi_config.channels
-            channels = Wiring(inputs=rig.inputs, outputs=rig.outputs)
-            check_channels(self._stage, channels)
-        self._inputs: dict[str, Detector] = {
-            name: mxbi.get_detector(channels.inputs[name])
-            for name in self._machine.channels.inputs
+        check_channels(self._stage, mxbi.inputs, mxbi.outputs)
+        self._inputs: dict[str, InputChannel] = {
+            name: mxbi.inputs[name] for name in self._machine.channels.inputs
         }
-        self._outputs: dict[str, Rewarder] = {
-            name: mxbi.get_rewarder(channels.outputs[name])
-            for name in self._machine.channels.outputs
+        self._outputs: dict[str, OutputChannel] = {
+            name: mxbi.outputs[name] for name in self._machine.channels.outputs
         }
         self._rotated = self._screen_rotated(
             (mxbi.screen_size.width, mxbi.screen_size.height)
@@ -195,7 +169,9 @@ class MachineScene(TrialScene):
         self._values: Values = self._draw.values
 
         self._trial: Trial | None = None
-        self._started_ms = 0
+        self._started = 0.0
+        # Touches since the last frame: when, and where on the machine's screen.
+        self._touches: list[tuple[float, float, float]] = []
         self._high: set[str] = set()
         self._playing: dict[str, tuple[float, PlayTask | None]] = {}
         self._frame: tuple[list[str], Surface] | None = None
@@ -203,11 +179,13 @@ class MachineScene(TrialScene):
     # ---- TrialScene ----------------------------------------------------------
 
     def begin(self) -> None:
-        self._started_ms = pygame.time.get_ticks()
+        self._started = monotonic()
+        levels: dict[str, bool] = {}
+        for name, channel in self._inputs.items():
+            channel.changes()  # what happened before the trial is not its events
+            levels[name] = channel.level()
         # The rig reports its own inputs, a photodiode among them: none is simulated.
-        self._trial = Trial(
-            self._machine, self._read_inputs(), 0, self._values, photodiode=False
-        )
+        self._trial = Trial(self._machine, levels, 0, self._values, photodiode=False)
         self._apply(0)
 
     def end(self) -> None:
@@ -255,18 +233,35 @@ class MachineScene(TrialScene):
             x, y = event.pos
             if self._rotated:
                 x, y = y, self._machine.screen.height - x
-            self._trial.touch(x, y, self._now())
+            self._touches.append((self._now(), x, y))
 
     def update(self, dt_s: float) -> None:
-        if not self._running or self._trial is None:
+        trial = self._trial
+        if not self._running or trial is None:
             return
         now = self._now()
-        for name, high in self._read_inputs().items():
-            self._trial.set_input(name, high, now)
-        self._trial.advance(now)
+        # Touches and input changes since the last frame, in the order they happened.
+        events: list[tuple[float, Callable[[float], None]]] = [
+            (at, lambda t, x=x, y=y, trial=trial: trial.touch(x, y, t))
+            for at, x, y in self._touches
+        ]
+        self._touches = []
+        for name, channel in self._inputs.items():
+            for at, high in channel.changes():
+                events.append(
+                    (
+                        self._ms(at),
+                        lambda t, name=name, high=high, trial=trial: trial.set_input(
+                            name, high, t
+                        ),
+                    )
+                )
+        for at, apply in sorted(events, key=lambda event: event[0]):
+            apply(min(max(at, trial.now), now))
+        trial.advance(now)
         self._apply(now)
-        if self._trial.state is None:
-            outcome = outcome_of(self._stage, self._trial)
+        if trial.state is None:
+            outcome = outcome_of(self._stage, trial)
             self.resolve(None if outcome == "none" else outcome == "correct")
             self.finish()
 
@@ -281,14 +276,12 @@ class MachineScene(TrialScene):
 
     # ---- the rig -------------------------------------------------------------
 
-    def _now(self) -> int:
-        return pygame.time.get_ticks() - self._started_ms
+    def _ms(self, at: float) -> float:
+        """A ``monotonic()`` time as milliseconds from the start of the trial."""
+        return round((at - self._started) * 1000, 3)
 
-    def _read_inputs(self) -> dict[str, bool]:
-        return {
-            name: detector.current_animal is not None
-            for name, detector in self._inputs.items()
-        }
+    def _now(self) -> float:
+        return self._ms(monotonic())
 
     def _screen_rotated(self, rig: tuple[int, int]) -> bool:
         """Whether the animal's upright screen is the rig's screen turned a quarter."""
@@ -308,9 +301,9 @@ class MachineScene(TrialScene):
             return
         high = self._trial.outputs(now)
         for name in high - self._high:
-            self._outputs[name].give_reward(_HOLD_MS)
+            self._outputs[name].set(True)
         for name in self._high - high:
-            self._outputs[name].stop_reward()
+            self._outputs[name].set(False)
         self._high = high
 
         sounds = self._trial.sounds

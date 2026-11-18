@@ -10,10 +10,11 @@ from urllib.parse import quote
 from pygame import MOUSEBUTTONDOWN, Event, Surface
 
 from mxbiflow.driver import MXBIModel
+from mxbiflow.driver.channels import DetectorInput, RewarderOutput
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 from mxbiflow.statemachine.models import Experiment
-from mxbiflow.statemachine.scene import Cursor, Wiring, machine_scenes
+from mxbiflow.statemachine.scene import Cursor, machine_scenes
 
 
 def state(name: str, **parts: Any) -> dict[str, Any]:
@@ -97,9 +98,6 @@ def stage(
     }
 
 
-WIRING = Wiring(inputs={"beam": 0}, outputs={"reward": 0})
-
-
 def experiment(*stages: dict[str, Any]) -> Experiment:
     return Experiment.model_validate({"stages": list(stages), "animals": []})
 
@@ -110,11 +108,13 @@ class MachineSceneTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.data = Path(directory.name)
         self.now = 0
-        ticks = patch("pygame.time.get_ticks", side_effect=lambda: self.now)
-        ticks.start()
-        self.addCleanup(ticks.stop)
+        # Milliseconds, for the scene's clock and the channels'.
+        for clock in ("mxbiflow.statemachine.scene", "mxbiflow.driver.channels"):
+            patcher = patch(f"{clock}.monotonic", side_effect=lambda: self.now / 1000)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
-        self.detector = SimpleNamespace(current_animal="a")
+        self.detector: Any = SimpleNamespace(current_animal="a")
         self.rewarder = Mock()
         self.aplayer = Mock(frequency_response_table=None)
 
@@ -123,6 +123,8 @@ class MachineSceneTests(unittest.TestCase):
         scenes: Experiment,
         *,
         rig: tuple[int, int] = (200, 100),
+        inputs: dict[str, Any] | None = None,
+        outputs: dict[str, Any] | None = None,
     ) -> SimpleNamespace:
         config = AnimalConfig(name="a", stage=scenes.stages[0].name)
         animal = Animal(
@@ -141,8 +143,10 @@ class MachineSceneTests(unittest.TestCase):
         mxbi = SimpleNamespace(
             screen_size=SimpleNamespace(width=rig[0], height=rig[1]),
             aplayer=self.aplayer,
-            get_detector=lambda _id: self.detector,
-            get_rewarder=lambda _id: self.rewarder,
+            inputs={"beam": DetectorInput(self.detector)} if inputs is None else inputs,
+            outputs={"reward": RewarderOutput(self.rewarder)}
+            if outputs is None
+            else outputs,
         )
         return SimpleNamespace(
             session=self.session, mxbi=mxbi, publish_trial=self.publish, timer=Mock()
@@ -152,7 +156,7 @@ class MachineSceneTests(unittest.TestCase):
         """Start the next trial of the animal's stage at the current time."""
         animal = self.session.require_current_animal()
         with patch("mxbiflow.context._current_mxbiflow", context):
-            scene = machine_scenes(scenes, WIRING)[animal.current_stage_name]()
+            scene = machine_scenes(scenes)[animal.current_stage_name]()
         scene.start()
         return scene
 
@@ -291,26 +295,56 @@ class MachineSceneTests(unittest.TestCase):
 
         self.assertEqual(screen.get_at((150, 20)), (0, 255, 0, 255))
 
-    def test_an_unmapped_channel_fails_with_its_name(self) -> None:
-        with self.assertRaisesRegex(ValueError, 'output "reward"'):
-            machine_scenes(experiment(stage("touch")), Wiring(inputs={"beam": 0}))
-
-    def test_the_rig_configuration_wires_the_channels(self) -> None:
+    def test_a_gpio_edge_keeps_the_time_it_happened(self) -> None:
         scenes = experiment(stage("touch"))
-        context = self.context(scenes)
-        with patch("mxbiflow.context._current_mxbiflow", context):
-            with self.assertRaisesRegex(ValueError, 'input "beam", output "reward"'):
-                machine_scenes(scenes)["touch"]()
-            self.assertEqual(self.session.require_current_animal().trial_id, 0)
+        beam = Mock()
+        beam.level.return_value = True
+        beam.changes.return_value = []
+        scene = self.trial(scenes, self.context(scenes, inputs={"beam": beam}))
 
-            self.session.mxbi_config.channels.inputs["beam"] = 0
-            self.session.mxbi_config.channels.outputs["reward"] = 0
-            scene = machine_scenes(scenes)["touch"]()
-        scene.start()
+        # The beam fell at 12 ms; the frame that reads it is at 30 ms.
+        beam.changes.return_value = [(0.012, False)]
+        self.now = 30
+        scene.update(0)
 
-        self.touch(scene, (150, 20), at=10)
+        self.assertEqual(
+            self.records("touch")[0]["events"][-2:],
+            [{"t": 12, "text": "beam.fall → exit"}, {"t": 12, "text": "trial ends"}],
+        )
 
-        self.rewarder.give_reward.assert_called_once()
+    def test_touches_and_edges_of_a_frame_are_handled_in_order(self) -> None:
+        scenes = experiment(stage("touch"))
+        beam = Mock()
+        beam.level.return_value = True
+        beam.changes.return_value = []
+        scene = self.trial(scenes, self.context(scenes, inputs={"beam": beam}))
+
+        # The touch at 10 ms comes before the beam's fall at 20 ms.
+        self.now = 10
+        scene.handle_event(Event(MOUSEBUTTONDOWN, button=1, pos=(150, 20)))
+        beam.changes.return_value = [(0.020, False)]
+        self.now = 30
+        scene.update(0)
+
+        self.assertEqual(
+            [entry["state"] for entry in self.records_after(scene)["states"]],
+            ["choice", "reward"],
+        )
+
+    def records_after(self, scene: Any) -> dict[str, Any]:
+        """Let the trial run out and return its record."""
+        self.now += 100
+        scene.update(0)
+        return self.records("touch")[0]
+
+    def test_an_unwired_channel_fails_before_the_trial_is_counted(self) -> None:
+        scenes = experiment(stage("touch"))
+        context = self.context(scenes, inputs={}, outputs={})
+
+        with self.assertRaisesRegex(ValueError, 'input "beam", output "reward"'):
+            self.trial(scenes, context)
+
+        self.assertEqual(self.session.require_current_animal().trial_id, 0)
 
     def test_a_screen_of_another_size_fails(self) -> None:
         scenes = experiment(stage("touch", screen=(300, 300)))

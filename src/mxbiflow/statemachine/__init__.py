@@ -15,9 +15,9 @@ conformance cases (`tests/fixtures/conformance`).
 from pathlib import Path
 
 from .models import Experiment
-from .scene import MachineScene, Wiring, machine_scenes
+from .scene import MachineScene, machine_scenes
 
-__all__ = ["Experiment", "MachineScene", "Wiring", "load_experiment", "machine_scenes"]
+__all__ = ["Experiment", "MachineScene", "load_experiment", "machine_scenes"]
 
 
 def load_experiment(path: Path) -> Experiment:
