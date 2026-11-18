@@ -164,7 +164,9 @@ class TrialParams(BaseModel):
     The field's type says what the parameter is: :data:`Time`, :data:`Count`, ``float``
     for any other number, the enum of the states for where a transition leads, the
     enum of the stimuli for which one to show or play. Its default is the parameter's.
-    A field's alias is the parameter's name when that is not a Python name.
+    A field's alias is the parameter's name when that is not a Python name. Defaults
+    known only when the stage is made (from a configuration) are an instance of the
+    model, given to the stage as ``defaults``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
@@ -567,6 +569,8 @@ class Stage(BaseModel):
 
     name: Name
     params: type[TrialParams] = TrialParams
+    #: The parameters' defaults, when they are not the fields' own.
+    defaults: TrialParams | None = None
     #: Names, or the enum class of them.
     inputs: Sequence[Name] = ()
     outputs: Sequence[Name] = ()
@@ -612,12 +616,17 @@ class Stage(BaseModel):
     def _parameters(self) -> list[dict[str, Any]]:
         states = set(_names(s.name for s in self.states)) | {EXIT}
         parameters: list[dict[str, Any]] = []
+        if self.defaults is not None and not isinstance(self.defaults, self.params):
+            raise ValueError(f"the defaults are not a {self.params.__name__}")
         for field_name, field in self.params.model_fields.items():
             name = field.alias or field_name
-            default = field.default
             kinds = [m.kind for m in field.metadata if isinstance(m, _Kind)]
-            if field.is_required():
+            if self.defaults is not None:
+                default = getattr(self.defaults, field_name)
+            elif field.is_required():
                 raise ValueError(f"parameter {name} needs a default")
+            else:
+                default = field.default
             if kinds:
                 kind = kinds[0]
             elif isinstance(default, str):
@@ -630,11 +639,10 @@ class Stage(BaseModel):
 
     def _values_of(self, parameter: str) -> list[str]:
         """Every name a parameter can take: its default, the levels', the rows'."""
-        fields = self.params.model_fields
         found = [
-            str(field.default)
-            for name, field in fields.items()
-            if (field.alias or name) == parameter and isinstance(field.default, str)
+            item["default"]
+            for item in self._parameters()
+            if item["name"] == parameter and isinstance(item["default"], str)
         ]
         for level in self.levels:
             value = level.values.get(parameter)

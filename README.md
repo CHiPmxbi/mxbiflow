@@ -453,7 +453,8 @@ scene_manager.register(stage_scenes(touch))
   stimulus, timer) and says where.
 - A parameter's type is its field's: `Time`, `Count`, `float` for any other number, the
   states' enum for where a transition leads, the stimuli's for which one to show or
-  play. `Params.refs().reward_ms` is the parameter itself: put it where a state or a
+  play. Defaults known only when the stage is made are an instance of the model
+  (`defaults=Params(...)`). `Params.refs().reward_ms` is the parameter itself: put it where a state or a
   stimulus takes a value, and use it as the key of a level's or a row's values. The
   event of a stimulus parameter (`Touch(p.target)`) is that of each stimulus it can name.
 - Python is the host's: `on_trial` hooks run before a trial and may set its parameters
