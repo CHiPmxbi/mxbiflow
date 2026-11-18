@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from py_mx_eye import MxEye, MxEyeConfig
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..audioplayer import AudioPlayer
 from ..audioplayer.frequency_response_table import FrequencyResponseTable
 from ..channels import (
     DetectorInput,
@@ -124,6 +125,20 @@ class ChannelsModel(BaseModel):
     )
 
 
+class AudioModel(BaseModel):
+    """The audio output every sound is played on, in one format."""
+
+    model_config = ConfigDict(title="Audio output")
+
+    sample_rate_hz: int | None = Field(
+        default=None,
+        gt=0,
+        title="Sample rate",
+        description="Sounds are converted to it when loaded; empty is the device's own",
+    )
+    channels: int = Field(default=2, gt=0, title="Channels")
+
+
 class MXBIModel(BaseModel):
     """The rig hardware; the device name in cogmote identifies the rig."""
 
@@ -142,6 +157,7 @@ class MXBIModel(BaseModel):
             "x-mxbi-columns": ["Frequency (Hz)", "Master volume (%)"],
         },
     )
+    audio: AudioModel = Field(default_factory=AudioModel)
     channels: ChannelsModel = Field(default_factory=ChannelsModel)
 
 
@@ -153,10 +169,17 @@ def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
         rewarders,
         detectors,
         _build_eyetrackers(config.eyetrackers),
-        # An empty table is no table: stages test for None before looking up a volume.
-        FrequencyResponseTable(config.frequency_response_table)
-        if config.frequency_response_table
-        else None,
+        aplayer=AudioPlayer(
+            sample_rate_hz=config.audio.sample_rate_hz,
+            channels=config.audio.channels,
+            # An empty table is no table: stages test for None before looking up a
+            # volume.
+            frequency_response_table=FrequencyResponseTable(
+                config.frequency_response_table
+            )
+            if config.frequency_response_table
+            else None,
+        ),
         inputs={
             name: _make_input(name, wire, detectors)
             for name, wire in config.channels.inputs.items()

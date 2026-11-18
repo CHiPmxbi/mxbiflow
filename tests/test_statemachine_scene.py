@@ -10,6 +10,7 @@ from urllib.parse import quote
 from pygame import MOUSEBUTTONDOWN, Event, Surface
 
 from mxbiflow.driver import MXBIModel
+from mxbiflow.driver.audioplayer import AudioFormat
 from mxbiflow.driver.channels import DetectorInput, RewarderOutput
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
@@ -118,7 +119,12 @@ class MachineSceneTests(unittest.TestCase):
 
         self.detector: Any = SimpleNamespace(current_animal="a")
         self.rewarder = Mock()
-        self.aplayer = Mock(frequency_response_table=None)
+        # An output of 8000 Hz and one channel: eight frames are a millisecond.
+        self.aplayer = Mock(
+            frequency_response_table=None,
+            format=AudioFormat(sample_rate_hz=8000, channels=1),
+            prepare=lambda sound: sound,
+        )
 
     def context(
         self,
@@ -174,13 +180,12 @@ class MachineSceneTests(unittest.TestCase):
     def test_a_touched_trial_drives_the_rig_and_is_recorded(self) -> None:
         scenes = experiment(stage("touch"))
         scene = self.trial(scenes, self.context(scenes))
-        self.aplayer.play_puretone_sequence.assert_called_once()
-        units = self.aplayer.play_puretone_sequence.call_args.args[0]
-        # The train is cut at the sound's 250 ms.
-        self.assertEqual(
-            [(u.frequency_hz, u.duration_ms) for u in units],
-            [(1000, 100), (0, 100), (1000, 50)],
-        )
+        self.aplayer.play.assert_called_once()
+        samples = self.aplayer.play.call_args.args[0].samples[:, 0]
+        # A 100 ms tone, a 100 ms gap, and the train is cut at the sound's 250 ms.
+        self.assertEqual(len(samples), 250 * 8)
+        self.assertTrue(samples[:800].any() and samples[1600:].any())
+        self.assertFalse(samples[800:1600].any())
         screen = Surface((200, 100))
         scene.draw(screen)
         self.assertEqual(screen.get_at((150, 20)), (255, 0, 0, 255))

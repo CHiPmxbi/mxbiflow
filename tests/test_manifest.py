@@ -153,6 +153,7 @@ class DescribeTests(unittest.TestCase):
                 "detectors",
                 "eyetrackers",
                 "frequency_response_table",
+                "audio",
                 "channels",
             },
         )

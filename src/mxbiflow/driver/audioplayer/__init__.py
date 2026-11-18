@@ -1,12 +1,14 @@
-from .audioplayer import AudioPlayer, LoadedWav, PlayResult, PlayStatus, PlayTask
+from .audioplayer import AudioPlayer
 from .puretone_generator import PureToneGenerator, PureToneUnit
+from .sound import AudioFormat, Sound, convert, read_sound, tone_train
 
 __all__ = [
+    "AudioFormat",
     "AudioPlayer",
-    "LoadedWav",
-    "PlayResult",
-    "PlayStatus",
-    "PlayTask",
     "PureToneGenerator",
     "PureToneUnit",
+    "Sound",
+    "convert",
+    "read_sound",
+    "tone_train",
 ]

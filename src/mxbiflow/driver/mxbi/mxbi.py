@@ -20,6 +20,7 @@ class MXBI:
         frequency_response_table: FrequencyResponseTable | None = None,
         inputs: Mapping[str, InputChannel] | None = None,
         outputs: Mapping[str, OutputChannel] | None = None,
+        aplayer: AudioPlayer | None = None,
     ):
         if not isinstance(screen_size, Screen):
             screen_size = Screen(width=screen_size[0], height=screen_size[1])
@@ -29,7 +30,9 @@ class MXBI:
         self._eyetracker: dict[int, Eyetracker] = self._normalize_optional(
             eyetracker, "eyetracker"
         )
-        self._aplayer = AudioPlayer(frequency_response_table=frequency_response_table)
+        self._aplayer = aplayer or AudioPlayer(
+            frequency_response_table=frequency_response_table
+        )
         #: State machines' channels by name, as the rig configuration wires them.
         self.inputs: dict[str, InputChannel] = dict(inputs or {})
         self.outputs: dict[str, OutputChannel] = dict(outputs or {})
@@ -98,7 +101,8 @@ class MXBI:
             eyetracker.begin()
 
     def quit(self) -> None:
-        """Stop all eyetrackers and detectors, and close all rewarders."""
+        """Stop all eyetrackers and detectors, close the rewarders and the audio output."""
+        self._aplayer.close()
         for eyetracker in self._eyetracker.values():
             eyetracker.quit()
         for detector in self._detector.values():

@@ -19,7 +19,7 @@ from mxbiflow.core.path import (
     set_base_path,
 )
 from mxbiflow.driver import MXBIModel, build_mxbi
-from mxbiflow.driver.audioplayer import AudioPlayer, PlayStatus, PureToneUnit
+from mxbiflow.driver.audioplayer import PureToneUnit, tone_train
 from mxbiflow.infra.hardware_config import (
     HardwareConfigError,
     read_hardware_config,
@@ -137,25 +137,17 @@ class NoTableTests(unittest.TestCase):
         self.assertIsNone(build_mxbi(config).aplayer.frequency_response_table)
 
     def test_a_tone_plays_at_the_volume_of_its_unit(self) -> None:
-        player = AudioPlayer()
-        tone = np.full(4, 1000, dtype=np.int16)
-        played: list[bytes] = []
+        tone = np.full(4, 16384, dtype=np.int16)
 
-        def play(_task: object, pcm: bytes, **_kwargs: object) -> PlayStatus:
-            played.append(pcm)
-            return PlayStatus.FINISHED
+        def played(**volume: int) -> list[float]:
+            unit = PureToneUnit(
+                frequency_hz=1000, duration_ms=1, stimulus=tone, **volume
+            )
+            return tone_train([unit], sample_rate_hz=4000).samples[:, 0].tolist()
 
-        unit = PureToneUnit(frequency_hz=1000, duration_ms=1, stimulus=tone)
-        with patch.object(player, "_play_pcm_bytes_with_callback", play):
-            task = player.play_puretone_sequence([unit])
-            for _ in range(200):
-                player.update()
-                if task.done():
-                    break
-                time.sleep(0.01)
-
-        self.assertTrue(task.done())
-        self.assertEqual(played, [tone.tobytes()])
+        self.assertEqual(played(), [0.5] * 4)
+        self.assertEqual(played(master_volume=50), [0.25] * 4)
+        self.assertEqual(played(master_volume=50, digital_volume=50), [0.125] * 4)
 
 
 if __name__ == "__main__":

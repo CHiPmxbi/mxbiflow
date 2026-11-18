@@ -234,7 +234,9 @@ class HookTests(unittest.TestCase):
             session=self.session,
             mxbi=SimpleNamespace(
                 screen_size=SimpleNamespace(width=200, height=100),
-                aplayer=Mock(frequency_response_table=None),
+                aplayer=Mock(
+                    frequency_response_table=None, prepare=lambda sound: sound
+                ),
                 inputs={},
                 outputs={"reward": RewarderOutput(self.rewarder)},
             ),
