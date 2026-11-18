@@ -32,6 +32,7 @@ from mxbiflow.statemachine.stage import (
     Size,
     Stage,
     State,
+    StateParam,
     Time,
     Timeout,
     Touch,
@@ -98,17 +99,22 @@ def touch_stage(
             )
         ],
         states=[
-            State(name=S.WAIT, timeout=1000, on_entry=[Show(Stim.TARGET)]),
+            State(name=S.WAIT, timeout_ms=1000, on_entry=[Show(Stim.TARGET)]),
             State(name=S.JUDGE, on_entry=[Clear()]),
             State(
                 name=S.FAST,
-                timeout=p.reward_ms,
+                timeout_ms=p.reward_ms,
                 hold=[Out.REWARD],
                 outcome=Outcome.correct,
             ),
-            State(name=S.SLOW, timeout=10, hold=[Out.REWARD], outcome=Outcome.correct),
             State(
-                name=S.MISS, timeout=10, on_entry=[Clear()], outcome=Outcome.incorrect
+                name=S.SLOW, timeout_ms=10, hold=[Out.REWARD], outcome=Outcome.correct
+            ),
+            State(
+                name=S.MISS,
+                timeout_ms=10,
+                on_entry=[Clear()],
+                outcome=Outcome.incorrect,
             ),
         ],
         transitions=[
@@ -185,14 +191,14 @@ class StageTests(unittest.TestCase):
     def test_defaults_known_when_the_stage_is_made_are_an_instance(self) -> None:
         class Timed(TrialParams):
             wait_ms: Time
-            after: S
+            after: StateParam[S]
 
         stage = Stage(
             name="timed",
             params=Timed,
             defaults=Timed(wait_ms=300, after=S.FAST),
             states=[
-                State(name=S.WAIT, timeout=Timed.refs().wait_ms),
+                State(name=S.WAIT, timeout_ms=Timed.refs().wait_ms),
                 State(name=S.FAST),
             ],
             transitions=[On(source=S.WAIT, event=Timeout(), target=Timed.refs().after)],
@@ -206,10 +212,18 @@ class StageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "parameter wait_ms needs a default"):
             Stage(name="none", params=Timed, states=[State(name=S.WAIT)]).build()
 
+    def test_a_parameter_whose_type_does_not_say_what_it_is_is_refused(self) -> None:
+        class Vague(TrialParams):
+            after: S = S.FAST
+
+        stage = Stage(name="vague", params=Vague, states=[State(name=S.FAST)])
+        with self.assertRaisesRegex(ValueError, "parameter after: its type does not"):
+            stage.build()
+
     def test_plain_strings_name_things_as_enum_members_do(self) -> None:
         stage = Stage(
             name="plain",
-            states=[State(name="wait", timeout=10)],
+            states=[State(name="wait", timeout_ms=10)],
             transitions=[On(source="wait", event=Timeout(), target=EXIT)],
         )
         data, _ = stage.build()
@@ -272,7 +286,7 @@ class HookTests(unittest.TestCase):
 
     def test_a_hook_judges_the_touch_and_sends_the_machine_its_verdict(self) -> None:
         def judge(scene: MachineScene) -> None:
-            latency = scene.now
+            latency = scene.now_ms
             scene.note(Extra(latency_ms=latency))
             scene.fire(Verdict.FAST if latency < 300 else Verdict.SLOW)
 

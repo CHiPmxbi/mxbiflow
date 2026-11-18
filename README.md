@@ -441,8 +441,8 @@ p = Params.refs()  # the parameters themselves, where a value could stand
 
 
 def judge(scene: MachineScene) -> None:  # Python where the data cannot say it
-    scene.note(Extra(latency_ms=scene.now))
-    scene.fire(Verdict.FAST if scene.now < 1500 else Verdict.SLOW)
+    scene.note(Extra(latency_ms=scene.now_ms))
+    scene.fire(Verdict.FAST if scene.now_ms < 1500 else Verdict.SLOW)
 
 
 def rule(scene: MachineScene, outcome: Outcome | None) -> SettlementAction:
@@ -464,13 +464,13 @@ touch = Stage(
         )
     ],
     states=[
-        State(name=S.WAIT, timeout=5000, on_entry=[Show(Stim.TARGET)]),
+        State(name=S.WAIT, timeout_ms=5000, on_entry=[Show(Stim.TARGET)]),
         State(name=S.JUDGE, on_entry=[Clear()]),
         State(
-            name=S.FAST, timeout=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct
+            name=S.FAST, timeout_ms=p.reward_ms, hold=[Out.REWARD], outcome=Outcome.correct
         ),
-        State(name=S.SLOW, timeout=200, hold=[Out.REWARD], outcome=Outcome.correct),
-        State(name=S.MISS, timeout=2000, on_entry=[Clear()], outcome=Outcome.incorrect),
+        State(name=S.SLOW, timeout_ms=200, hold=[Out.REWARD], outcome=Outcome.correct),
+        State(name=S.MISS, timeout_ms=2000, on_entry=[Clear()], outcome=Outcome.incorrect),
     ],
     transitions=[
         On(source=S.WAIT, event=Touch(Stim.TARGET), target=S.JUDGE),
@@ -510,15 +510,16 @@ scene_manager.register(stage_scenes(touch))
   transitions tried in the order given; a group's hold and transitions apply in its
   states. `build()` refuses a name that leads nowhere (a missing state, output,
   stimulus, timer) and says where.
-- A parameter's type is its field's: `Time`, `Count`, `float` for any other number, the
-  states' enum for where a transition leads, the stimuli's for which one to show or
-  play. Defaults known only when the stage is made are an instance of the model
+- A parameter's type is its field's: `Time`, `Count`, `float` for any other number,
+  `StateParam[S]` for where a transition leads and `StimulusParam[Stim]` for which
+  stimulus to show or play; a field of another type is refused. Times carry their unit
+  in the name (`timeout_ms`, `time_ms`, `width_ms`). Defaults known only when the stage is made are an instance of the model
   (`defaults=Params(...)`). `Params.refs().reward_ms` is the parameter itself: put it where a state or a
   stimulus takes a value, and use it as the key of a level's or a row's values. The
   event of a stimulus parameter (`Touch(p.target)`) is that of each stimulus it can name.
 - Python is the host's: `on_trial` hooks run before a trial and may set its parameters
   (`scene.set(p.target_x, 0.3)`); `on_enter` hooks run when their state is entered. A
-  hook has `scene.mxbiflow`, `scene.trial`, `scene.now`, `scene.params(Params)` for the
+  hook has `scene.mxbiflow`, `scene.trial`, `scene.now_ms`, `scene.params(Params)` for the
   trial's values as the model, `scene.fire(name)` to send the machine `Host(name)`, and
   `scene.note(model)` to keep a model's fields under `extra` in the trial's record.
 - `rule` moves the animal between levels: `RateRule`, `CountRule`, or Python for a rule
