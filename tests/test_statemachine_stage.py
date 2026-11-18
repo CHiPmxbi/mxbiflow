@@ -174,6 +174,27 @@ class StageTests(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "no parameter rewardms"):
             _ = p.rewardms  # pyright: ignore[reportAttributeAccessIssue]
 
+    def test_defaults_known_when_the_stage_is_made_are_an_instance(self) -> None:
+        class Timed(TrialParams):
+            wait_ms: Time
+            after: S
+
+        stage = Stage(
+            "timed",
+            params=Timed,
+            defaults=Timed(wait_ms=300, after=S.FAST),
+            states=[State(S.WAIT, timeout=Timed.refs().wait_ms), State(S.FAST)],
+            transitions=[On(S.WAIT, Timeout(), Timed.refs().after)],
+        )
+
+        parameters = stage.build()[0].machine.parameters
+        self.assertEqual(
+            [(x.name, x.type, x.default) for x in parameters],
+            [("wait_ms", "time", 300), ("after", "state", "fast")],
+        )
+        with self.assertRaisesRegex(ValueError, "parameter wait_ms needs a default"):
+            Stage("none", params=Timed, states=[State(S.WAIT)]).build()
+
     def test_plain_strings_name_things_as_enum_members_do(self) -> None:
         stage = Stage(
             "plain",
