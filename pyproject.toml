@@ -26,6 +26,7 @@ dependencies = [
     "rich>=15.0.0",
     "sounddevice>=0.5.6",
     "soundfile>=0.14.0",
+    "soxr>=1.1.0",
     "stamina>=26.1.0",
     "varname>=1.0.0",
 ]

@@ -270,6 +270,31 @@ stages read it from `mxbi.aplayer.frequency_response_table`. Without a table tha
 is `None`, and tones play at the volume of their unit. Offline, the table comes
 from `~/.config/mxbi/frequency_response_table.json` instead.
 
+### Sounds and delays
+
+`mxbi.aplayer` plays on one output stream, opened when the run starts and kept open,
+and mixes the sounds that play together. The stream has one format (`audio` in the
+hardware configuration: `sample_rate_hz`, empty for the device's own, and `channels`);
+a sound is converted to it once, before it is played, so a file of any sample rate,
+sample type and channel count plays:
+
+```python
+click = aplayer.load(CLICKER_PATH)        # read and converted, once
+task = aplayer.play(click, gain=0.5)      # starts with the output's next block
+task.on_done(lambda result: ...)          # FINISHED, CANCELLED or ERROR
+task.cancel()
+```
+
+A `Sound` is samples (`mxbiflow.driver.audioplayer`): `read_sound` reads a file,
+`tone_train` joins generated tones, `aplayer.prepare` converts either to the output's
+format. `play` refuses a sound in another format rather than convert it during a
+trial. Sounds that are too loud together are clipped, with a warning in the log.
+
+A delay of `mxbiflow.timer` is the same `Task` (`mxbiflow.task`):
+`timer.after(delay_ms=500, callback=...)` and `timer.every(...)` give one that can be
+cancelled and tells when it is done. Callbacks of both run on the game loop's thread.
+A trial's delays and sounds are cancelled when it ends.
+
 ## cogforge experiments
 
 An experiment designed in cogforge (stages, each a trial state machine with levels,

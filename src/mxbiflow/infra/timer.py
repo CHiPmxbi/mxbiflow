@@ -1,55 +1,72 @@
+"""Delays on the game loop's clock."""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from pygame import time
 
+from ..task import Task, TaskResult, TaskStatus
+
 
 @dataclass
-class _Task:
-    interval_ms: int
+class _Timed:
+    task: Task
     callback: Callable[[], None]
-    repeat: bool
     next_fire_ms: int
-    cancelled: bool = False
-
-    def cancel(self) -> None:
-        self.cancelled = True
+    #: The time between calls of a repeating delay; ``None`` fires once.
+    interval_ms: int | None
 
 
 class FrameTimer:
+    """Calls back after a delay, when the game loop updates it.
+
+    A delay is a :class:`~mxbiflow.task.Task`: it finishes when it has fired (a
+    repeating one never does) and can be cancelled.
+    """
+
     def __init__(self) -> None:
-        self._tasks: list[_Task] = []
+        self._timed: list[_Timed] = []
 
-    def after(self, delay_ms: int, callback: Callable[[], None]) -> _Task:
-        now = time.get_ticks()
-        task = _Task(delay_ms, callback, False, now + delay_ms)
-        self._tasks.append(task)
+    def after(self, delay_ms: int, callback: Callable[[], None]) -> Task:
+        return self._add(delay_ms=delay_ms, callback=callback, repeat=False)
+
+    def every(self, interval_ms: int, callback: Callable[[], None]) -> Task:
+        return self._add(delay_ms=interval_ms, callback=callback, repeat=True)
+
+    def _add(
+        self, *, delay_ms: int, callback: Callable[[], None], repeat: bool
+    ) -> Task:
+        task = Task()
+        self._timed.append(
+            _Timed(
+                task=task,
+                callback=callback,
+                next_fire_ms=time.get_ticks() + delay_ms,
+                interval_ms=delay_ms if repeat else None,
+            )
+        )
         return task
 
-    def every(self, interval_ms: int, callback: Callable[[], None]) -> _Task:
-        now = time.get_ticks()
-        task = _Task(interval_ms, callback, True, now + interval_ms)
-        self._tasks.append(task)
-        return task
-
-    def cancel(self, task: _Task) -> None:
+    def cancel(self, task: Task) -> None:
         task.cancel()
 
     def cancel_all(self) -> None:
-        for task in self._tasks:
-            task.cancel()
-        self._tasks.clear()
+        timed, self._timed = self._timed, []
+        for item in timed:
+            item.task.complete(TaskResult(TaskStatus.CANCELLED))
 
     def update(self) -> None:
         now = time.get_ticks()
-        for task in self._tasks:
-            if task.cancelled:
-                continue
-            if now >= task.next_fire_ms:
-                task.callback()
-                if task.repeat and not task.cancelled:
-                    task.next_fire_ms += task.interval_ms
+        for item in list(self._timed):
+            task = item.task
+            if task.cancel_requested:
+                task.complete(TaskResult(TaskStatus.CANCELLED))
+            elif now >= item.next_fire_ms:
+                item.callback()
+                if item.interval_ms is None:
+                    task.complete(TaskResult(TaskStatus.FINISHED))
+                elif task.cancel_requested:
+                    task.complete(TaskResult(TaskStatus.CANCELLED))
                 else:
-                    task.cancel()
-
-        self._tasks = [task for task in self._tasks if not task.cancelled]
+                    item.next_fire_ms += item.interval_ms
+        self._timed = [item for item in self._timed if not item.task.done]

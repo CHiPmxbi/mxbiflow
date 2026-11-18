@@ -21,18 +21,24 @@ from typing import ClassVar
 from urllib.request import urlopen
 
 import pygame
-import soundfile
 from pydantic import BaseModel, JsonValue
 from pygame import Surface
 from pygame.event import Event
 
 from ..context import get_mxbiflow
-from ..driver.audioplayer.audioplayer import AudioPlayer, LoadedWav, PlayTask
-from ..driver.audioplayer.puretone_generator import PureToneGenerator, PureToneUnit
+from ..driver.audioplayer import (
+    AudioPlayer,
+    PureToneGenerator,
+    PureToneUnit,
+    Sound,
+    read_sound,
+    tone_train,
+)
 from ..driver.channels import InputChannel, OutputChannel
 from ..scene.scene import Scene
 from ..scene.settlement import SettlementAction
 from ..scene.trial_scene import TrialScene
+from ..task import Task
 from .host import (
     ACTIONS,
     Outcome,
@@ -66,8 +72,6 @@ from .runner import (
 from .validate import check_experiment
 
 _CONTEXT = "machine"
-
-type Sound = WavStimulus | TonesStimulus
 
 
 class Cursor(BaseModel):
@@ -160,7 +164,7 @@ class MachineScene(TrialScene):
     hooks: ClassVar[Hooks]
     # Decoded pictures and sounds of the stage, kept across its trials.
     _surfaces: ClassVar[dict[str, Surface | None]]
-    _sounds: ClassVar[dict[Hashable, LoadedWav | list[PureToneUnit] | None]]
+    _sounds: ClassVar[dict[Hashable, Sound | None]]
 
     @classmethod
     def name(cls) -> str:
@@ -211,7 +215,7 @@ class MachineScene(TrialScene):
         # Touches since the last frame: when, and where on the machine's screen.
         self._touches: list[tuple[float, float, float]] = []
         self._high: set[str] = set()
-        self._playing: dict[str, tuple[float, PlayTask | None]] = {}
+        self._playing: dict[str, tuple[float, Task | None]] = {}
         self._frame: tuple[list[str], Surface] | None = None
 
     # ---- TrialScene ----------------------------------------------------------
@@ -439,20 +443,24 @@ class MachineScene(TrialScene):
             if name not in self._playing:
                 self._playing[name] = (end, self._play(name))
 
-    def _play(self, name: str) -> PlayTask | None:
+    def _play(self, name: str) -> Task | None:
         sound = self._sound(name)
-        if sound is None:
-            return None
-        if isinstance(sound, LoadedWav):
-            return self._aplayer.play_loaded_wav(sound)
-        return self._aplayer.play_puretone_sequence(sound)
+        return None if sound is None else self._aplayer.play(sound)
 
-    def _sound(self, name: str) -> LoadedWav | list[PureToneUnit] | None:
+    def _sound(self, name: str) -> Sound | None:
+        """The stimulus's sound in the output's format, made once and kept."""
         stimulus = next(s for s in self._machine.stimuli if s.name == name)
         assert isinstance(stimulus, (WavStimulus, TonesStimulus))
+        aplayer = self._aplayer
         if isinstance(stimulus, WavStimulus):
             if name not in self._sounds:
-                type(self)._sounds[name] = _load_wav(stimulus)
+                type(self)._sounds[name] = (
+                    None
+                    if stimulus.sound is None
+                    else aplayer.prepare(
+                        read_sound(io.BytesIO(_data(stimulus.sound)[1]))
+                    )
+                )
             return self._sounds[name]
         # Tones may be this trial's: frequencies and lengths can be parameters.
         tones = tuple(
@@ -461,7 +469,11 @@ class MachineScene(TrialScene):
         )
         key = (name, tones, duration_of(stimulus, self._values))
         if key not in self._sounds:
-            type(self)._sounds[key] = _tone_train(tones, key[2], self._aplayer)
+            sample_rate_hz = aplayer.format.sample_rate_hz
+            units = _tone_units(tones, key[2], aplayer, sample_rate_hz)
+            type(self)._sounds[key] = aplayer.prepare(
+                tone_train(units, sample_rate_hz=sample_rate_hz)
+            )
         return self._sounds[key]
 
     # ---- the screen ----------------------------------------------------------
@@ -550,25 +562,14 @@ def _draw_text(
     frame.blit(rendered, rendered.get_rect(center=center))
 
 
-def _load_wav(stimulus: WavStimulus) -> LoadedWav | None:
-    if stimulus.sound is None:
-        return None
-    samples, sample_rate = soundfile.read(
-        io.BytesIO(_data(stimulus.sound)[1]), dtype="int16", always_2d=True
-    )
-    return LoadedWav(
-        pcm_bytes=samples.tobytes(),
-        sample_rate=sample_rate,
-        channels=samples.shape[1],
-        sample_dtype="int16",
-    )
-
-
-def _tone_train(
-    tones: Sequence[tuple[float, float]], duration: float, aplayer: AudioPlayer
+def _tone_units(
+    tones: Sequence[tuple[float, float]],
+    duration: float,
+    aplayer: AudioPlayer,
+    sample_rate_hz: int,
 ) -> list[PureToneUnit]:
     """Tones of ``(Hz, ms)`` repeated until ``duration`` has passed; the last is cut."""
-    generator = PureToneGenerator()
+    generator = PureToneGenerator(sample_rate=sample_rate_hz)
     table = aplayer.frequency_response_table
     units: list[PureToneUnit] = []
     left = duration

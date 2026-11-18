@@ -43,6 +43,8 @@ class Game:
         self._session = session
         self._mxbi = mxbi
         self._aplayer = self._mxbi.aplayer
+        # A format the output does not take stops the run here, not in a trial.
+        self._aplayer.open()
 
         self._detector_binder = detector_bridge
         self._detector_binder.start()
