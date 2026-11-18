@@ -92,7 +92,7 @@ class StageConfigTests(unittest.TestCase):
             Touch.config_template.write_text(json.dumps(TEMPLATE))
             context = Mock()
             context.session.config.stage_configs = {}
-            with patch("mxbiflow.core.context.get_mxbiflow", return_value=context):
+            with patch("mxbiflow.context.get_mxbiflow", return_value=context):
                 self.assertEqual(Touch.config_document(), TEMPLATE)
                 cogmote = {"default": {**TEMPLATE["default"], "reward_ms": 5}}
                 context.session.config.stage_configs = {"touch": cogmote}
@@ -153,6 +153,7 @@ class DescribeTests(unittest.TestCase):
                 "detectors",
                 "eyetrackers",
                 "frequency_response_table",
+                "channels",
             },
         )
         self.assertNotIn("$defs", hardware)

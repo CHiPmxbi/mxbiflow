@@ -6,7 +6,7 @@ from pygame import MOUSEBUTTONDOWN, QUIT, Event, Rect, Surface, event, image, tr
 from pygame.sprite import Group
 
 from ...assets import APPLE_IMAGES, Corner, CornerButton, create_background
-from ...core.context import get_mxbiflow
+from ...context import get_mxbiflow
 from ..scene import Scene
 
 _BORDER_WIDTH = 40

@@ -85,6 +85,17 @@ class StageState(ContextState):
     initial_level: int = Field(default=0, ge=0)
     level: int = Field(default=0, ge=0)
     level_trial_id: int = Field(default=0, ge=0)
+    # Finished trials at this level that count towards its settlement, and the
+    # correct ones among them (Session.count_trial).
+    level_counted: int = Field(default=0, ge=0)
+    level_correct: int = Field(default=0, ge=0)
+
+    def reset_level(self, level: int) -> None:
+        """Move to ``level`` with its trial counts at zero."""
+        self.level = level
+        self.level_trial_id = 0
+        self.level_counted = 0
+        self.level_correct = 0
 
 
 class StageSnapshot(ContextState):

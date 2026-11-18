@@ -7,13 +7,13 @@ from pydantic import BaseModel
 from mxbiflow.driver import MXBI
 from mxbiflow.driver.eyetracker.eyetracker import EyeSample
 
-from ..infra.camera_recording import TrialMark
-from ..infra.timer import FrameTimer
-from ..infra.trial_status import TrialPublisher
-from ..models.session import Session
-from ..models.trial import split_record
-from .offline import is_offline
-from .path import get_data_dir_path
+from .core.offline import is_offline
+from .core.path import get_data_dir_path
+from .infra.camera_recording import TrialMark
+from .infra.timer import FrameTimer
+from .infra.trial_status import TrialPublisher
+from .models.session import Session
+from .models.trial import split_record
 
 
 class MXBIFlow:

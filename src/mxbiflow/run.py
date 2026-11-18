@@ -10,7 +10,7 @@ from threading import Thread
 from cyclopts import App, Parameter
 
 from .bootstrap import init_gameloop
-from .core.context import MXBIFlow, get_mxbiflow
+from .context import MXBIFlow, get_mxbiflow
 from .core.offline import is_offline
 from .core.path import get_base_path
 from .infra.camera_recording import CameraRecording, RecordedCamera

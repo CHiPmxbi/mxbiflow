@@ -26,7 +26,7 @@ class Scene(ABC):
         else the stage's ``config.json`` template. Pass it to
         :func:`~mxbiflow.models.stage_config.for_animal`.
         """
-        from ..core.context import get_mxbiflow
+        from ..context import get_mxbiflow
 
         document = get_mxbiflow().session.config.stage_configs.get(cls.name())
         if document is not None:

@@ -1,0 +1,334 @@
+{
+  "stages": [
+    {
+      "name": "discriminate",
+      "machine": {
+        "channels": {
+          "inputs": [
+            "lick_left",
+            "lick_right",
+            "screen_on"
+          ],
+          "outputs": [
+            "reward"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "on_left",
+            "type": "state",
+            "default": "reward"
+          },
+          {
+            "name": "on_right",
+            "type": "state",
+            "default": "error"
+          },
+          {
+            "name": "reward_ms",
+            "type": "time",
+            "default": 50
+          },
+          {
+            "name": "choice_ms",
+            "type": "time",
+            "default": 10000
+          },
+          {
+            "name": "a_x",
+            "type": "number",
+            "default": 0.25
+          },
+          {
+            "name": "b_x",
+            "type": "number",
+            "default": 0.75
+          }
+        ],
+        "timers": [],
+        "generators": [],
+        "counters": [],
+        "start": "wait",
+        "groups": [],
+        "states": [
+          {
+            "name": "wait",
+            "group": null,
+            "hold": [],
+            "timeout": null,
+            "onEntry": [
+              {
+                "show": "grey"
+              },
+              {
+                "show": "fixation"
+              },
+              {
+                "play": "cue"
+              }
+            ],
+            "transitions": [
+              {
+                "event": "cue.done",
+                "target": "show"
+              }
+            ]
+          },
+          {
+            "name": "show",
+            "group": null,
+            "hold": [],
+            "timeout": null,
+            "onEntry": [
+              {
+                "hide": "fixation"
+              },
+              {
+                "show": "A"
+              },
+              {
+                "show": "B"
+              }
+            ],
+            "transitions": [
+              {
+                "event": "screen_on.rise",
+                "target": "choice"
+              }
+            ]
+          },
+          {
+            "name": "choice",
+            "group": null,
+            "hold": [],
+            "timeout": {
+              "param": "choice_ms"
+            },
+            "onEntry": [],
+            "transitions": [
+              {
+                "event": "lick_left.rise",
+                "target": {
+                  "param": "on_left"
+                }
+              },
+              {
+                "event": "lick_right.rise",
+                "target": {
+                  "param": "on_right"
+                }
+              },
+              {
+                "event": "timeout",
+                "target": "exit"
+              }
+            ]
+          },
+          {
+            "name": "reward",
+            "group": null,
+            "hold": [
+              "reward"
+            ],
+            "timeout": {
+              "param": "reward_ms"
+            },
+            "onEntry": [
+              {
+                "clear": true
+              }
+            ],
+            "transitions": [
+              {
+                "event": "timeout",
+                "target": "exit"
+              }
+            ]
+          },
+          {
+            "name": "error",
+            "group": null,
+            "hold": [],
+            "timeout": 2000,
+            "onEntry": [
+              {
+                "clear": true
+              }
+            ],
+            "transitions": [
+              {
+                "event": "timeout",
+                "target": "exit"
+              }
+            ]
+          }
+        ],
+        "layout": {
+          "wait": {
+            "x": 0,
+            "y": 100
+          },
+          "show": {
+            "x": 300,
+            "y": 100
+          },
+          "choice": {
+            "x": 600,
+            "y": 100
+          },
+          "reward": {
+            "x": 920,
+            "y": -120
+          },
+          "error": {
+            "x": 920,
+            "y": 240
+          }
+        },
+        "screen": {
+          "width": 1080,
+          "height": 1920
+        },
+        "stimuli": [
+          {
+            "kind": "background",
+            "name": "grey",
+            "color": "#404040"
+          },
+          {
+            "kind": "cross",
+            "name": "fixation",
+            "x": 0.5,
+            "y": 0.36,
+            "size": "px",
+            "width": 120,
+            "height": 120,
+            "color": "#ffffff"
+          },
+          {
+            "kind": "image",
+            "name": "A",
+            "x": {
+              "param": "a_x"
+            },
+            "y": 0.625,
+            "size": "fraction",
+            "width": 0.35,
+            "height": 0.35,
+            "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cpolygon%20points%3D%2250%2C6%2096%2C92%204%2C92%22%20fill%3D%22%23f59e0b%22%2F%3E%3C%2Fsvg%3E"
+          },
+          {
+            "kind": "image",
+            "name": "B",
+            "x": {
+              "param": "b_x"
+            },
+            "y": 0.625,
+            "size": "fraction",
+            "width": 0.35,
+            "height": 0.35,
+            "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2244%22%20fill%3D%22%233b82f6%22%2F%3E%3C%2Fsvg%3E"
+          },
+          {
+            "kind": "tones",
+            "name": "cue",
+            "tones": [
+              {
+                "frequency": 9500,
+                "duration": 100
+              },
+              {
+                "frequency": 0,
+                "duration": 100
+              }
+            ],
+            "duration": 600
+          }
+        ]
+      },
+      "outcomes": {
+        "reward": "correct",
+        "error": "incorrect"
+      },
+      "levels": [
+        {
+          "name": "1",
+          "values": {
+            "choice_ms": 10000
+          },
+          "types": [
+            {
+              "name": "A left",
+              "weight": 1,
+              "values": {
+                "on_left": "reward",
+                "on_right": "error",
+                "a_x": 0.25,
+                "b_x": 0.75
+              }
+            },
+            {
+              "name": "A right",
+              "weight": 1,
+              "values": {
+                "on_left": "error",
+                "on_right": "reward",
+                "a_x": 0.75,
+                "b_x": 0.25
+              }
+            }
+          ],
+          "order": "random"
+        },
+        {
+          "name": "2",
+          "values": {
+            "choice_ms": {
+              "uniform": [
+                3000,
+                5000
+              ]
+            }
+          },
+          "types": [
+            {
+              "name": "A left",
+              "weight": 1,
+              "values": {
+                "on_left": "reward",
+                "on_right": "error",
+                "a_x": 0.25,
+                "b_x": 0.75
+              }
+            },
+            {
+              "name": "A right",
+              "weight": 1,
+              "values": {
+                "on_left": "error",
+                "on_right": "reward",
+                "a_x": 0.75,
+                "b_x": 0.25
+              }
+            }
+          ],
+          "order": "random"
+        }
+      ],
+      "progression": {
+        "rule": "rate",
+        "minTrials": 10,
+        "up": 0.8,
+        "down": 0.3
+      }
+    }
+  ],
+  "animals": [
+    {
+      "name": "mock_001",
+      "stage": "discriminate",
+      "level": "1",
+      "values": {}
+    }
+  ]
+}

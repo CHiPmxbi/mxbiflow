@@ -111,6 +111,36 @@ class MyScene:
     def draw(self, screen: Surface) -> None: ...
 ```
 
+### Trials
+
+A stage whose scene is one trial subclasses `TrialScene`, and the framework keeps the
+trial's life cycle. The scheduler makes an instance for each trial of the animal's
+stage; the instance counts the trial, and when it ends the framework records it in
+`<stage>/result.jsonl`, publishes it, settles the level and cancels the trial's timers
+and sounds, in that order.
+
+```python
+class Touch(TrialScene):
+    def begin(self) -> None: ...          # start the trial
+    def end(self) -> None: ...            # stop what it started; called once
+    def record(self) -> BaseModel: ...    # asked once, after settling
+    def settlement(self) -> RateSettlementConfig | CountSettlementConfig | None: ...
+    # handle_event, update and draw run the trial: self.resolve(correct), self.finish()
+```
+
+- `self.info` is the animal's stage, level and trial numbers when the trial started;
+  `self.correct`, `self.aborted` and `self.action` are set before `record()` is asked.
+- `resolve(correct)` gives the outcome as soon as it is known; `correct=None` leaves the
+  trial out of accuracy and of the level's counts. `finish()` ends the trial, after the
+  reward and the inter-trial interval if the trial has them.
+- A trial the framework ends (the animal left, the run ended) before it is resolved is
+  aborted: recorded and published with `aborted` set, and not settled. A resolved one is
+  settled as if it had finished.
+- Levels count from 1. The counts a rule settles on are the session's
+  (`StageState.level_counted` and `level_correct`), and start again at every level
+  change, a manual one included. Without `settlement()` the level stays.
+- `decide()` and `move()` can be overridden for a rule of the stage's own.
+
 ## Logging
 
 mxbiflow never configures logging on import. For a batteries-included
@@ -239,6 +269,46 @@ maps a tone frequency to a master volume, entered as a table in the preset, and
 stages read it from `mxbi.aplayer.frequency_response_table`. Without a table that
 is `None`, and tones play at the volume of their unit. Offline, the table comes
 from `~/.config/mxbi/frequency_response_table.json` instead.
+
+## cogforge experiments
+
+An experiment designed in cogforge (stages, each a trial state machine with levels,
+trial types, outcomes and level rules) runs without stage code:
+
+```python
+from mxbiflow.statemachine import load_experiment, machine_scenes
+
+scene_manager.register(machine_scenes(load_experiment(Path("experiment.json"))))
+```
+
+Each stage becomes a scene of its name, and one scene instance is one trial
+(`mxbiflow.statemachine`). The machine is evaluated once per frame, so its times have
+one-frame resolution. The format is cogforge's: `models.py` is generated from its JSON
+Schema (`uv run datamodel-codegen` after copying a new `experiment.schema.json`), and the
+runner and the host logic pass cogforge's conformance cases
+(`tests/fixtures/conformance/cases.json`, copied from cogforge).
+
+- **Channels**: the experiment only names them; the wiring is the rig's, in the hardware
+  configuration: `"channels": {"inputs": {"beam": 0}, "outputs": {"reward": 0}}`. An
+  input is a detector id and is high while that detector sees an animal; an output is a
+  rewarder id that runs while the output is high. A stage that uses a channel the rig
+  does not wire fails with the channel's name before its first trial starts. The
+  touchscreen needs no wiring: a touch is `<stimulus>.touch` or `screen.touch`.
+  `machine_scenes(experiment, Wiring(...))` replaces the rig's wiring, for tests.
+- **Screen**: a stimulus's centre is a fraction of the screen as the animal sees it,
+  and its size is pixels or a fraction of the screen's width. The rig's `screen_size`
+  counts; the experiment's own screen is only cogforge's reference, and says whether
+  the layout is upright: when it is and the rig's framebuffer lies on its side, the
+  frame is drawn turned, as the idle scene's picture is. A stimulus that does not fit
+  the rig's screen, or a centre outside it, stops the run with the stimulus's name.
+- **Animals**: stage and level come from the session configuration; level `n` is the
+  stage's `n`-th level, from 1. The experiment file's animals only give their own
+  parameter values. Counts at the level are the session's; the trial-type cursor is in
+  the stage's context `machine`.
+- **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl` with
+  cogforge's fields (`animal`, `trial`, `stage`, `level`, `type`, `values`, `outcome`,
+  `action`, `states`, `events`). A trial stopped because the animal left or the run
+  ended is recorded but does not count towards the level rules.
 
 ## Experiment manifest and stage configurations
 

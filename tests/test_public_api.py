@@ -5,9 +5,9 @@ import unittest
 import mxbiflow
 from mxbiflow.bootstrap import init_gameloop
 from mxbiflow.commands import CommandRegistry, NoParams, RemoteCommand, Reply
-from mxbiflow.core.context import MXBIFlow, get_mxbiflow
+from mxbiflow.context import MXBIFlow, get_mxbiflow
 from mxbiflow.core.path import get_base_path, set_base_path
-from mxbiflow.scene import Scene, SceneManager
+from mxbiflow.scene import Scene, SceneManager, TrialScene
 
 
 class PublicApiTests(unittest.TestCase):
@@ -20,6 +20,7 @@ class PublicApiTests(unittest.TestCase):
             "Reply",
             "Scene",
             "SceneManager",
+            "TrialScene",
             "get_base_path",
             "get_mxbiflow",
             "init_gameloop",
@@ -34,6 +35,7 @@ class PublicApiTests(unittest.TestCase):
         self.assertIs(mxbiflow.Reply, Reply)
         self.assertIs(mxbiflow.Scene, Scene)
         self.assertIs(mxbiflow.SceneManager, SceneManager)
+        self.assertIs(mxbiflow.TrialScene, TrialScene)
         self.assertIs(mxbiflow.get_base_path, get_base_path)
         self.assertIs(mxbiflow.get_mxbiflow, get_mxbiflow)
         self.assertIs(mxbiflow.init_gameloop, init_gameloop)
