@@ -153,7 +153,6 @@ class DescribeTests(unittest.TestCase):
                 "detectors",
                 "eyetrackers",
                 "frequency_response_table",
-                "channels",
             },
         )
         self.assertNotIn("$defs", hardware)

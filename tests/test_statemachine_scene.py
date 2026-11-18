@@ -13,7 +13,7 @@ from mxbiflow.driver import MXBIModel
 from mxbiflow.models.animal import Animal, AnimalConfig, StageState
 from mxbiflow.models.session import Session, SessionConfig, SessionState
 from mxbiflow.statemachine.models import Experiment
-from mxbiflow.statemachine.scene import LevelCounts, machine_scenes
+from mxbiflow.statemachine.scene import LevelCounts, Wiring, machine_scenes
 
 
 def state(name: str, **parts: Any) -> dict[str, Any]:
@@ -97,6 +97,9 @@ def stage(
     }
 
 
+WIRING = Wiring(inputs={"beam": 0}, outputs={"reward": 0})
+
+
 def experiment(*stages: dict[str, Any]) -> Experiment:
     return Experiment.model_validate({"stages": list(stages), "animals": []})
 
@@ -120,7 +123,6 @@ class MachineSceneTests(unittest.TestCase):
         scenes: Experiment,
         *,
         rig: tuple[int, int] = (200, 100),
-        channels: dict[str, dict[str, int]] | None = None,
     ) -> SimpleNamespace:
         config = AnimalConfig(name="a", stage=scenes.stages[0].name)
         animal = Animal(
@@ -128,11 +130,9 @@ class MachineSceneTests(unittest.TestCase):
             current_stage_name=config.stage,
             stages={config.stage: StageState(stage_name=config.stage)},
         )
-        if channels is None:
-            channels = {"inputs": {"beam": 0}, "outputs": {"reward": 0}}
         self.session = Session(
             config=SessionConfig(unknown_animal_as="a", animals=(config,)),
-            mxbi_config=MXBIModel.model_validate({"channels": channels}),
+            mxbi_config=MXBIModel(),
             state=SessionState(animals={"a": animal}),
         )
         self.session.start(self.data)
@@ -152,7 +152,7 @@ class MachineSceneTests(unittest.TestCase):
         """Start the next trial of the animal's stage at the current time."""
         animal = self.session.require_current_animal()
         with patch("mxbiflow.statemachine.scene.get_mxbiflow", return_value=context):
-            scene = machine_scenes(scenes)[animal.current_stage_name]()
+            scene = machine_scenes(scenes, WIRING)[animal.current_stage_name]()
         scene.start()
         return scene
 
@@ -294,11 +294,8 @@ class MachineSceneTests(unittest.TestCase):
         self.assertEqual(screen.get_at((150, 20)), (0, 255, 0, 255))
 
     def test_an_unmapped_channel_fails_with_its_name(self) -> None:
-        scenes = experiment(stage("touch"))
-        context = self.context(scenes, channels={"inputs": {"beam": 0}, "outputs": {}})
-
         with self.assertRaisesRegex(ValueError, 'output "reward"'):
-            self.trial(scenes, context)
+            machine_scenes(experiment(stage("touch")), Wiring(inputs={"beam": 0}))
 
     def test_a_screen_of_another_size_fails(self) -> None:
         scenes = experiment(stage("touch", screen=(300, 300)))

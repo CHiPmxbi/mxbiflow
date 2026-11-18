@@ -4,14 +4,14 @@ Without cagelab-2 the machine is evaluated once per frame, so every time has one
 resolution. Register the scenes of :func:`machine_scenes` with the scene manager; the
 scheduler then starts the scene of the animal's stage for each trial.
 
-Channels are mapped in the rig configuration (``channels`` in ``mxbi.json``): an input is
-high while its detector sees an animal, an output runs its rewarder while it is high. The
+Channels are mapped by the :class:`Wiring` given with the experiment: an input is high
+while its detector sees an animal, an output runs its rewarder while it is high. The
 touchscreen needs no mapping. A stopped trial (the animal left, the run ended) is recorded
 but does not count towards the level rules.
 """
 
 import io
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from typing import ClassVar
 from urllib.request import urlopen
 
@@ -25,7 +25,6 @@ from ..core.context import get_mxbiflow
 from ..driver.audioplayer.audioplayer import AudioPlayer, LoadedWav, PlayTask
 from ..driver.audioplayer.puretone_generator import PureToneGenerator, PureToneUnit
 from ..driver.detector.detector import Detector
-from ..driver.mxbi.factory import ChannelsModel
 from ..driver.rewarder.rewarder import Rewarder
 from ..infra.data_logger import DataLogger
 from ..models.animal import StageState
@@ -65,8 +64,18 @@ class LevelCounts(BaseModel):
     cursor: int = 0
 
 
-def check_channels(stage: Stage, channels: ChannelsModel) -> None:
-    """Raise ``ValueError`` when the stage uses a channel the rig does not map."""
+@dataclass(frozen=True)
+class Wiring:
+    """The experiment's channels by name: which of the rig's devices each one is."""
+
+    #: Input name to detector id.
+    inputs: dict[str, int] = field(default_factory=dict)
+    #: Output name to rewarder id.
+    outputs: dict[str, int] = field(default_factory=dict)
+
+
+def check_channels(stage: Stage, channels: Wiring) -> None:
+    """Raise ``ValueError`` when the stage uses a channel the wiring does not map."""
     missing = [
         f'{kind} "{name}"'
         for kind, names, mapped in (
@@ -78,19 +87,25 @@ def check_channels(stage: Stage, channels: ChannelsModel) -> None:
     ]
     if missing:
         raise ValueError(
-            f'stage "{stage.name}" uses {", ".join(missing)}, which this rig does not '
-            "map: add them under channels in the hardware configuration (mxbi.json)"
+            f'stage "{stage.name}" uses {", ".join(missing)}, which the experiment\'s '
+            "wiring does not map"
         )
 
 
-def machine_scenes(experiment: Experiment) -> dict[str, type[Scene]]:
-    """One scene class per stage of ``experiment``, by stage name."""
+def machine_scenes(experiment: Experiment, wiring: Wiring) -> dict[str, type[Scene]]:
+    """One scene class per stage of ``experiment``, by stage name.
+
+    Raises ``ValueError`` when a stage uses a channel ``wiring`` does not map.
+    """
+    for stage in experiment.stages:
+        check_channels(stage, wiring)
     return {
         stage.name: type(
             f"MachineScene[{stage.name}]",
             (MachineScene,),
             {
                 "experiment": experiment,
+                "wiring": wiring,
                 "stage_index": index,
                 "level_table": {"default": list(range(len(stage.levels)))},
                 "_surfaces": {},
@@ -105,6 +120,7 @@ class MachineScene(Scene):
     """One trial of one stage; :func:`machine_scenes` makes the class of each stage."""
 
     experiment: ClassVar[Experiment]
+    wiring: ClassVar[Wiring]
     stage_index: ClassVar[int]
     # Decoded pictures and sounds of the stage, kept across its trials.
     _surfaces: ClassVar[dict[str, Surface | None]]
@@ -123,8 +139,7 @@ class MachineScene(Scene):
         self._stage = self.experiment.stages[self.stage_index]
         self._machine: Machine = self._stage.machine
 
-        channels = self._session.mxbi_config.channels
-        check_channels(self._stage, channels)
+        channels = self.wiring
         self._inputs: dict[str, Detector] = {
             name: mxbi.get_detector(channels.inputs[name])
             for name in self._machine.channels.inputs
