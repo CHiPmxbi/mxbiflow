@@ -282,19 +282,35 @@ scene_manager.register(machine_scenes(load_experiment(Path("experiment.json"))))
 ```
 
 Each stage becomes a scene of its name, and one scene instance is one trial
-(`mxbiflow.statemachine`). The machine is evaluated once per frame, so its times have
-one-frame resolution. The format is cogforge's: `models.py` is generated from its JSON
+(`mxbiflow.statemachine`). The machine is evaluated once per frame: timeouts, timers,
+sounds and outputs have one-frame resolution, GPIO input edges keep their own time. The format is cogforge's: `models.py` is generated from its JSON
 Schema (`uv run datamodel-codegen` after copying a new `experiment.schema.json`), and the
 runner and the host logic pass cogforge's conformance cases
 (`tests/fixtures/conformance/cases.json`, copied from cogforge).
 
-- **Channels**: the experiment only names them; the wiring is the rig's, in the hardware
-  configuration: `"channels": {"inputs": {"beam": 0}, "outputs": {"reward": 0}}`. An
-  input is a detector id and is high while that detector sees an animal; an output is a
-  rewarder id that runs while the output is high. A stage that uses a channel the rig
-  does not wire fails with the channel's name before its first trial starts. The
-  touchscreen needs no wiring: a touch is `<stimulus>.touch` or `screen.touch`.
-  `machine_scenes(experiment, Wiring(...))` replaces the rig's wiring, for tests.
+- **Channels**: the experiment only names them; the wiring is the rig's, under
+  `channels` in the hardware configuration (`mxbiflow.driver.channels`):
+
+  ```json
+  "channels": {
+    "inputs": {
+      "beam": {"type": "detector", "id": 0},
+      "lick_left": {"type": "gpio", "pin": 17, "bounce_ms": 5}
+    },
+    "outputs": {
+      "reward": {"type": "rewarder", "id": 0},
+      "laser": {"type": "gpio", "pin": 27}
+    }
+  }
+  ```
+
+  A `detector` input is high while that detector sees an animal; a `gpio` input is a
+  pin (`pull_up`, or `pull_up: null` with `active_high` for a pin without a resistor),
+  and its edges carry the time they happened, so a lick shorter than a frame is not
+  lost. A `rewarder` output runs the rewarder while it is high; a `gpio` output drives
+  its pin. A stage that uses a channel the rig does not wire fails with the channel's
+  name before its first trial starts. The touchscreen needs no wiring: a touch is
+  `<stimulus>.touch` or `screen.touch`.
 - **Screen**: a stimulus's centre is a fraction of the screen as the animal sees it,
   and its size is pixels or a fraction of the screen's width. The rig's `screen_size`
   counts; the experiment's own screen is only cogforge's reference, and says whether
