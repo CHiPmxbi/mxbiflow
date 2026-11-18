@@ -240,6 +240,41 @@ stages read it from `mxbi.aplayer.frequency_response_table`. Without a table tha
 is `None`, and tones play at the volume of their unit. Offline, the table comes
 from `~/.config/mxbi/frequency_response_table.json` instead.
 
+## cogforge experiments
+
+An experiment designed in cogforge (stages, each a trial state machine with levels,
+trial types, outcomes and level rules) runs without stage code:
+
+```python
+from mxbiflow.statemachine import load_experiment, machine_scenes
+
+scene_manager.register(machine_scenes(load_experiment(Path("experiment.json"))))
+```
+
+Each stage becomes a scene of its name, and one scene instance is one trial
+(`mxbiflow.statemachine`). The machine is evaluated once per frame, so its times have
+one-frame resolution. The format is cogforge's: `models.py` is generated from its JSON
+Schema (`uv run datamodel-codegen` after copying a new `experiment.schema.json`), and the
+runner and the host logic pass cogforge's conformance cases
+(`tests/fixtures/conformance/cases.json`, copied from cogforge).
+
+- **Channels** are mapped per rig in the hardware configuration:
+  `"channels": {"inputs": {"beam": 0}, "outputs": {"reward": 0}}`. An input is a detector
+  id and is high while that detector sees an animal; an output is a rewarder id that
+  runs while the output is high. A stage that uses an unmapped channel does not start.
+  The touchscreen needs no mapping: a touch is `<stimulus>.touch` or `screen.touch`.
+- **Screen**: stimuli are placed in the machine's screen pixels, which must be the
+  rig's `screen_size`, or its transpose for an upright screen (drawn turned as the idle
+  scene's picture is).
+- **Animals**: stage and level come from the session configuration, the level as an
+  index into the stage's levels; the experiment file's animals only give their own
+  parameter values. Counts at the level and the trial-type cursor are in the stage's
+  context `machine` of the session snapshot.
+- **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl` with
+  cogforge's fields (`animal`, `trial`, `stage`, `level`, `type`, `values`, `outcome`,
+  `action`, `states`, `events`). A trial stopped because the animal left or the run
+  ended is recorded but does not count towards the level rules.
+
 ## Experiment manifest and stage configurations
 
 `--describe` (`uv run main.py --describe`) prints the experiment's manifest as

@@ -3,13 +3,21 @@
 `models.py` is generated from `experiment.schema.json`, which is copied from cogforge
 (`schema/experiment.schema.json`). Never edit it by hand: copy the new schema over and
 run `uv run datamodel-codegen`.
+
+An experiment runs by registering its stages' scenes::
+
+    scene_manager.register(machine_scenes(load_experiment(path)))
+
+`runner` and `host` are ports of cogforge's `simulate.ts` and `host.ts` and pass its
+conformance cases (`tests/fixtures/conformance`).
 """
 
 from pathlib import Path
 
 from .models import Experiment
+from .scene import MachineScene, machine_scenes
 
-__all__ = ["Experiment", "load_experiment"]
+__all__ = ["Experiment", "MachineScene", "load_experiment", "machine_scenes"]
 
 
 def load_experiment(path: Path) -> Experiment:

@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from py_mx_eye import MxEye, MxEyeConfig
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..audioplayer.frequency_response_table import FrequencyResponseTable
 from ..detector import (
@@ -32,6 +32,26 @@ from ..rewarder import (
 from .mxbi import MXBI
 
 
+class ChannelsModel(BaseModel):
+    """The channels of state machines (:mod:`mxbiflow.statemachine`) on this rig.
+
+    A machine names its inputs and outputs; the rig says which device each one is.
+    """
+
+    model_config = ConfigDict(title="State machine channels")
+
+    inputs: dict[str, Annotated[int, Field(ge=0)]] = Field(
+        default_factory=dict,
+        title="Inputs",
+        description="Input name to detector id: high while the detector sees an animal",
+    )
+    outputs: dict[str, Annotated[int, Field(ge=0)]] = Field(
+        default_factory=dict,
+        title="Outputs",
+        description="Output name to rewarder id: it runs while the output is high",
+    )
+
+
 class MXBIModel(BaseModel):
     """The rig hardware; the device name in cogmote identifies the rig."""
 
@@ -50,6 +70,7 @@ class MXBIModel(BaseModel):
             "x-mxbi-columns": ["Frequency (Hz)", "Master volume (%)"],
         },
     )
+    channels: ChannelsModel = Field(default_factory=ChannelsModel)
 
 
 def build_mxbi(config: MXBIModel, logger=None) -> MXBI:
