@@ -293,7 +293,9 @@ class Timeout:
 class Touch:
     """The animal touched this stimulus.
 
-    With a parameter it is a touch of whichever stimulus the trial drew for it.
+    With a parameter it is a touch of whichever stimulus the trial drew for it. That
+    is written as the touch of each stimulus the parameter can name, so no other
+    parameter with events may name one of them.
     """
 
     stimulus: StimulusName
@@ -675,6 +677,39 @@ class Stage(BaseModel):
                         found.append(str(item))
         return list(dict.fromkeys(found))
 
+    def _shared_stimuli(self) -> list[str]:
+        """Stimuli that two parameters with events can both name.
+
+        The format's events are those of stimuli, so the event of a parameter is
+        written as the event of each stimulus it can name. A stimulus two parameters
+        can name would then be taken for both: a touch of the target in one trial and
+        of the distractor in another could not be told apart.
+        """
+        events = [on.event for on in self.transitions]
+        events += [counter.event for counter in self.counters]
+        parameters: dict[str, None] = {}
+        for event in events:
+            name = (
+                event.stimulus
+                if isinstance(event, Touch)
+                else event.name
+                if isinstance(event, Done)
+                else None
+            )
+            if isinstance(name, Ref):
+                parameters[name] = None
+        problems: list[str] = []
+        names = list(parameters)
+        for index, first in enumerate(names):
+            for second in names[index + 1 :]:
+                both = set(self._values_of(first)) & set(self._values_of(second))
+                problems += [
+                    f'"{stimulus}" can be both {first} and {second}, so its events '
+                    "cannot tell which it is: give each its own stimulus"
+                    for stimulus in sorted(both)
+                ]
+        return problems
+
     def _events(self, event: Event) -> list[str]:
         """The format's events of an event; several for a stimulus parameter's."""
 
@@ -817,7 +852,7 @@ class Stage(BaseModel):
                     {"event": event, "target": target}
                 )
         holders = _names(s.name for s in (*self.states, *self.groups))
-        problems = [
+        problems = self._shared_stimuli() + [
             f'a transition from "{source}", which is no state or group'
             for source in transitions
             if source not in holders

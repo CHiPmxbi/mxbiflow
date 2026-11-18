@@ -26,6 +26,7 @@ from mxbiflow.statemachine.stage import (
     StimulusParam,
     Time,
     Tones,
+    Touch,
     TrialParams,
     Uniform,
     stage_scenes,
@@ -222,6 +223,36 @@ class TrialTests(unittest.TestCase):
         self.assertEqual(
             [t.event for t in machine.states[0].transitions], ["low.done", "high.done"]
         )
+
+    def test_a_stimulus_two_parameters_with_events_can_name_is_refused(self) -> None:
+        class Roles(TrialParams):
+            target: StimulusParam[Stim] = Stim.A
+            other: StimulusParam[Stim] = Stim.B
+
+        r = Roles.refs()
+        stage = Stage(
+            name="roles",
+            params=Roles,
+            stimuli=[
+                Rect(name=name, x=0.5, y=0.5, width=0.2, height=0.2, color="#ffffff")
+                for name in (Stim.A, Stim.B)
+            ],
+            states=[
+                State(name=S.CUE, on_entry=[Show(r.other), Show(r.target)]),
+                State(name="hit", outcome=Outcome.correct),
+            ],
+            transitions=[
+                On(source=S.CUE, event=Touch(r.target), target="hit"),
+                On(source=S.CUE, event=Touch(r.other), target=EXIT),
+            ],
+            # In the second trial kind the two swap: A is then the other one.
+            levels=[Level(name=1, values={r.target: Choice(Stim.A, Stim.B)})],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, '"b" can be both target and other.*give each its own stimulus'
+        ):
+            stage.build()
 
     def test_a_stimulus_that_is_not_there_is_said_in_the_log(self) -> None:
         trial = self.trial(picture="low", sound="nothing", hz=500, tone_ms=0)
