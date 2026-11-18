@@ -7,10 +7,10 @@ run `uv run datamodel-codegen`.
 The format has the trial only: a stage is a machine and the outcomes of its states.
 Which values a trial gets and how an animal moves between levels is the host's Python.
 
-A stage written in Python is a class with its machine (`machine`) and each trial's
-values (`scene.MachineTrial`)::
+A stage written in Python is its trial (`scene.MachineTrial`: the machine) and the
+stage itself (`stage.Stage`: each trial's values, and when the animal moves)::
 
-    scene_manager.register([Touch])
+    scene_manager.register([Touching.scene()])
 
 The stages of a cogforge file run with their parameters' defaults::
 
@@ -27,12 +27,14 @@ from pathlib import Path
 from .machine import Machine, TrialParams
 from .models import Experiment
 from .scene import MachineScene, MachineTrial, machine_scenes, on_enter
+from .stage import Stage
 
 __all__ = [
     "Experiment",
     "Machine",
     "MachineScene",
     "MachineTrial",
+    "Stage",
     "TrialParams",
     "load_experiment",
     "machine_scenes",
