@@ -14,15 +14,15 @@ the level rules.
 """
 
 import io
-from collections.abc import Callable, Collection
-from dataclasses import replace
+from collections.abc import Callable, Collection, Mapping
+from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import ClassVar
 from urllib.request import urlopen
 
 import pygame
 import soundfile
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
 from pygame import Surface
 from pygame.event import Event
 
@@ -71,6 +71,9 @@ class Cursor(BaseModel):
     cursor: int = 0
 
 
+type Hook = Callable[["MachineScene"], None]
+
+
 def check_channels(
     stage: Stage, inputs: Collection[str], outputs: Collection[str]
 ) -> None:
@@ -91,11 +94,29 @@ def check_channels(
         )
 
 
-def machine_scenes(experiment: Experiment) -> dict[str, type[Scene]]:
+@dataclass
+class Hooks:
+    """A stage's own Python code, run by the host around the machine.
+
+    The machine stays data: what it does is in its states and transitions. A hook is
+    for what the data cannot say, such as picking this trial's values from a sequence
+    or grading a reward. It gets the trial's :class:`MachineScene`.
+    """
+
+    #: Called before the trial starts; may change ``scene.values``.
+    on_trial: list[Hook] = field(default_factory=list["Hook"])
+    #: By state name: called once each time the state is entered.
+    on_enter: dict[str, list[Hook]] = field(default_factory=dict[str, list["Hook"]])
+
+
+def machine_scenes(
+    experiment: Experiment, hooks: Mapping[str, Hooks] | None = None
+) -> dict[str, type[Scene]]:
     """One scene class per stage of ``experiment``, by stage name.
 
-    A stage that uses a channel the rig does not wire raises ``ValueError`` when its
-    first trial is made, before the trial starts.
+    ``hooks`` gives stages their Python code, by stage name. A stage that uses a
+    channel the rig does not wire raises ``ValueError`` when its first trial is made,
+    before the trial starts.
     """
     return {
         stage.name: type(
@@ -104,6 +125,7 @@ def machine_scenes(experiment: Experiment) -> dict[str, type[Scene]]:
             {
                 "experiment": experiment,
                 "stage_index": index,
+                "hooks": (hooks or {}).get(stage.name, Hooks()),
                 "level_table": {"default": list(range(1, len(stage.levels) + 1))},
                 "_surfaces": {},
                 "_sounds": {},
@@ -121,6 +143,7 @@ class MachineScene(TrialScene):
 
     experiment: ClassVar[Experiment]
     stage_index: ClassVar[int]
+    hooks: ClassVar[Hooks]
     # Decoded pictures and sounds of the stage, kept across its trials.
     _surfaces: ClassVar[dict[str, Surface | None]]
     _sounds: ClassVar[dict[str, LoadedWav | list[PureToneUnit] | None]]
@@ -166,7 +189,8 @@ class MachineScene(TrialScene):
         self._settled: Progress = self._progress
         self._outcome: Outcome = "none"
         self._values: Values = self._draw.values
-        self._check_places()
+        self._extra: dict[str, JsonValue] = {}
+        self._entered = 0
 
         self._trial: Trial | None = None
         self._started = 0.0
@@ -179,6 +203,9 @@ class MachineScene(TrialScene):
     # ---- TrialScene ----------------------------------------------------------
 
     def begin(self) -> None:
+        for hook in self.hooks.on_trial:
+            hook(self)
+        self._check_places()
         self._started = monotonic()
         levels: dict[str, bool] = {}
         for name, channel in self._inputs.items():
@@ -193,6 +220,7 @@ class MachineScene(TrialScene):
             photodiode=False,
             screen=self._screen,
         )
+        self._run_hooks()
         self._apply(0)
 
     def end(self) -> None:
@@ -219,6 +247,7 @@ class MachineScene(TrialScene):
             self._trial,
             self._outcome,
             ACTIONS[self.action],
+            self._extra,
         )
 
     def move(self, action: SettlementAction) -> None:
@@ -266,6 +295,7 @@ class MachineScene(TrialScene):
         for at, apply in sorted(events, key=lambda event: event[0]):
             apply(min(max(at, trial.now), now))
         trial.advance(now)
+        self._run_hooks()
         self._apply(now)
         if trial.state is None:
             outcome = outcome_of(self._stage, trial)
@@ -280,6 +310,42 @@ class MachineScene(TrialScene):
                 frame = pygame.transform.rotate(frame, -90)
             self._frame = (list(shown), frame)
         screen.blit(self._frame[1], (0, 0))
+
+    # ---- for the stage's hooks -----------------------------------------------
+
+    @property
+    def values(self) -> Values:
+        """This trial's parameter values; an ``on_trial`` hook may change them."""
+        return self._values
+
+    @property
+    def trial(self) -> Trial:
+        """The running trial: its state, the states visited, its log."""
+        if self._trial is None:
+            raise RuntimeError("the trial has not started")
+        return self._trial
+
+    @property
+    def now(self) -> float:
+        """Milliseconds from the start of the trial."""
+        return self._now()
+
+    def fire(self, name: str) -> None:
+        """Send the machine the event ``host.<name>``."""
+        self.trial.host(name, max(self._now(), self.trial.now))
+
+    def note(self, key: str, value: JsonValue) -> None:
+        """Keep a value in the trial's record, under ``extra``."""
+        self._extra[key] = value
+
+    def _run_hooks(self) -> None:
+        """Call the hooks of the states entered since the last call, in order."""
+        trial = self.trial
+        while self._entered < len(trial.visited):
+            visit = trial.visited[self._entered]
+            self._entered += 1
+            for hook in self.hooks.on_enter.get(visit.state, []):
+                hook(self)
 
     # ---- the rig -------------------------------------------------------------
 
