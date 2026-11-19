@@ -75,6 +75,7 @@ from .validate import machine_problems
 
 __all__ = [
     "EXIT",
+    "Action",
     "Background",
     "Cancel",
     "Circle",
