@@ -24,12 +24,15 @@ from typing import Any
 
 from . import machine as machine_module
 from .models import (
+    After,
     Amount1,
     BackgroundStimulus,
     ClearAction,
     Duration,
     Experiment,
+    HighAction,
     ImageStimulus,
+    LowAction,
     ParamRef,
     Size,
     Stage,
@@ -49,7 +52,8 @@ FIELDS = {
     "On": ["source", "event", "target"],
     "Timer": ["name", "time_ms"],
     "Counter": ["name", "event", "limit"],
-    "Generator": ["name", "output"],
+    "SetHigh": ["output"],
+    "SetLow": ["output"],
     "Background": ["name", "color"],
     "Image": ["name", "path"],
     "Rect": ["name"],
@@ -190,7 +194,6 @@ class _StageSource:
             "Inputs": machine.channels.inputs,
             "Outputs": machine.channels.outputs,
             "Timers": [t.name for t in machine.timers],
-            "Generators": [g.name for g in machine.generators],
             "Counters": [c.name for c in machine.counters],
             "HostEvents": hosts,
         }
@@ -212,7 +215,7 @@ class _StageSource:
     def _param(self, name: str) -> ast.expr:
         return ast.Attribute(ast.Name(self.refs), self.parameters[name])
 
-    def _amount(self, value: Amount1 | Duration | ParamRef) -> ast.expr:
+    def _amount(self, value: After | Amount1 | Duration | ParamRef) -> ast.expr:
         return (
             self._param(value.param)
             if isinstance(value, ParamRef)
@@ -250,8 +253,6 @@ class _StageSource:
         return _call(name, **dict(zip(names, args, strict=False)), **kwargs)
 
     def _event(self, event: str, where: str) -> ast.Call:
-        if event == "timeout":
-            return self._model("Timeout")
         if event == "screen.touch":
             return self._model("ScreenTouch")
         if event.startswith("host."):
@@ -259,7 +260,7 @@ class _StageSource:
         name, _, suffix = event.rpartition(".")
         kinds = {
             "reached": ["Counters"],
-            "done": ["Timers", "Generators", "Stimuli"],
+            "done": ["Timers", "Stimuli"],
             "touch": ["Stimuli"],
         }.get(suffix, ["Inputs"])
         if suffix not in SUFFIXES:
@@ -383,16 +384,28 @@ class _StageSource:
     def _action(self, action: Any, where: str) -> ast.Call:
         if isinstance(action, ClearAction):
             return self._model("Clear")
+        if isinstance(action, (HighAction, LowAction)):
+            high = isinstance(action, HighAction)
+            output = action.high if isinstance(action, HighAction) else action.low
+            return self._model(
+                "SetHigh" if high else "SetLow",
+                self._name("Outputs", output),
+                after_ms=None if action.after is None else self._amount(action.after),
+            )
         ((kind, name),) = dict(action).items()
         kinds = {
             "show": ["Stimuli"],
             "hide": ["Stimuli"],
             "play": ["Stimuli"],
-            "start": ["Timers", "Generators"],
-            "stop": ["Timers", "Generators", "Stimuli"],
+            "start": ["Timers"],
+            "stop": ["Timers", "Stimuli"],
             "reset": ["Counters"],
+            "cancel": ["Outputs"],
         }[kind]
         return self._model(kind.capitalize(), self._of(kinds, name, where))
+
+    def _actions(self, actions: Iterable[Any], where: str) -> list[ast.Call] | None:
+        return [self._action(action, where) for action in actions] or None
 
     def _state(self, state: State) -> ast.Call:
         outcome = self.stage.outcomes.get(state.name)
@@ -401,9 +414,8 @@ class _StageSource:
         return self._model(
             "State",
             self._name("States", state.name),
-            timeout_ms=None if state.timeout is None else self._amount(state.timeout),
-            hold=[self._name("Outputs", name) for name in state.hold] or None,
-            on_entry=[self._action(a, state.name) for a in state.on_entry] or None,
+            on_entry=self._actions(state.on_entry, state.name),
+            on_exit=self._actions(state.on_exit, state.name),
             group=None if state.group is None else self._name("Groups", state.group),
             outcome=None
             if outcome is None
@@ -426,7 +438,10 @@ class _StageSource:
                 "On",
                 self._of(["States", "Groups"], holder.name, holder.name),
                 self._event(t.event, holder.name),
-                self._target(t.target, holder.name),
+                target=None
+                if t.target is None
+                else self._target(t.target, holder.name),
+                actions=self._actions(t.actions, holder.name),
             )
             for holder in (*machine.states, *machine.groups)
             for t in holder.transitions
@@ -446,19 +461,6 @@ class _StageSource:
                 for t in machine.timers
             ]
             or None,
-            generators=[
-                self._model(
-                    "Generator",
-                    self._name("Generators", g.name),
-                    self._name("Outputs", g.output),
-                    width_ms=self._amount(g.width),
-                    delay_ms=self._unless(g.delay, 0),
-                    period_ms=self._unless(g.period, 0),
-                    count=self._unless(g.count, 1),
-                )
-                for g in machine.generators
-            ]
-            or None,
             counters=[
                 self._model(
                     "Counter",
@@ -473,7 +475,8 @@ class _StageSource:
                 self._model(
                     "Group",
                     self._name("Groups", g.name),
-                    hold=[self._name("Outputs", name) for name in g.hold] or None,
+                    on_entry=self._actions(g.on_entry, g.name),
+                    on_exit=self._actions(g.on_exit, g.name),
                     parent=None if g.group is None else self._name("Groups", g.group),
                 )
                 for g in machine.groups

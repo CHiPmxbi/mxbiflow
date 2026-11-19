@@ -50,8 +50,24 @@
             "default": 9500
           }
         ],
-        "timers": [],
-        "generators": [],
+        "timers": [
+          {
+            "name": "choice_time",
+            "time": {
+              "param": "choice_ms"
+            }
+          },
+          {
+            "name": "reward_time",
+            "time": {
+              "param": "reward_ms"
+            }
+          },
+          {
+            "name": "error_time",
+            "time": 2000
+          }
+        ],
         "counters": [],
         "start": "wait",
         "groups": [],
@@ -59,8 +75,6 @@
           {
             "name": "wait",
             "group": null,
-            "hold": [],
-            "timeout": null,
             "onEntry": [
               {
                 "show": "grey"
@@ -72,18 +86,18 @@
                 "play": "cue"
               }
             ],
+            "onExit": [],
             "transitions": [
               {
                 "event": "cue.done",
-                "target": "show"
+                "target": "show",
+                "actions": []
               }
             ]
           },
           {
             "name": "show",
             "group": null,
-            "hold": [],
-            "timeout": null,
             "onEntry": [
               {
                 "hide": "fixation"
@@ -95,75 +109,94 @@
                 "show": "B"
               }
             ],
+            "onExit": [],
             "transitions": [
               {
                 "event": "screen_on.rise",
-                "target": "choice"
+                "target": "choice",
+                "actions": []
               }
             ]
           },
           {
             "name": "choice",
             "group": null,
-            "hold": [],
-            "timeout": {
-              "param": "choice_ms"
-            },
-            "onEntry": [],
+            "onEntry": [
+              {
+                "start": "choice_time"
+              }
+            ],
+            "onExit": [
+              {
+                "stop": "choice_time"
+              }
+            ],
             "transitions": [
               {
                 "event": "lick_left.rise",
                 "target": {
                   "param": "on_left"
-                }
+                },
+                "actions": []
               },
               {
                 "event": "lick_right.rise",
                 "target": {
                   "param": "on_right"
-                }
+                },
+                "actions": []
               },
               {
-                "event": "timeout",
-                "target": "exit"
+                "event": "choice_time.done",
+                "target": "exit",
+                "actions": []
               }
             ]
           },
           {
             "name": "reward",
             "group": null,
-            "hold": [
-              "reward"
-            ],
-            "timeout": {
-              "param": "reward_ms"
-            },
             "onEntry": [
               {
                 "clear": true
+              },
+              {
+                "high": "reward"
+              },
+              {
+                "start": "reward_time"
+              }
+            ],
+            "onExit": [
+              {
+                "low": "reward"
               }
             ],
             "transitions": [
               {
-                "event": "timeout",
-                "target": "exit"
+                "event": "reward_time.done",
+                "target": "exit",
+                "actions": []
               }
             ]
           },
           {
             "name": "error",
             "group": null,
-            "hold": [],
-            "timeout": 2000,
             "onEntry": [
               {
                 "clear": true
+              },
+              {
+                "start": "error_time"
               }
             ],
+            "onExit": [],
             "transitions": [
               {
-                "event": "timeout",
-                "target": "exit"
+                "event": "error_time.done",
+                "target": "exit",
+                "actions": []
               }
             ]
           }

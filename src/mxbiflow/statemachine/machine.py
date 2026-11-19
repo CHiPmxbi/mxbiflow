@@ -75,7 +75,9 @@ from .validate import machine_problems
 
 __all__ = [
     "EXIT",
+    "Action",
     "Background",
+    "Cancel",
     "Circle",
     "Clear",
     "Count",
@@ -83,7 +85,6 @@ __all__ = [
     "Cross",
     "Done",
     "Fall",
-    "Generator",
     "Group",
     "Hide",
     "High",
@@ -100,6 +101,8 @@ __all__ = [
     "Reset",
     "Rise",
     "ScreenTouch",
+    "SetHigh",
+    "SetLow",
     "Show",
     "Size",
     "Start",
@@ -194,7 +197,7 @@ class _Refs:
         return Ref(field.alias or name)
 
 
-# ---- what a state does when it is entered ------------------------------------
+# ---- instructions: what is done on entry, on exit and on a transition ---------
 
 
 @dataclass(frozen=True, config=_CONFIG)
@@ -221,16 +224,43 @@ class Play:
     sound: StimulusName
 
 
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
+class SetHigh:
+    """Take an output high: at once, or ``after_ms`` by a hardware timer.
+
+    The time counts from the event that caused the instruction. Timed edges queue for
+    each output and outlast the state; :class:`Cancel` empties an output's queue.
+    """
+
+    output: Name
+    after_ms: Amount | None = None
+
+
+@dataclass(frozen=True, config=_CONFIG, kw_only=True)
+class SetLow:
+    """Take an output low: at once, or ``after_ms`` by a hardware timer."""
+
+    output: Name
+    after_ms: Amount | None = None
+
+
+@dataclass(frozen=True, config=_CONFIG)
+class Cancel:
+    """Drop an output's timed edges still to come."""
+
+    output: Name
+
+
 @dataclass(frozen=True, config=_CONFIG)
 class Start:
-    """Start a timer or a pulse generator."""
+    """Start a timer; starting one that runs ends the trial as an error."""
 
-    name: Name
+    timer: Name
 
 
 @dataclass(frozen=True, config=_CONFIG)
 class Stop:
-    """Stop a timer, a pulse generator or a sound."""
+    """Stop a timer or a sound."""
 
     name: StimulusName
 
@@ -240,7 +270,9 @@ class Reset:
     counter: Name
 
 
-type Action = Show | Hide | Clear | Play | Start | Stop | Reset
+type Action = (
+    Show | Hide | Clear | Play | Start | Stop | Reset | SetHigh | SetLow | Cancel
+)
 
 _ACTIONS: dict[type, str] = {
     Show: "show",
@@ -249,6 +281,7 @@ _ACTIONS: dict[type, str] = {
     Stop: "stop",
     Start: "start",
     Reset: "reset",
+    Cancel: "cancel",
 }
 
 
@@ -257,7 +290,7 @@ _ACTIONS: dict[type, str] = {
 
 @dataclass(frozen=True, config=_CONFIG)
 class Timeout:
-    """The state's ``timeout_ms`` ran out."""
+    """The state's ``timeout_ms`` ran out: its own timer is done."""
 
 
 @dataclass(frozen=True, config=_CONFIG)
@@ -278,7 +311,7 @@ class ScreenTouch:
 
 @dataclass(frozen=True, config=_CONFIG)
 class Done:
-    """A timer or a pulse generator is done, or a sound has played to its end."""
+    """A timer is done, or a sound has played to its end."""
 
     name: Name
 
@@ -331,39 +364,53 @@ type Event = (
 class State:
     """A state; the first one of a stage is where a trial starts.
 
-    ``hold`` are outputs high while the machine is in the state. When ``timeout_ms`` runs
-    out the event is :class:`Timeout`. A trial's outcome is that of the last state
-    entered that has one.
+    ``on_entry`` and ``on_exit`` are what is done when the machine enters and leaves
+    it. A trial's outcome is that of the last state entered that has one.
+
+    Two shortcuts are written out as instructions, as cogforge's editor does.
+    ``timeout_ms`` is a timer of the state's own, started on entry and stopped on exit,
+    whose event is :class:`Timeout`. ``hold`` are outputs taken high on entry and low
+    on exit.
     """
 
     name: Name
     timeout_ms: Amount | None = None
     hold: Sequence[Name] = ()
     on_entry: Sequence[Action] = ()
+    on_exit: Sequence[Action] = ()
     group: Name | None = None
     outcome: Outcome | None = None
 
 
 @dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class Group:
-    """A group of states: its hold and its transitions apply in each of them."""
+    """A group of states: its transitions apply in each of them.
+
+    ``on_entry`` and ``on_exit`` run only when the machine crosses the group's
+    boundary; ``hold`` is the shortcut for an output high inside it.
+    """
 
     name: Name
     hold: Sequence[Name] = ()
+    on_entry: Sequence[Action] = ()
+    on_exit: Sequence[Action] = ()
     parent: Name | None = None
 
 
 @dataclass(frozen=True, config=_CONFIG, kw_only=True)
 class On:
-    """In state or group ``source``, ``event`` leads to ``target``.
+    """In state or group ``source``, ``event`` runs ``actions`` and leads to ``target``.
 
     A state's transitions are tried in the order given, before its groups'. The target
     is a state, :data:`EXIT` (the trial ends) or a parameter that names a state.
+    Without a target the actions run and the state stays: nothing is left or entered.
+    A transition to the state it is in leaves and enters it.
     """
 
     source: Name
     event: Event
-    target: Name | Ref
+    target: Name | Ref | None = None
+    actions: Sequence[Action] = ()
 
 
 @dataclass(frozen=True, config=_CONFIG, kw_only=True)
@@ -381,18 +428,6 @@ class Counter:
     name: Name
     event: Event
     limit: Amount
-
-
-@dataclass(frozen=True, config=_CONFIG, kw_only=True)
-class Generator:
-    """A pulse or a pulse train on an output; ``count`` 0 runs until stopped."""
-
-    name: Name
-    output: Name
-    width_ms: Amount
-    delay_ms: Amount = 0
-    period_ms: Amount = 0
-    count: Amount = 1
 
 
 # ---- stimuli ------------------------------------------------------------------
@@ -518,7 +553,6 @@ class Machine:
     screen: tuple[int, int] = (1080, 1920)
     stimuli: Sequence[Stimulus] = ()
     timers: Sequence[Timer] = ()
-    generators: Sequence[Generator] = ()
     counters: Sequence[Counter] = ()
     groups: Sequence[Group] = ()
     start: Name | None = None
@@ -553,8 +587,18 @@ class Machine:
     def _action(self, action: Action) -> dict[str, Any]:
         if isinstance(action, Clear):
             return {"clear": True}
+        if isinstance(action, (SetHigh, SetLow)):
+            edge: dict[str, Any] = {
+                "high" if isinstance(action, SetHigh) else "low": str(action.output)
+            }
+            if action.after_ms is not None:
+                edge["after"] = _amount(action.after_ms)
+            return edge
         (value,) = (getattr(action, f) for f in action.__dataclass_fields__)
         return {_ACTIONS[type(action)]: _amount(value)}
+
+    def _actions(self, actions: Sequence[Action]) -> list[dict[str, Any]]:
+        return [self._action(action) for action in actions]
 
     def _stimulus(self, stimulus: Stimulus) -> dict[str, Any]:
         name = str(stimulus.name)
@@ -610,20 +654,62 @@ class Machine:
 
     def build(self, name: str) -> StageData:
         """The machine as the format's stage called ``name``; raises for a wrong name."""
+        # The timer of each state with a timeout, named as cogforge's editor names it.
+        taken = {str(t.name) for t in self.timers}
+        timeouts: dict[str, str] = {}
+        for state in self.states:
+            if state.timeout_ms is not None:
+                timer = f"{state.name}_time"
+                while timer in taken:
+                    timer += "_"
+                taken.add(timer)
+                timeouts[str(state.name)] = timer
+        holders = _names(s.name for s in (*self.states, *self.groups))
+        problems: list[str] = []
         transitions: dict[str, list[dict[str, Any]]] = {}
         for on in self.transitions:
-            target = (
-                _amount(on.target) if isinstance(on.target, Ref) else str(on.target)
+            source = str(on.source)
+            if source not in holders:
+                problems.append(
+                    f'a transition from "{source}", which is no state or group'
+                )
+                continue
+            if isinstance(on.event, Timeout):
+                if source not in timeouts:
+                    problems.append(f"{source}: a timeout without timeout_ms")
+                    continue
+                event = f"{timeouts[source]}.done"
+            else:
+                event = _event(on.event)
+            if on.target is None:
+                target = None
+            elif isinstance(on.target, Ref):
+                target = _amount(on.target)
+            else:
+                target = str(on.target)
+            transitions.setdefault(source, []).append(
+                {"event": event, "target": target, "actions": self._actions(on.actions)}
             )
-            transitions.setdefault(str(on.source), []).append(
-                {"event": _event(on.event), "target": target}
-            )
-        holders = _names(s.name for s in (*self.states, *self.groups))
-        problems = [
-            f'a transition from "{source}", which is no state or group'
-            for source in transitions
-            if source not in holders
-        ]
+
+        def holder(item: State | Group, group: Name | None) -> dict[str, Any]:
+            timer = timeouts.get(str(item.name))
+            return {
+                "name": str(item.name),
+                "group": None if group is None else str(group),
+                "onEntry": [
+                    *({"high": str(output)} for output in item.hold),
+                    *([] if timer is None else [{"start": timer}]),
+                    *self._actions(item.on_entry),
+                ],
+                "onExit": [
+                    *self._actions(item.on_exit),
+                    *([] if timer is None else [{"stop": timer}]),
+                    *({"low": str(output)} for output in item.hold),
+                ],
+                "transitions": transitions.get(str(item.name), []),
+            }
+
+        times = {str(s.name): s.timeout_ms for s in self.states}
         data: dict[str, Any] = {
             "name": name,
             "machine": {
@@ -633,19 +719,14 @@ class Machine:
                 },
                 "parameters": self._parameters(),
                 "timers": [
-                    {"name": str(t.name), "time": _amount(t.time_ms)}
-                    for t in self.timers
-                ],
-                "generators": [
-                    {
-                        "name": str(g.name),
-                        "output": str(g.output),
-                        "delay": _amount(g.delay_ms),
-                        "width": _amount(g.width_ms),
-                        "period": _amount(g.period_ms),
-                        "count": _amount(g.count),
-                    }
-                    for g in self.generators
+                    *(
+                        {"name": str(t.name), "time": _amount(t.time_ms)}
+                        for t in self.timers
+                    ),
+                    *(
+                        {"name": timer, "time": _amount(cast(Amount, times[state]))}
+                        for state, timer in timeouts.items()
+                    ),
                 ],
                 "counters": [
                     {
@@ -658,28 +739,8 @@ class Machine:
                 "start": str(
                     self.start or (self.states[0].name if self.states else "")
                 ),
-                "groups": [
-                    {
-                        "name": str(g.name),
-                        "group": None if g.parent is None else str(g.parent),
-                        "hold": _names(g.hold),
-                        "transitions": transitions.get(str(g.name), []),
-                    }
-                    for g in self.groups
-                ],
-                "states": [
-                    {
-                        "name": str(s.name),
-                        "group": None if s.group is None else str(s.group),
-                        "hold": _names(s.hold),
-                        "timeout": None
-                        if s.timeout_ms is None
-                        else _amount(s.timeout_ms),
-                        "onEntry": [self._action(a) for a in s.on_entry],
-                        "transitions": transitions.get(str(s.name), []),
-                    }
-                    for s in self.states
-                ],
+                "groups": [holder(g, g.parent) for g in self.groups],
+                "states": [holder(s, s.group) for s in self.states],
                 "layout": {},
                 "screen": {"width": self.screen[0], "height": self.screen[1]},
                 "stimuli": [self._stimulus(s) for s in self.stimuli],
@@ -702,7 +763,7 @@ def _event(event: Event) -> str:
     """The format's name of an event."""
     match event:
         case Timeout():
-            return "timeout"
+            raise ValueError("a timeout is its state's: it cannot be counted")
         case ScreenTouch():
             return "screen.touch"
         case Touch(stimulus=stimulus):
@@ -734,7 +795,8 @@ def _dangling(data: dict[str, Any]) -> list[str]:
     if machine["start"] not in states:
         problems.append(f'the start state "{machine["start"]}" does not exist')
     targets = {p["name"] for p in machine["parameters"] if p["type"] == "state"}
-    startable = {t["name"] for t in machine["timers"] + machine["generators"]}
+    timers = {t["name"] for t in machine["timers"]}
+    outputs = set(machine["channels"]["outputs"])
     counters = {c["name"] for c in machine["counters"]}
     kinds = {s["name"]: s["kind"] for s in machine["stimuli"]}
     if len(kinds) != len(machine["stimuli"]):
@@ -745,17 +807,17 @@ def _dangling(data: dict[str, Any]) -> list[str]:
         "show": visuals,
         "hide": visuals,
         "play": sounds,
-        "start": startable,
-        "stop": startable | sounds,
+        "start": timers,
+        "stop": timers | sounds,
         "reset": counters,
+        "high": outputs,
+        "low": outputs,
+        "cancel": outputs,
     }
     for holder in (*machine["states"], *machine["groups"]):
         where = holder["name"]
         if holder["group"] is not None and holder["group"] not in groups:
             problems.append(f'{where}: no group "{holder["group"]}"')
-        for output in holder["hold"]:
-            if output not in machine["channels"]["outputs"]:
-                problems.append(f'{where}: no output "{output}"')
         events = [transition["event"] for transition in holder["transitions"]]
         for event in dict.fromkeys(events):
             if events.count(event) > 1:
@@ -763,17 +825,25 @@ def _dangling(data: dict[str, Any]) -> list[str]:
                 problems.append(f'{where}: "{event}" has more than one transition')
         for transition in holder["transitions"]:
             target = transition["target"]
-            if isinstance(target, dict):
+            if target is None:
+                if not transition["actions"]:
+                    problems.append(
+                        f'{where}: "{transition["event"]}" has no target and does '
+                        "nothing"
+                    )
+            elif isinstance(target, dict):
                 if target["param"] not in targets:
                     problems.append(f'{where}: no state parameter "{target["param"]}"')
             elif target != EXIT and target not in states:
                 problems.append(f'{where}: no state "{target}"')
-        for action in holder.get("onEntry", []):
-            ((kind, name),) = action.items()
+        lists = [
+            holder["onEntry"],
+            holder["onExit"],
+            *(transition["actions"] for transition in holder["transitions"]),
+        ]
+        for action in (action for actions in lists for action in actions):
+            kind, name = next(iter(action.items()))
             # What a stimulus parameter names is checked with the trial's values.
             if kind in known and not isinstance(name, dict) and name not in known[kind]:
                 problems.append(f'{where}: {kind} "{name}" does not exist')
-    for generator in machine["generators"]:
-        if generator["output"] not in machine["channels"]["outputs"]:
-            problems.append(f'{generator["name"]}: no output "{generator["output"]}"')
     return problems

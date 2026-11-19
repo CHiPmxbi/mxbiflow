@@ -297,15 +297,17 @@ A trial's delays and sounds are cancelled when it ends.
 
 ## Trial state machines
 
-A stage's trial can be a state machine: states that hold outputs and show or play
-stimuli when entered, and transitions on events (a touch, an input's edge, a timeout).
-The machine is data in cogforge's experiment format, which has the trial only: a stage
+A stage's trial can be a state machine: states with instructions done when they are
+entered and left (take an output high or low, start a timer, show or play a stimulus),
+and transitions on events (a touch, an input's edge, a timer that is done). The
+machine is data in cogforge's experiment format, which has the trial only: a stage
 is a machine and the outcomes of its states. Which values a trial gets and how an
 animal moves between levels is the stage's Python, as in any stage.
 
 One scene instance is one trial (`mxbiflow.statemachine`). The machine is evaluated
-once per frame: timeouts, timers, sounds and outputs have one-frame resolution, GPIO
-input edges keep their own time. `models.py` is generated from cogforge's JSON Schema
+once per frame: timers, sounds and outputs have one-frame resolution, timed edges of
+an output included, and GPIO input edges keep their own time. Every change of an output
+is given to the rig in order, so a pulse shorter than a frame is not lost. `models.py` is generated from cogforge's JSON Schema
 (`uv run datamodel-codegen` after copying a new `experiment.schema.json`), and the
 runner passes cogforge's conformance cases (`tests/fixtures/conformance/cases.json`,
 copied from cogforge).
@@ -339,8 +341,12 @@ copied from cogforge).
   the layout is upright: when it is and the rig's framebuffer lies on its side, the
   frame is drawn turned, as the idle scene's picture is. A stimulus that does not fit
   the rig's screen, or a centre outside it, stops the run with the stimulus's name.
+- **Errors**: a machine's error ends its trial at once with every output low: a loop
+  (more than 64 state entries at one instant), `start` on a running timer, a timed edge
+  whose time is not ahead, a target that is no state. It is logged and is the record's
+  `error`.
 - **Records**: one line per trial in `<animal>/<run>/<stage>/result.jsonl`: cogforge's
-  `trial`, `stage`, `values`, `outcome`, `states` and `events`, and mxbiflow's
+  `trial`, `stage`, `values`, `outcome`, `error`, `states` and `events`, and mxbiflow's
   `animal`, `level`, `action` and `extra`. A trial stopped because the animal left or
   the run ended is recorded; it is settled once a state has decided its outcome (the
   animal leaving during the time between trials), and not before.
@@ -475,14 +481,22 @@ class Touching(Stage[Params]):
 scene_manager.register([Touching.scene()])
 ```
 
-- The machine is data: a state holds outputs, does its entry actions and has
-  transitions tried in the order given; a group's hold and transitions apply in its
-  states. `Machine.build` refuses a name that leads nowhere (a missing state, output,
+- The machine is data: a state does its `on_entry` and `on_exit` instructions and has
+  transitions tried in the order given; a group's transitions apply in its states, and
+  its instructions run when the machine crosses its boundary. A transition may carry
+  `actions`, and without a target it only runs them. An output is driven by
+  `SetHigh(output=...)` and `SetLow(output=...)`, at once or `after_ms`; a pulse is
+  `SetHigh(output=Out.REWARD)` with `SetLow(output=Out.REWARD, after_ms=p.reward_ms)`,
+  and it outlasts the state unless `Cancel(Out.REWARD)` drops it.
+- Two shortcuts are written out as those instructions, as cogforge's editor does:
+  `timeout_ms` is a timer of the state's own (`<state>_time`), started on entry and
+  stopped on exit, whose event is `Timeout()`; `hold` takes outputs high on entry and
+  low on exit. `Machine.build` refuses a name that leads nowhere (a missing state, output,
   stimulus, timer) and an event with two transitions in one state, and says where.
 - A parameter's type is its field's: `Time`, `Count`, `float` for any other number,
   `StateParam[S]` for where a transition leads and `StimulusParam[Stim]` for which
   stimulus to show or play; a field of another type is refused. Times carry their unit
-  in the name (`timeout_ms`, `time_ms`, `width_ms`). `Params.refs().reward_ms` is the
+  in the name (`timeout_ms`, `time_ms`, `after_ms`). `Params.refs().reward_ms` is the
   parameter itself: put it where a state or a stimulus takes a value. An event is a
   stimulus's, not a parameter's: for the touch of a stimulus a parameter names, give
   each stimulus it can name its own transition.

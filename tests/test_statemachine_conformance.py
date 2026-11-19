@@ -36,6 +36,8 @@ def run_trial(case: dict[str, Any]) -> dict[str, Any]:
         "state": trial.state,
         "shown": trial.shown,
         "outcome": outcome_of(stage, trial),
+        "edges": [asdict(edge) for edge in trial.changes],
+        "error": trial.error,
     }
 
 

@@ -21,6 +21,7 @@ from mxbiflow.scene.settlement import SettlementAction
 from mxbiflow.statemachine.host import TrialRecord
 from mxbiflow.statemachine.machine import (
     EXIT,
+    Cancel,
     Clear,
     Host,
     Machine,
@@ -29,6 +30,7 @@ from mxbiflow.statemachine.machine import (
     Play,
     Rect,
     ScreenTouch,
+    SetLow,
     Show,
     Size,
     State,
@@ -40,7 +42,8 @@ from mxbiflow.statemachine.machine import (
     Touch,
     TrialParams,
 )
-from mxbiflow.statemachine.runner import Trial
+from mxbiflow.statemachine.models import ParamRef
+from mxbiflow.statemachine.runner import Edge, Trial
 from mxbiflow.statemachine.scene import MachineTrial, on_enter
 from mxbiflow.statemachine.stage import Stage
 
@@ -182,10 +185,13 @@ class MachineTests(unittest.TestCase):
         trial.touch(150, 20, 100)
         self.assertEqual(trial.state, "judge")
         trial.host("fast", 120)
-        self.assertEqual((trial.state, trial.held()), ("fast", {"reward"}))
+        self.assertEqual((trial.state, trial.high()), ("fast", {"reward"}))
         trial.advance(200)
 
         self.assertIsNone(trial.state)
+        self.assertEqual(
+            trial.changes, [Edge(120, "reward", True), Edge(170, "reward", False)]
+        )
         self.assertEqual(
             [visit.state for visit in trial.visited], ["wait", "judge", "fast"]
         )
@@ -202,6 +208,7 @@ class MachineTests(unittest.TestCase):
             transitions=[
                 On(source=S.WAIT, event=Host(Verdict.SLOW), target="nowhere"),
                 On(source="nobody", event=Timeout(), target=EXIT),
+                On(source=S.FAST, event=Timeout(), target=EXIT),
             ],
         )
 
@@ -212,11 +219,84 @@ class MachineTests(unittest.TestCase):
         for part in (
             'stage "lost"',
             'wait: no state "nowhere"',
-            'fast: no output "laser"',
+            'fast: high "laser" does not exist',
+            "fast: a timeout without timeout_ms",
             'wait: show "ghost" does not exist',
             'a transition from "nobody", which is no state or group',
         ):
             self.assertIn(part, message)
+
+    def test_shortcuts_are_written_out_as_instructions(self) -> None:
+        machine = Machine(
+            outputs=Out,
+            states=[
+                State(
+                    name=S.WAIT,
+                    timeout_ms=30,
+                    hold=[Out.REWARD],
+                    on_entry=[Clear()],
+                    on_exit=[Cancel(Out.REWARD)],
+                )
+            ],
+            transitions=[
+                On(source=S.WAIT, event=Timeout(), target=EXIT),
+                On(
+                    source=S.WAIT,
+                    event=ScreenTouch(),
+                    actions=[SetLow(output=Out.REWARD, after_ms=5)],
+                ),
+            ],
+        )
+
+        built = machine.build("short").machine
+        state = built.states[0].model_dump(mode="json", by_alias=True)
+
+        self.assertEqual(
+            [
+                (t.name, t.time.root)
+                for t in built.timers
+                if not isinstance(t.time, ParamRef)
+            ],
+            [("wait_time", 30)],
+        )
+        self.assertEqual(
+            state["onEntry"],
+            [
+                {"high": "reward", "after": None},
+                {"start": "wait_time"},
+                {"clear": True},
+            ],
+        )
+        self.assertEqual(
+            state["onExit"],
+            [
+                {"cancel": "reward"},
+                {"stop": "wait_time"},
+                {"low": "reward", "after": None},
+            ],
+        )
+        self.assertEqual(
+            state["transitions"],
+            [
+                {"event": "wait_time.done", "target": "exit", "actions": []},
+                {
+                    "event": "screen.touch",
+                    "target": None,
+                    "actions": [{"low": "reward", "after": 5}],
+                },
+            ],
+        )
+
+    def test_a_transition_that_does_nothing_is_refused(self) -> None:
+        machine = Machine(
+            states=[State(name=S.WAIT)],
+            transitions=[On(source=S.WAIT, event=ScreenTouch())],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, 'wait: "screen.touch" has no target and does nothing'
+        ):
+            machine.build("idle")
 
     def test_an_event_with_two_transitions_in_one_state_is_refused(self) -> None:
         machine = Machine(

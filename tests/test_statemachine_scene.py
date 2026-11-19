@@ -22,12 +22,15 @@ def state(name: str, **parts: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "name": name,
         "group": None,
-        "hold": [],
-        "timeout": None,
         "onEntry": [],
+        "onExit": [],
         "transitions": [],
     }
     return base | parts
+
+
+def on(event: str, target: str) -> dict[str, Any]:
+    return {"event": event, "target": target, "actions": []}
 
 
 def stage(
@@ -42,8 +45,10 @@ def stage(
         "machine": {
             "channels": {"inputs": ["beam"], "outputs": ["reward"]},
             "parameters": [{"name": "reward_ms", "type": "time", "default": 50}],
-            "timers": [],
-            "generators": [],
+            "timers": [
+                {"name": "reward_time", "time": {"param": "reward_ms"}},
+                {"name": "error_time", "time": 10},
+            ],
             "counters": [],
             "start": "choice",
             "groups": [],
@@ -52,22 +57,25 @@ def stage(
                     "choice",
                     onEntry=[{"show": "target"}, {"play": "cue"}],
                     transitions=[
-                        {"event": "target.touch", "target": "reward"},
-                        {"event": "screen.touch", "target": "error"},
-                        {"event": "beam.fall", "target": "exit"},
+                        on("target.touch", "reward"),
+                        on("screen.touch", "error"),
+                        on("beam.fall", "exit"),
                     ],
                 ),
                 state(
                     "reward",
-                    hold=["reward"],
-                    timeout={"param": "reward_ms"},
-                    onEntry=[{"clear": True}],
-                    transitions=[{"event": "timeout", "target": "exit"}],
+                    onEntry=[
+                        {"clear": True},
+                        {"high": "reward"},
+                        {"start": "reward_time"},
+                    ],
+                    onExit=[{"low": "reward"}],
+                    transitions=[on("reward_time.done", "exit")],
                 ),
                 state(
                     "error",
-                    timeout=10,
-                    transitions=[{"event": "timeout", "target": "exit"}],
+                    onEntry=[{"start": "error_time"}],
+                    transitions=[on("error_time.done", "exit")],
                 ),
             ],
             "layout": {},
@@ -367,3 +375,31 @@ class MachineSceneTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, '"target" is outside the screen'):
             self.trial(scenes, self.context(scenes))
+
+    def test_a_machines_error_ends_the_trial_and_is_recorded(self) -> None:
+        failing = stage("fail")
+        choice = failing["machine"]["states"][0]
+        choice["onEntry"].append({"start": "reward_time"})
+        # A touch takes the output high and starts the timer that already runs.
+        choice["transitions"] = [
+            {
+                "event": "target.touch",
+                "target": None,
+                "actions": [{"high": "reward"}, {"start": "reward_time"}],
+            }
+        ]
+        scenes = experiment(failing)
+        scene = self.trial(scenes, self.context(scenes))
+
+        with self.assertLogs("mxbiflow.statemachine.scene", "ERROR") as logged:
+            self.touch(scene, (155, 25), at=5)
+
+        self.assertFalse(scene.running)
+        self.assertIn("start reward_time: the timer is running", logged.output[0])
+        # The output went high and, with the error, low again.
+        self.rewarder.give_reward.assert_called_once()
+        self.rewarder.stop_reward.assert_called_once()
+        (record,) = self.records("fail")
+        self.assertEqual(
+            (record["error"], record["outcome"]), ("timer_running", "none")
+        )
