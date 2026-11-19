@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, JsonValue
 
 from ..scene.settlement import SettlementAction
 from .models import Stage
-from .runner import Trial
+from .runner import Trial, TrialError
 
 type Outcome = Literal["correct", "incorrect", "miss", "none"]
 type Action = Literal["none", "level up", "level down", "next stage", "previous stage"]
@@ -38,7 +38,7 @@ class Logged(BaseModel):
 class TrialRecord(BaseModel):
     """One line of ``result.jsonl``: cogforge's ``TrialRecord``, and the host's own.
 
-    ``trial``, ``stage``, ``values``, ``outcome``, ``states`` and ``events`` are
+    ``trial``, ``stage``, ``values``, ``outcome``, ``error``, ``states`` and ``events`` are
     cogforge's; the animal, its level, what settling the trial decided and what the
     stage noted about it are mxbiflow's.
     """
@@ -49,6 +49,8 @@ class TrialRecord(BaseModel):
     level: int
     values: dict[str, float | str]
     outcome: Outcome
+    #: Why the trial ended, if by an error of its machine.
+    error: TrialError | None = None
     action: Action
     states: list[Entered]
     events: list[Logged]

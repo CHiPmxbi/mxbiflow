@@ -24,8 +24,17 @@ from .runner import EXIT
 def stimulus_uses(machine: Machine) -> dict[str, set[str]]:
     """How each stimulus parameter is used: on the ``screen``, as a ``sound``."""
     uses: dict[str, set[str]] = {}
-    for state in machine.states:
-        for action in state.on_entry:
+    lists = [
+        actions
+        for holder in (*machine.groups, *machine.states)
+        for actions in (
+            holder.on_entry,
+            holder.on_exit,
+            *(transition.actions for transition in holder.transitions),
+        )
+    ]
+    for actions in lists:
+        for action in actions:
             if isinstance(action, ShowAction):
                 ref, use = action.show, "screen"
             elif isinstance(action, HideAction):

@@ -17,6 +17,7 @@ touchscreen needs no wiring. The trial's life cycle is
 """
 
 import io
+import logging
 from abc import abstractmethod
 from collections.abc import Callable, Collection, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -67,6 +68,8 @@ from .runner import (
 )
 from .stage import Stage, stage_of
 from .validate import machine_problems, value_problems
+
+logger = logging.getLogger(__name__)
 
 
 def check_channels(
@@ -211,7 +214,9 @@ class MachineScene(TrialScene):
         self._started = 0.0
         # Touches since the last frame: when, and where on the machine's screen.
         self._touches: list[tuple[float, float, float]] = []
-        self._high: set[str] = set()
+        # How many of the trial's output changes have been given to the rig.
+        self._applied = 0
+        self._failed = False
         self._playing: dict[str, tuple[float, Task | None]] = {}
         self._frame: tuple[list[str], Surface] | None = None
 
@@ -254,6 +259,7 @@ class MachineScene(TrialScene):
             level=self.info.level,
             values=self._values,
             outcome=self._outcome,
+            error=trial.error,
             action=ACTIONS[self.action],
             states=[Entered(state=v.state, t=v.t) for v in trial.visited],
             events=[Logged(t=entry.t, text=entry.text) for entry in trial.log],
@@ -386,12 +392,19 @@ class MachineScene(TrialScene):
         """Drive the outputs and sounds to what the trial says they are at ``now``."""
         if self._trial is None:
             return
-        high = self._trial.outputs(now)
-        for name in high - self._high:
-            self._outputs[name].set(True)
-        for name in self._high - high:
-            self._outputs[name].set(False)
-        self._high = high
+        # Every change of an output since the last frame, in order: a pulse shorter
+        # than a frame is still given.
+        changes = self._trial.changes
+        for edge in changes[self._applied :]:
+            self._outputs[edge.output].set(edge.high)
+        self._applied = len(changes)
+        if self._trial.error is not None and not self._failed:
+            self._failed = True
+            logger.error(
+                'stage "%s": the trial ended by an error of its machine: %s',
+                self._stage.name,
+                self._trial.error_detail,
+            )
 
         sounds = self._trial.sounds
         for name, (end, task) in list(self._playing.items()):

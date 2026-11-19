@@ -44,24 +44,50 @@
               {
                 "name": "trial_limit",
                 "time": 20000
+              },
+              {
+                "name": "cue_time",
+                "time": 500
+              },
+              {
+                "name": "response_time",
+                "time": {
+                  "param": "response_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              },
+              {
+                "name": "abort_time",
+                "time": 1000
               }
             ],
-            "generators": [],
             "counters": [],
             "start": "wait_beam",
             "groups": [
               {
                 "name": "trial",
                 "group": null,
-                "hold": [],
+                "onEntry": [],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.fall",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   },
                   {
                     "event": "trial_limit.done",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   }
                 ]
               }
@@ -70,102 +96,137 @@
               {
                 "name": "wait_beam",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "start": "trial_limit"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.high",
-                    "target": "cue"
+                    "target": "cue",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "cue",
                 "group": "trial",
-                "hold": [
-                  "sound"
+                "onEntry": [
+                  {
+                    "high": "sound"
+                  },
+                  {
+                    "start": "cue_time"
+                  }
                 ],
-                "timeout": 500,
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "sound"
+                  },
+                  {
+                    "stop": "cue_time"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "response"
+                    "event": "cue_time.done",
+                    "target": "response",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "response",
                 "group": "trial",
-                "hold": [],
-                "timeout": {
-                  "param": "response_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "response_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "response_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "response_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
+                "onEntry": [
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
                 ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "reward"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "error_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "abort",
                 "group": null,
-                "hold": [],
-                "timeout": 1000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "abort_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "abort_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -250,7 +311,20 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "none"
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 100,
+          "output": "sound",
+          "high": true
+        },
+        {
+          "t": 300,
+          "output": "sound",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -298,24 +372,50 @@
               {
                 "name": "trial_limit",
                 "time": 20000
+              },
+              {
+                "name": "cue_time",
+                "time": 500
+              },
+              {
+                "name": "response_time",
+                "time": {
+                  "param": "response_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              },
+              {
+                "name": "abort_time",
+                "time": 1000
               }
             ],
-            "generators": [],
             "counters": [],
             "start": "wait_beam",
             "groups": [
               {
                 "name": "trial",
                 "group": null,
-                "hold": [],
+                "onEntry": [],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.fall",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   },
                   {
                     "event": "trial_limit.done",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   }
                 ]
               }
@@ -324,102 +424,137 @@
               {
                 "name": "wait_beam",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "start": "trial_limit"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.high",
-                    "target": "cue"
+                    "target": "cue",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "cue",
                 "group": "trial",
-                "hold": [
-                  "sound"
+                "onEntry": [
+                  {
+                    "high": "sound"
+                  },
+                  {
+                    "start": "cue_time"
+                  }
                 ],
-                "timeout": 500,
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "sound"
+                  },
+                  {
+                    "stop": "cue_time"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "response"
+                    "event": "cue_time.done",
+                    "target": "response",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "response",
                 "group": "trial",
-                "hold": [],
-                "timeout": {
-                  "param": "response_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "response_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "response_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "response_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
+                "onEntry": [
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
                 ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "reward"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "error_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "abort",
                 "group": null,
-                "hold": [],
-                "timeout": 1000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "abort_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "abort_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -505,7 +640,30 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "none"
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 0,
+          "output": "sound",
+          "high": true
+        },
+        {
+          "t": 500,
+          "output": "sound",
+          "high": false
+        },
+        {
+          "t": 700,
+          "output": "reward",
+          "high": true
+        },
+        {
+          "t": 750,
+          "output": "reward",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -553,24 +711,50 @@
               {
                 "name": "trial_limit",
                 "time": 20000
+              },
+              {
+                "name": "cue_time",
+                "time": 500
+              },
+              {
+                "name": "response_time",
+                "time": {
+                  "param": "response_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              },
+              {
+                "name": "abort_time",
+                "time": 1000
               }
             ],
-            "generators": [],
             "counters": [],
             "start": "wait_beam",
             "groups": [
               {
                 "name": "trial",
                 "group": null,
-                "hold": [],
+                "onEntry": [],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.fall",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   },
                   {
                     "event": "trial_limit.done",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   }
                 ]
               }
@@ -579,102 +763,137 @@
               {
                 "name": "wait_beam",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "start": "trial_limit"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.high",
-                    "target": "cue"
+                    "target": "cue",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "cue",
                 "group": "trial",
-                "hold": [
-                  "sound"
+                "onEntry": [
+                  {
+                    "high": "sound"
+                  },
+                  {
+                    "start": "cue_time"
+                  }
                 ],
-                "timeout": 500,
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "sound"
+                  },
+                  {
+                    "stop": "cue_time"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "response"
+                    "event": "cue_time.done",
+                    "target": "response",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "response",
                 "group": "trial",
-                "hold": [],
-                "timeout": {
-                  "param": "response_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "response_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "response_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "response_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
+                "onEntry": [
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
                 ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "reward"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "error_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "abort",
                 "group": null,
-                "hold": [],
-                "timeout": 1000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "abort_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "abort_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -763,7 +982,20 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "none"
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 50,
+          "output": "sound",
+          "high": true
+        },
+        {
+          "t": 550,
+          "output": "sound",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -811,24 +1043,50 @@
               {
                 "name": "trial_limit",
                 "time": 20000
+              },
+              {
+                "name": "cue_time",
+                "time": 500
+              },
+              {
+                "name": "response_time",
+                "time": {
+                  "param": "response_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              },
+              {
+                "name": "abort_time",
+                "time": 1000
               }
             ],
-            "generators": [],
             "counters": [],
             "start": "wait_beam",
             "groups": [
               {
                 "name": "trial",
                 "group": null,
-                "hold": [],
+                "onEntry": [],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.fall",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   },
                   {
                     "event": "trial_limit.done",
-                    "target": "abort"
+                    "target": "abort",
+                    "actions": []
                   }
                 ]
               }
@@ -837,102 +1095,137 @@
               {
                 "name": "wait_beam",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "start": "trial_limit"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "beam.high",
-                    "target": "cue"
+                    "target": "cue",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "cue",
                 "group": "trial",
-                "hold": [
-                  "sound"
+                "onEntry": [
+                  {
+                    "high": "sound"
+                  },
+                  {
+                    "start": "cue_time"
+                  }
                 ],
-                "timeout": 500,
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "sound"
+                  },
+                  {
+                    "stop": "cue_time"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "response"
+                    "event": "cue_time.done",
+                    "target": "response",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "response",
                 "group": "trial",
-                "hold": [],
-                "timeout": {
-                  "param": "response_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "response_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "response_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "response_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
+                "onEntry": [
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
                 ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "reward"
+                  }
+                ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "error_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "abort",
                 "group": null,
-                "hold": [],
-                "timeout": 1000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "abort_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "abort_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -1016,7 +1309,20 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "none"
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 19000,
+          "output": "sound",
+          "high": true
+        },
+        {
+          "t": 19500,
+          "output": "sound",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -1055,8 +1361,30 @@
                 "default": 50
               }
             ],
-            "timers": [],
-            "generators": [],
+            "timers": [
+              {
+                "name": "wait_time",
+                "time": 5000
+              },
+              {
+                "name": "visual_time",
+                "time": 2000
+              },
+              {
+                "name": "response_time",
+                "time": 5000
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              }
+            ],
             "counters": [],
             "start": "wait",
             "groups": [],
@@ -1064,108 +1392,139 @@
               {
                 "name": "wait",
                 "group": null,
-                "hold": [],
-                "timeout": 5000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "wait_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "visual"
+                    "event": "wait_time.done",
+                    "target": "visual",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "visual",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "show": "grating"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "screen_on.rise",
-                    "target": "visual_on"
+                    "target": "visual_on",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "visual_on",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "visual_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "response"
+                    "event": "visual_time.done",
+                    "target": "response",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "response",
                 "group": null,
-                "hold": [
-                  "sound"
+                "onEntry": [
+                  {
+                    "high": "sound"
+                  },
+                  {
+                    "start": "response_time"
+                  }
                 ],
-                "timeout": 5000,
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "sound"
+                  },
+                  {
+                    "stop": "response_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "response_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
-                ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "reward"
                   }
                 ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "start": "error_time"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -1257,7 +1616,30 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "none"
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 7017,
+          "output": "sound",
+          "high": true
+        },
+        {
+          "t": 7100,
+          "output": "sound",
+          "high": false
+        },
+        {
+          "t": 7100,
+          "output": "reward",
+          "high": true
+        },
+        {
+          "t": 7150,
+          "output": "reward",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -1296,8 +1678,30 @@
                 "default": 50
               }
             ],
-            "timers": [],
-            "generators": [],
+            "timers": [
+              {
+                "name": "wait_time",
+                "time": 5000
+              },
+              {
+                "name": "visual_time",
+                "time": 2000
+              },
+              {
+                "name": "response_time",
+                "time": 5000
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              }
+            ],
             "counters": [],
             "start": "wait",
             "groups": [],
@@ -1305,108 +1709,139 @@
               {
                 "name": "wait",
                 "group": null,
-                "hold": [],
-                "timeout": 5000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "wait_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "visual"
+                    "event": "wait_time.done",
+                    "target": "visual",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "visual",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "show": "grating"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "screen_on.rise",
-                    "target": "visual_on"
+                    "target": "visual_on",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "visual_on",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "visual_time"
+                  }
+                ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "response"
+                    "event": "visual_time.done",
+                    "target": "response",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "response",
                 "group": null,
-                "hold": [
-                  "sound"
+                "onEntry": [
+                  {
+                    "high": "sound"
+                  },
+                  {
+                    "start": "response_time"
+                  }
                 ],
-                "timeout": 5000,
-                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "sound"
+                  },
+                  {
+                    "stop": "response_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "response_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
-                ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "reward"
                   }
                 ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "start": "error_time"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -1488,7 +1923,20 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "none"
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 7017,
+          "output": "sound",
+          "high": true
+        },
+        {
+          "t": 12017,
+          "output": "sound",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -1546,8 +1994,24 @@
                 "default": 9500
               }
             ],
-            "timers": [],
-            "generators": [],
+            "timers": [
+              {
+                "name": "choice_time",
+                "time": {
+                  "param": "choice_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              }
+            ],
             "counters": [],
             "start": "wait",
             "groups": [],
@@ -1555,8 +2019,6 @@
               {
                 "name": "wait",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "show": "grey"
@@ -1568,18 +2030,18 @@
                     "play": "cue"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "cue.done",
-                    "target": "show"
+                    "target": "show",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "show",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "hide": "fixation"
@@ -1591,75 +2053,94 @@
                     "show": "B"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "screen_on.rise",
-                    "target": "choice"
+                    "target": "choice",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "choice",
                 "group": null,
-                "hold": [],
-                "timeout": {
-                  "param": "choice_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "choice_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "choice_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "lick_left.rise",
                     "target": {
                       "param": "on_left"
-                    }
+                    },
+                    "actions": []
                   },
                   {
                     "event": "lick_right.rise",
                     "target": {
                       "param": "on_right"
-                    }
+                    },
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "choice_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
-                ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "reward"
                   }
                 ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "start": "error_time"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -1796,7 +2277,9 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "incorrect"
+      "outcome": "incorrect",
+      "edges": [],
+      "error": null
     }
   },
   {
@@ -1854,8 +2337,24 @@
                 "default": 9500
               }
             ],
-            "timers": [],
-            "generators": [],
+            "timers": [
+              {
+                "name": "choice_time",
+                "time": {
+                  "param": "choice_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              }
+            ],
             "counters": [],
             "start": "wait",
             "groups": [],
@@ -1863,8 +2362,6 @@
               {
                 "name": "wait",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "show": "grey"
@@ -1876,18 +2373,18 @@
                     "play": "cue"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "cue.done",
-                    "target": "show"
+                    "target": "show",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "show",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "hide": "fixation"
@@ -1899,71 +2396,90 @@
                     "show": "B"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "screen_on.rise",
-                    "target": "choice"
+                    "target": "choice",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "choice",
                 "group": null,
-                "hold": [],
-                "timeout": {
-                  "param": "choice_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "choice_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "choice_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "A.touch",
-                    "target": "reward"
+                    "target": "reward",
+                    "actions": []
                   },
                   {
                     "event": "B.touch",
-                    "target": "error"
+                    "target": "error",
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "choice_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
-                ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "reward"
                   }
                 ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "start": "error_time"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -2102,7 +2618,20 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "correct"
+      "outcome": "correct",
+      "edges": [
+        {
+          "t": 1000,
+          "output": "reward",
+          "high": true
+        },
+        {
+          "t": 1050,
+          "output": "reward",
+          "high": false
+        }
+      ],
+      "error": null
     }
   },
   {
@@ -2160,8 +2689,24 @@
                 "default": 9500
               }
             ],
-            "timers": [],
-            "generators": [],
+            "timers": [
+              {
+                "name": "choice_time",
+                "time": {
+                  "param": "choice_ms"
+                }
+              },
+              {
+                "name": "reward_time",
+                "time": {
+                  "param": "reward_ms"
+                }
+              },
+              {
+                "name": "error_time",
+                "time": 2000
+              }
+            ],
             "counters": [],
             "start": "wait",
             "groups": [],
@@ -2169,8 +2714,6 @@
               {
                 "name": "wait",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "show": "grey"
@@ -2182,18 +2725,18 @@
                     "play": "cue"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "cue.done",
-                    "target": "show"
+                    "target": "show",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "show",
                 "group": null,
-                "hold": [],
-                "timeout": null,
                 "onEntry": [
                   {
                     "hide": "fixation"
@@ -2205,71 +2748,90 @@
                     "show": "B"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
                     "event": "screen_on.rise",
-                    "target": "choice"
+                    "target": "choice",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "choice",
                 "group": null,
-                "hold": [],
-                "timeout": {
-                  "param": "choice_ms"
-                },
-                "onEntry": [],
+                "onEntry": [
+                  {
+                    "start": "choice_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "choice_time"
+                  }
+                ],
                 "transitions": [
                   {
                     "event": "A.touch",
-                    "target": "reward"
+                    "target": "reward",
+                    "actions": []
                   },
                   {
                     "event": "B.touch",
-                    "target": "error"
+                    "target": "error",
+                    "actions": []
                   },
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "choice_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "reward",
                 "group": null,
-                "hold": [
-                  "reward"
-                ],
-                "timeout": {
-                  "param": "reward_ms"
-                },
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "high": "reward"
+                  },
+                  {
+                    "start": "reward_time"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "reward"
                   }
                 ],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "reward_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               },
               {
                 "name": "error",
                 "group": null,
-                "hold": [],
-                "timeout": 2000,
                 "onEntry": [
                   {
                     "clear": true
+                  },
+                  {
+                    "start": "error_time"
                   }
                 ],
+                "onExit": [],
                 "transitions": [
                   {
-                    "event": "timeout",
-                    "target": "exit"
+                    "event": "error_time.done",
+                    "target": "exit",
+                    "actions": []
                   }
                 ]
               }
@@ -2415,7 +2977,1670 @@
       ],
       "state": null,
       "shown": [],
-      "outcome": "correct"
+      "outcome": "correct",
+      "edges": [
+        {
+          "t": 1200,
+          "output": "reward",
+          "high": true
+        },
+        {
+          "t": 1250,
+          "output": "reward",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: a transition to the same state exits and enters",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 1000
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "high": "led"
+                  },
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "led"
+                  },
+                  {
+                    "stop": "t"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": "a",
+                    "actions": []
+                  },
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 600,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 610,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 2000,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "a",
+          "t": 600
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 0,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 600,
+          "output": "led",
+          "high": false
+        },
+        {
+          "t": 600,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 1600,
+          "output": "led",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: a group is left only across its boundary",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "ta",
+                "time": 100
+              },
+              {
+                "name": "tb",
+                "time": 1000
+              },
+              {
+                "name": "tc",
+                "time": 100
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [
+              {
+                "name": "g",
+                "group": null,
+                "onEntry": [
+                  {
+                    "high": "laser"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "low": "laser"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": "a",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "states": [
+              {
+                "name": "a",
+                "group": "g",
+                "onEntry": [
+                  {
+                    "start": "ta"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "ta"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "event": "ta.done",
+                    "target": "b",
+                    "actions": []
+                  }
+                ]
+              },
+              {
+                "name": "b",
+                "group": "g",
+                "onEntry": [
+                  {
+                    "start": "tb"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "tb"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "event": "tb.done",
+                    "target": "out",
+                    "actions": []
+                  }
+                ]
+              },
+              {
+                "name": "out",
+                "group": null,
+                "onEntry": [
+                  {
+                    "start": "tc"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "tc.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 300,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 310,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 2000,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 300
+        },
+        {
+          "state": "b",
+          "t": 400
+        },
+        {
+          "state": "out",
+          "t": 1400
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 0,
+          "output": "laser",
+          "high": true
+        },
+        {
+          "t": 1400,
+          "output": "laser",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: the order within one transition",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 100
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [
+              {
+                "name": "g1",
+                "group": null,
+                "onEntry": [],
+                "onExit": [
+                  {
+                    "low": "led"
+                  }
+                ],
+                "transitions": []
+              },
+              {
+                "name": "g2",
+                "group": null,
+                "onEntry": [
+                  {
+                    "low": "led"
+                  }
+                ],
+                "onExit": [],
+                "transitions": []
+              }
+            ],
+            "states": [
+              {
+                "name": "a",
+                "group": "g1",
+                "onEntry": [],
+                "onExit": [
+                  {
+                    "high": "led"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": "b",
+                    "actions": [
+                      {
+                        "high": "led"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "b",
+                "group": "g2",
+                "onEntry": [
+                  {
+                    "high": "led"
+                  },
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 50,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 60,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "b",
+          "t": 50
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 50,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 50,
+          "output": "led",
+          "high": false
+        },
+        {
+          "t": 50,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 50,
+          "output": "led",
+          "high": false
+        },
+        {
+          "t": 50,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 150,
+          "output": "led",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: no target, queued edges, reached after its cause",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 500
+              }
+            ],
+            "counters": [
+              {
+                "name": "licks",
+                "event": "lick.rise",
+                "limit": 3
+              }
+            ],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "reset": "licks"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": null,
+                    "actions": [
+                      {
+                        "high": "led"
+                      },
+                      {
+                        "low": "led",
+                        "after": 100
+                      }
+                    ]
+                  },
+                  {
+                    "event": "licks.reached",
+                    "target": "done",
+                    "actions": []
+                  }
+                ]
+              },
+              {
+                "name": "done",
+                "group": null,
+                "onEntry": [
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 10,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 20,
+        "input": "lick",
+        "high": false
+      },
+      {
+        "t": 70,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 80,
+        "input": "lick",
+        "high": false
+      },
+      {
+        "t": 300,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 310,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 1000,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "done",
+          "t": 300
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 10,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 110,
+          "output": "led",
+          "high": false
+        },
+        {
+          "t": 300,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 400,
+          "output": "led",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: cancel keeps only the newest edge",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 1000
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": null,
+                    "actions": [
+                      {
+                        "cancel": "led"
+                      },
+                      {
+                        "high": "led"
+                      },
+                      {
+                        "low": "led",
+                        "after": 100
+                      }
+                    ]
+                  },
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 10,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 20,
+        "input": "lick",
+        "high": false
+      },
+      {
+        "t": 70,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 80,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 1500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 10,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 170,
+          "output": "led",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: reached is handled where the machine then is",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 50
+              }
+            ],
+            "counters": [
+              {
+                "name": "licks",
+                "event": "lick.rise",
+                "limit": 2
+              }
+            ],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": "b",
+                    "actions": []
+                  },
+                  {
+                    "event": "licks.reached",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              },
+              {
+                "name": "b",
+                "group": null,
+                "onEntry": [
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [
+                  {
+                    "stop": "t"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "event": "t.done",
+                    "target": "a",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 10,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 20,
+        "input": "lick",
+        "high": false
+      },
+      {
+        "t": 100,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 110,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "b",
+          "t": 10
+        },
+        {
+          "state": "a",
+          "t": 60
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 150
+        }
+      ],
+      "state": "a",
+      "shown": [],
+      "outcome": "none",
+      "edges": [],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: the end of a trial cancels timed edges",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 120
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "high": "laser",
+                    "after": 100
+                  },
+                  {
+                    "low": "laser",
+                    "after": 150
+                  },
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 100,
+          "output": "laser",
+          "high": true
+        },
+        {
+          "t": 120,
+          "output": "laser",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: a timed edge comes before an event of the same time",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 100
+              },
+              {
+                "name": "long",
+                "time": 300
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "high": "led",
+                    "after": 100
+                  },
+                  {
+                    "start": "t"
+                  },
+                  {
+                    "start": "long"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "t.done",
+                    "target": null,
+                    "actions": [
+                      {
+                        "low": "led"
+                      }
+                    ]
+                  },
+                  {
+                    "event": "long.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [
+        {
+          "t": 100,
+          "output": "led",
+          "high": true
+        },
+        {
+          "t": 100,
+          "output": "led",
+          "high": false
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: a loop at one instant is an error",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "lick.high",
+                    "target": "b",
+                    "actions": []
+                  }
+                ]
+              },
+              {
+                "name": "b",
+                "group": null,
+                "onEntry": [],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "lick.high",
+                    "target": "a",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 100,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 110,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        },
+        {
+          "state": "b",
+          "t": 100
+        },
+        {
+          "state": "a",
+          "t": 100
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [],
+      "error": "loop"
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: start on a running timer is an error",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [],
+            "timers": [
+              {
+                "name": "t",
+                "time": 1000
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "lick.rise",
+                    "target": "a",
+                    "actions": []
+                  },
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {},
+    "initial": {},
+    "steps": [
+      {
+        "t": 100,
+        "input": "lick",
+        "high": true
+      },
+      {
+        "t": 110,
+        "input": "lick",
+        "high": false
+      }
+    ],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        },
+        {
+          "state": "a",
+          "t": 100
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [],
+      "error": "timer_running"
+    }
+  },
+  {
+    "kind": "trial",
+    "name": "rule: a timed edge not ahead is an error",
+    "experiment": {
+      "stages": [
+        {
+          "name": "rule",
+          "machine": {
+            "channels": {
+              "inputs": [
+                "lick"
+              ],
+              "outputs": [
+                "led",
+                "laser"
+              ]
+            },
+            "parameters": [
+              {
+                "name": "delay",
+                "type": "time",
+                "default": 100
+              }
+            ],
+            "timers": [
+              {
+                "name": "t",
+                "time": 300
+              }
+            ],
+            "counters": [],
+            "start": "a",
+            "groups": [],
+            "states": [
+              {
+                "name": "a",
+                "group": null,
+                "onEntry": [
+                  {
+                    "high": "led",
+                    "after": {
+                      "param": "delay"
+                    }
+                  },
+                  {
+                    "start": "t"
+                  }
+                ],
+                "onExit": [],
+                "transitions": [
+                  {
+                    "event": "t.done",
+                    "target": "exit",
+                    "actions": []
+                  }
+                ]
+              }
+            ],
+            "layout": {},
+            "screen": {
+              "width": 1080,
+              "height": 1920
+            },
+            "stimuli": []
+          },
+          "outcomes": {}
+        }
+      ]
+    },
+    "stage": 0,
+    "values": {
+      "delay": 0
+    },
+    "initial": {},
+    "steps": [],
+    "end": 500,
+    "expected": {
+      "visited": [
+        {
+          "state": "a",
+          "t": 0
+        }
+      ],
+      "state": null,
+      "shown": [],
+      "outcome": "none",
+      "edges": [],
+      "error": "edge_past"
     }
   }
 ]

@@ -90,12 +90,6 @@
             "$ref": "#/$defs/Timer"
           }
         },
-        "generators": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Generator"
-          }
-        },
         "counters": {
           "type": "array",
           "items": {
@@ -142,7 +136,6 @@
         "channels",
         "parameters",
         "timers",
-        "generators",
         "counters",
         "start",
         "groups",
@@ -328,40 +321,6 @@
       ],
       "additionalProperties": false
     },
-    "Generator": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "output": {
-          "type": "string",
-          "minLength": 1
-        },
-        "delay": {
-          "$ref": "#/$defs/Amount"
-        },
-        "width": {
-          "$ref": "#/$defs/Amount"
-        },
-        "period": {
-          "$ref": "#/$defs/Amount"
-        },
-        "count": {
-          "$ref": "#/$defs/Amount"
-        }
-      },
-      "required": [
-        "name",
-        "output",
-        "delay",
-        "width",
-        "period",
-        "count"
-      ],
-      "additionalProperties": false
-    },
     "Counter": {
       "type": "object",
       "properties": {
@@ -402,92 +361,13 @@
             }
           ]
         },
-        "hold": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "transitions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Transition"
-          }
-        }
-      },
-      "required": [
-        "name",
-        "group",
-        "hold",
-        "transitions"
-      ],
-      "additionalProperties": false
-    },
-    "Transition": {
-      "type": "object",
-      "properties": {
-        "event": {
-          "type": "string",
-          "minLength": 1
-        },
-        "target": {
-          "$ref": "#/$defs/Target"
-        }
-      },
-      "required": [
-        "event",
-        "target"
-      ],
-      "additionalProperties": false
-    },
-    "Target": {
-      "anyOf": [
-        {
-          "type": "string",
-          "minLength": 1
-        },
-        {
-          "$ref": "#/$defs/ParamRef"
-        }
-      ]
-    },
-    "State": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "group": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "hold": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "timeout": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Amount"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "onEntry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Action"
+          }
+        },
+        "onExit": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Action"
@@ -503,15 +383,23 @@
       "required": [
         "name",
         "group",
-        "hold",
-        "timeout",
         "onEntry",
+        "onExit",
         "transitions"
       ],
       "additionalProperties": false
     },
     "Action": {
       "anyOf": [
+        {
+          "$ref": "#/$defs/HighAction"
+        },
+        {
+          "$ref": "#/$defs/LowAction"
+        },
+        {
+          "$ref": "#/$defs/CancelAction"
+        },
         {
           "$ref": "#/$defs/StartAction"
         },
@@ -534,6 +422,67 @@
           "$ref": "#/$defs/PlayAction"
         }
       ]
+    },
+    "HighAction": {
+      "type": "object",
+      "properties": {
+        "high": {
+          "type": "string",
+          "minLength": 1
+        },
+        "after": {
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "$ref": "#/$defs/ParamRef"
+            }
+          ]
+        }
+      },
+      "required": [
+        "high"
+      ],
+      "additionalProperties": false
+    },
+    "LowAction": {
+      "type": "object",
+      "properties": {
+        "low": {
+          "type": "string",
+          "minLength": 1
+        },
+        "after": {
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "$ref": "#/$defs/ParamRef"
+            }
+          ]
+        }
+      },
+      "required": [
+        "low"
+      ],
+      "additionalProperties": false
+    },
+    "CancelAction": {
+      "type": "object",
+      "properties": {
+        "cancel": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cancel"
+      ],
+      "additionalProperties": false
     },
     "StartAction": {
       "type": "object",
@@ -630,6 +579,94 @@
       },
       "required": [
         "play"
+      ],
+      "additionalProperties": false
+    },
+    "Transition": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Target"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Action"
+          }
+        }
+      },
+      "required": [
+        "event",
+        "target",
+        "actions"
+      ],
+      "additionalProperties": false
+    },
+    "Target": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "$ref": "#/$defs/ParamRef"
+        }
+      ]
+    },
+    "State": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "onEntry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Action"
+          }
+        },
+        "onExit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Action"
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Transition"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "group",
+        "onEntry",
+        "onExit",
+        "transitions"
       ],
       "additionalProperties": false
     },

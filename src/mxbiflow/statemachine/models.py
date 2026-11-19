@@ -84,6 +84,40 @@ class ParamRef(BaseModel):
     param: Annotated[str, Field(min_length=1)]
 
 
+class Group(RootModel[str]):
+    root: Annotated[str, Field(min_length=1)]
+
+
+class After(RootModel[float]):
+    root: Annotated[float, Field(gt=0.0)]
+
+
+class HighAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    high: Annotated[str, Field(min_length=1)]
+    after: After | ParamRef | None = None
+
+
+class LowAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    low: Annotated[str, Field(min_length=1)]
+    after: After | ParamRef | None = None
+
+
+class CancelAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    cancel: Annotated[str, Field(min_length=1)]
+
+
 class StartAction(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -182,19 +216,6 @@ class Duration(RootModel[float]):
     root: Annotated[float, Field(gt=0.0)]
 
 
-class Generator(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    name: Annotated[str, Field(min_length=1)]
-    output: Annotated[str, Field(min_length=1)]
-    delay: Amount1 | ParamRef
-    width: Amount1 | ParamRef
-    period: Amount1 | ParamRef
-    count: Amount1 | ParamRef
-
-
 class Counter(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -203,15 +224,6 @@ class Counter(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     event: Annotated[str, Field(min_length=1)]
     limit: Amount1 | ParamRef
-
-
-class Transition(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-    )
-    event: Annotated[str, Field(min_length=1)]
-    target: ParamRef | Annotated[str, StringConstraints(min_length=1)]
 
 
 class StopAction(BaseModel):
@@ -327,15 +339,53 @@ class Timer(BaseModel):
     time: Amount1 | ParamRef
 
 
-class Group(BaseModel):
+class Action(
+    RootModel[
+        HighAction
+        | LowAction
+        | CancelAction
+        | StartAction
+        | StopAction
+        | ResetAction
+        | ShowAction
+        | HideAction
+        | ClearAction
+        | PlayAction
+    ]
+):
+    root: (
+        HighAction
+        | LowAction
+        | CancelAction
+        | StartAction
+        | StopAction
+        | ResetAction
+        | ShowAction
+        | HideAction
+        | ClearAction
+        | PlayAction
+    )
+
+
+class Transition(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         populate_by_name=True,
     )
-    name: Annotated[str, Field(min_length=1)]
-    group: Annotated[str, StringConstraints(min_length=1)] | None
-    hold: list[Annotated[str, StringConstraints(min_length=1)]]
-    transitions: list[Transition]
+    event: Annotated[str, Field(min_length=1)]
+    target: ParamRef | Annotated[str, StringConstraints(min_length=1)] | None
+    actions: list[
+        HighAction
+        | LowAction
+        | CancelAction
+        | StartAction
+        | StopAction
+        | ResetAction
+        | ShowAction
+        | HideAction
+        | ClearAction
+        | PlayAction
+    ]
 
 
 class State(BaseModel):
@@ -345,11 +395,12 @@ class State(BaseModel):
     )
     name: Annotated[str, Field(min_length=1)]
     group: Annotated[str, StringConstraints(min_length=1)] | None
-    hold: list[Annotated[str, StringConstraints(min_length=1)]]
-    timeout: Amount1 | ParamRef | None
     on_entry: Annotated[
         list[
-            StartAction
+            HighAction
+            | LowAction
+            | CancelAction
+            | StartAction
             | StopAction
             | ResetAction
             | ShowAction
@@ -358,6 +409,21 @@ class State(BaseModel):
             | PlayAction
         ],
         Field(alias="onEntry"),
+    ]
+    on_exit: Annotated[
+        list[
+            HighAction
+            | LowAction
+            | CancelAction
+            | StartAction
+            | StopAction
+            | ResetAction
+            | ShowAction
+            | HideAction
+            | ClearAction
+            | PlayAction
+        ],
+        Field(alias="onExit"),
     ]
     transitions: list[Transition]
 
@@ -379,10 +445,9 @@ class Machine(BaseModel):
         ]
     ]
     timers: list[Timer]
-    generators: list[Generator]
     counters: list[Counter]
     start: Annotated[str, Field(min_length=1)]
-    groups: list[Group]
+    groups: list[State]
     states: list[State]
     layout: dict[Annotated[str, StringConstraints(min_length=1)], Place]
     screen: ScreenSize
